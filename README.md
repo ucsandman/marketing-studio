@@ -3,6 +3,11 @@
 Agent-driven animation studio. Remotion is the backbone; per-product brand
 configs live in `brands/`. Spec: `docs/superpowers/specs/2026-07-09-animation-studio-design.md`.
 
+## Setup
+
+Copy `.env.example` to `.env` and set `BLENDER_PATH` if Blender is not on PATH
+(used by the phase 3 feeder and `launch.py` health checks).
+
 ## Run
 
     python launch.py     # health checks + opens Remotion Studio in the browser

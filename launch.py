@@ -16,6 +16,26 @@ def check(label: str, ok: bool, detail: str = "", required: bool = True) -> bool
     return ok or not required
 
 
+def read_env(path: Path) -> dict:
+    """Minimal KEY=VALUE .env reader (no dependency)."""
+    if not path.is_file():
+        return {}
+    out = {}
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            k, v = line.split("=", 1)
+            out[k.strip()] = v.strip()
+    return out
+
+
+def find_blender(env: dict) -> str | None:
+    configured = env.get("BLENDER_PATH")
+    if configured and Path(configured).is_file():
+        return configured
+    return shutil.which("blender")
+
+
 def comfy_running() -> bool:
     for port in (8000, 8188):  # ComfyUI Desktop / classic default
         try:
@@ -37,11 +57,11 @@ def main() -> int:
         (STUDIO / "node_modules").is_dir(),
         "run: cd studio && npm install",
     )
-    blender = shutil.which("blender")
+    blender = find_blender(read_env(ROOT / ".env"))
     check(
         "Blender (phase 3 feeder)",
         blender is not None,
-        blender or "not on PATH",
+        blender or "not on PATH; set BLENDER_PATH in .env",
         required=False,
     )
     check(
