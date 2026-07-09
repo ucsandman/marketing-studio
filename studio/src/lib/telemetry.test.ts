@@ -56,4 +56,15 @@ describe('cursorAt', () => {
   it('handles an empty click list', () => {
     expect(cursorAt([], 500)).toEqual({x: 0, y: 0, press: 0});
   });
+
+  it('still rests on the previous click when clicks are closer than the approach window', () => {
+    const rapid = [
+      {type: 'click' as const, t: 1000, x: 100, y: 100},
+      {type: 'click' as const, t: 1300, x: 500, y: 300},
+    ];
+    // at the moment of the first click the cursor is exactly on it
+    expect(cursorAt(rapid, 1000)).toMatchObject({x: 100, y: 100});
+    // and it lands exactly on the second click at its time
+    expect(cursorAt(rapid, 1300)).toMatchObject({x: 500, y: 300});
+  });
 });

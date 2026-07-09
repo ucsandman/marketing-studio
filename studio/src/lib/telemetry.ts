@@ -50,10 +50,11 @@ export const cursorAt = (
   const next = clickList[i + 1];
   if (!next) return {x: from.x, y: from.y, press};
 
-  const approachStart = next.t - APPROACH_MS;
+  const approachStart = Math.max(next.t - APPROACH_MS, from.t);
   if (tMs < approachStart) return {x: from.x, y: from.y, press};
 
-  const p = easeInOutCubic((tMs - approachStart) / APPROACH_MS);
+  const span = next.t - approachStart;
+  const p = span > 0 ? easeInOutCubic((tMs - approachStart) / span) : 1;
   return {
     x: from.x + (next.x - from.x) * p,
     y: from.y + (next.y - from.y) * p,
