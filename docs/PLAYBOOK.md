@@ -133,6 +133,37 @@ placeholder so smoke stays green on a clean clone.
   registered in fonts.ts. Subset new Google Fonts loaders to 'latin' — an unsubset
   family fans out to dozens of font requests per render.
 
+### Audio (ElevenLabs feeder)
+- Verified endpoints (Context7, do not re-derive): TTS
+  `POST https://api.elevenlabs.io/v1/text-to-speech/{voice_id}?output_format=mp3_44100_128`
+  with body `{"text", "model_id": "eleven_multilingual_v2"}`; Music
+  `POST https://api.elevenlabs.io/v1/music?output_format=mp3_44100_128` with body
+  `{"prompt", "music_length_ms", "model_id": "music_v2"}`. Both take header
+  `xi-api-key`, return binary mp3. `music_length_ms` covers the 3s-120s range we need.
+- Ducking constants live in `studio/src/lib/audioMix.ts`: `BASE 0.35` (music level when
+  no VO is playing) / `DUCKED 0.12` (music level under VO) / `RAMP 9` frames to cross-fade
+  the duck / `VO_LEAD 12` frames of music-only lead-in before each line starts /
+  track fades `FADE_IN 24` / `FADE_OUT 36` frames. Tune here if a redline calls for it.
+- Manifest contract (`props/<brand>-audio.json`, validated by `audioSchema` in
+  `audioMix.ts`): `{music: {src, durationMs} | null, lines: [{act, src, durationMs, text}]}`.
+  `act` keys match `launchTiming.ts`'s acts (`logo|hook|demo|feature-N|end`). The
+  feeder's `probe --file <mp3>` mode measures an existing file's duration with no API
+  call, used when a build script skips regenerating a line that's already on disk.
+- VO text is written for the ear ("noban dot gg", never "noban.gg") — spell out
+  anything a TTS model would otherwise mispronounce.
+- If a line overruns its act's time budget, trim the COPY rather than squeeze the
+  timing — shortening `launchTiming.ts`'s act lengths to fit audio inverts the
+  source of truth.
+- Free tier returns 402 (`paid_plan_required`) on API voice/library access — Starter
+  plan or above is required for both TTS and music generation (music also needs a
+  paid plan for the commercial license). Cost is cents per video for TTS; a few
+  credits per generation for music.
+- Remotion's `Audio` component is deprecated; use `Html5Audio` (same export, same
+  props, zero behavior change) — see `SoundTrack.tsx`.
+- Fallback behavior is part of the contract, not an error state: missing
+  `ELEVENLABS_API_KEY` makes the feeder exit 2 with guidance and the video renders
+  silent — that silent render is still a valid deliverable on a clean clone.
+
 ### Process
 - Every generated props file has a builder script as its source of truth
   (`build-launch-props.mjs` pattern) — never hand-edit generated JSON.

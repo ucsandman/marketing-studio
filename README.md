@@ -32,3 +32,6 @@ Manual equivalents:
     npx remotion render ProductDemo ../out/noban/demo.mp4 --props=../props/noban-demo.json
     npx remotion render LogoReveal ../out/noban/logo-reveal.mp4 --props='{"brandId":"noban","sequence":"noban/logo-reveal","frameCount":90,"cta":"Simulate free at noban.gg"}'
     npx remotion render LaunchVideo ../out/noban/launch.mp4 --props=../props/noban-launch.json
+    node scripts/build-noban-audio.mjs        # generate VO + music (needs ELEVENLABS_API_KEY in .env)
+    node scripts/merge-launch-audio.mjs       # merge audio manifest into launch props
+    npx remotion render LaunchVideo ../out/noban/launch-audio.mp4 --props=../out/noban/launch-audio-props.json
