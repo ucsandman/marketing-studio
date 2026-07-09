@@ -3,7 +3,7 @@ import {AbsoluteFill, Img, staticFile, useCurrentFrame, useVideoConfig} from 're
 import {z} from 'zod';
 import {getBrand} from '../lib/brand';
 import {loadBrandFonts} from '../lib/fonts';
-import {NobanMark} from '../brands/NobanMark';
+import {getMark} from '../brands/marks';
 import {FloatBar} from '../components/FloatBar';
 import {BackgroundLoop} from '../components/BackgroundLoop';
 
@@ -18,11 +18,12 @@ export const animatedOgSchema = z.object({
 
 type Props = z.infer<typeof animatedOgSchema>;
 
-export const AnimatedOG: React.FC<Props> = ({tagline, cta, heroImage, loopSequence, loopFrames}) => {
+export const AnimatedOG: React.FC<Props> = ({brandId, tagline, cta, heroImage, loopSequence, loopFrames}) => {
   const frame = useCurrentFrame();
   const {durationInFrames} = useVideoConfig();
-  const brand = getBrand('noban');
+  const brand = getBrand(brandId);
   const fonts = loadBrandFonts();
+  const Mark = getMark(brand.id);
   const cycle = frame / durationInFrames; // 0..1, and frame N == frame 0 on loop
   // triangular ping-pong: 0 -> 1 -> 0 across the loop, continuous at the seam
   const barProgress = cycle < 0.5 ? cycle * 2 : 2 - cycle * 2;
@@ -30,7 +31,7 @@ export const AnimatedOG: React.FC<Props> = ({tagline, cta, heroImage, loopSequen
   const glow = 0.75 + 0.25 * Math.sin(2 * Math.PI * cycle);
   return (
     <AbsoluteFill style={{backgroundColor: brand.colors.bg}}>
-      <BackgroundLoop dir={loopSequence} frameCount={loopFrames} opacity={0.6} />
+      <BackgroundLoop dir={loopSequence} frameCount={loopFrames} brand={brand} opacity={0.6} />
       {heroImage ? (
         <Img
           src={staticFile(heroImage)}
@@ -52,7 +53,7 @@ export const AnimatedOG: React.FC<Props> = ({tagline, cta, heroImage, loopSequen
       />
       <AbsoluteFill style={{justifyContent: 'center', alignItems: 'center', gap: 18}}>
         <div style={{display: 'flex', alignItems: 'center', gap: 24}}>
-          <NobanMark size={84} color={brand.colors.brand} />
+          <Mark size={84} color={brand.colors.brand} />
           <div style={{fontFamily: fonts.display, fontWeight: 800, fontSize: 88, color: brand.colors.ink}}>
             {brand.name}
           </div>

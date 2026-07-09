@@ -1,18 +1,19 @@
 import React from 'react';
 import {AbsoluteFill, OffthreadVideo, staticFile} from 'remotion';
-import {getBrand} from '../lib/brand';
+import type {Brand} from '../lib/brand';
 import type {Telemetry} from '../lib/telemetry';
 import {clicks, focuses} from '../lib/telemetry';
 import {cameraAt} from '../lib/camera';
 import {DemoCursor} from './DemoCursor';
-import {NobanMark} from '../brands/NobanMark';
+import {getMark} from '../brands/marks';
 
 export const DemoStage: React.FC<{
   video: string | null;
   telemetry: Telemetry | null;
   timeMs: number;
-}> = ({video, telemetry, timeMs}) => {
-  const brand = getBrand('noban');
+  brand: Brand;
+}> = ({video, telemetry, timeMs, brand}) => {
+  const Mark = getMark(brand.id);
   const vp = telemetry?.viewport ?? {width: 1600, height: 1000};
   const cam = cameraAt(telemetry ? focuses(telemetry) : [], timeMs, vp);
   const clickList = telemetry ? clicks(telemetry) : [];
@@ -52,7 +53,7 @@ export const DemoStage: React.FC<{
           <AbsoluteFill
             style={{background: brand.colors.surface2, justifyContent: 'center', alignItems: 'center'}}
           >
-            <NobanMark size={120} color={brand.colors.line} />
+            <Mark size={120} color={brand.colors.line} />
           </AbsoluteFill>
         )}
         {telemetry ? <DemoCursor clickList={clickList} timeMs={timeMs} brand={brand} /> : null}

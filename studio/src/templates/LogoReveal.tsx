@@ -9,7 +9,7 @@ import {
 import {z} from 'zod';
 import {getBrand} from '../lib/brand';
 import {loadBrandFonts} from '../lib/fonts';
-import {NobanMark} from '../brands/NobanMark';
+import {getMark} from '../brands/marks';
 import {PngSequence} from '../components/PngSequence';
 
 export const logoRevealSchema = z.object({
@@ -21,11 +21,12 @@ export const logoRevealSchema = z.object({
 
 type Props = z.infer<typeof logoRevealSchema>;
 
-export const LogoReveal: React.FC<Props> = ({sequence, frameCount, cta}) => {
+export const LogoReveal: React.FC<Props> = ({brandId, sequence, frameCount, cta}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
-  const brand = getBrand('noban');
+  const brand = getBrand(brandId);
   const fonts = loadBrandFonts();
+  const Mark = getMark(brand.id);
   const wordmarkIn = spring({frame: frame - 66, fps, config: {damping: 200}});
   const ctaIn = interpolate(frame, [96, 110], [0, 1], {
     extrapolateLeft: 'clamp',
@@ -49,7 +50,7 @@ export const LogoReveal: React.FC<Props> = ({sequence, frameCount, cta}) => {
             />
           ) : (
             <AbsoluteFill style={{justifyContent: 'center', alignItems: 'center', position: 'relative'}}>
-              <NobanMark size={420} color={brand.colors.brand} />
+              <Mark size={420} color={brand.colors.brand} />
             </AbsoluteFill>
           )}
         </div>

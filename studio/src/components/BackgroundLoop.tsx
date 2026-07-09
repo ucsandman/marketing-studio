@@ -1,14 +1,14 @@
 import React from 'react';
 import {AbsoluteFill} from 'remotion';
-import {getBrand} from '../lib/brand';
+import type {Brand} from '../lib/brand';
 import {PngSequence} from './PngSequence';
 
 export const BackgroundLoop: React.FC<{
   dir: string | null;
   frameCount: number;
+  brand: Brand;
   opacity?: number;
-}> = ({dir, frameCount, opacity = 1}) => {
-  const brand = getBrand('noban');
+}> = ({dir, frameCount, brand, opacity = 1}) => {
   if (!dir) return <AbsoluteFill style={{backgroundColor: brand.colors.bg}} />;
   return (
     <AbsoluteFill style={{opacity}}>

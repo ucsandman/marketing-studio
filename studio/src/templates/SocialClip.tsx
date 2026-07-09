@@ -18,10 +18,10 @@ export const socialClipSchema = z.object({
 
 type Props = z.infer<typeof socialClipSchema>;
 
-export const SocialClip: React.FC<Props> = ({kicker, headline, lines, screenshot, cta}) => {
+export const SocialClip: React.FC<Props> = ({brandId, kicker, headline, lines, screenshot, cta}) => {
   const frame = useCurrentFrame();
   const {durationInFrames} = useVideoConfig();
-  const brand = getBrand('noban');
+  const brand = getBrand(brandId);
   const fadeAt = (start: number, end: number) =>
     interpolate(frame, [start, start + 12, end - 12, end], [0, 1, 1, 0], {
       extrapolateLeft: 'clamp',
@@ -37,16 +37,16 @@ export const SocialClip: React.FC<Props> = ({kicker, headline, lines, screenshot
       />
       <Sequence durationInFrames={90}>
         <AbsoluteFill style={{opacity: fadeAt(0, 90)}}>
-          <Headline kicker={kicker} headline={headline} />
+          <Headline kicker={kicker} headline={headline} brand={brand} />
         </AbsoluteFill>
       </Sequence>
       <Sequence from={78} durationInFrames={162}>
         <AbsoluteFill style={{opacity: fadeAt(78, 240)}}>
-          <FeaturePanel screenshot={screenshot} lines={lines} />
+          <FeaturePanel screenshot={screenshot} lines={lines} brand={brand} />
         </AbsoluteFill>
       </Sequence>
       <Sequence from={228}>
-        <EndCard cta={cta} />
+        <EndCard cta={cta} brand={brand} />
       </Sequence>
       {/* progress float bar, pinned bottom */}
       <div style={{position: 'absolute', bottom: 48, left: 0, right: 0, display: 'flex', justifyContent: 'center'}}>

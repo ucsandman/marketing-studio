@@ -1,14 +1,13 @@
 import React from 'react';
 import {AbsoluteFill, Easing, interpolate, spring, useCurrentFrame, useVideoConfig} from 'remotion';
-import {getBrand} from '../lib/brand';
+import type {Brand} from '../lib/brand';
 import {loadBrandFonts} from '../lib/fonts';
 
 const easeOutExpo = Easing.out(Easing.exp);
 
-export const Headline: React.FC<{kicker: string; headline: string}> = ({kicker, headline}) => {
+export const Headline: React.FC<{kicker: string; headline: string; brand: Brand}> = ({kicker, headline, brand}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
-  const brand = getBrand('noban');
   const fonts = loadBrandFonts();
   const words = headline.split(' ');
   const kickerIn = interpolate(frame, [0, 12], [0, 1], {

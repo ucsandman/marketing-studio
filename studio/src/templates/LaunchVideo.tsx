@@ -9,6 +9,7 @@ import {
 } from 'remotion';
 import {z} from 'zod';
 import {getBrand} from '../lib/brand';
+import type {Brand} from '../lib/brand';
 import {loadBrandFonts} from '../lib/fonts';
 import {telemetrySchema, steps} from '../lib/telemetry';
 import {launchTiming} from '../lib/launchTiming';
@@ -20,7 +21,7 @@ import {DemoStage} from '../components/DemoStage';
 import {EndCard} from '../components/EndCard';
 import {Caption} from '../components/Caption';
 import {FloatBar} from '../components/FloatBar';
-import {NobanMark} from '../brands/NobanMark';
+import {getMark} from '../brands/marks';
 
 export const launchVideoSchema = z.object({
   brandId: z.string(),
@@ -56,9 +57,9 @@ const useActFade = (len: number): number => {
   });
 };
 
-const LogoAct: React.FC<{assets: Props['assets']; len: number}> = ({assets, len}) => {
-  const brand = getBrand('noban');
+const LogoAct: React.FC<{assets: Props['assets']; len: number; brand: Brand}> = ({assets, len, brand}) => {
   const fade = useActFade(len);
+  const Mark = getMark(brand.id);
   return (
     <AbsoluteFill style={{opacity: fade, justifyContent: 'center', alignItems: 'center'}}>
       <div style={{width: 500, height: 500, filter: `drop-shadow(0 0 42px ${brand.colors.brand}66)`}}>
@@ -71,7 +72,7 @@ const LogoAct: React.FC<{assets: Props['assets']; len: number}> = ({assets, len}
           />
         ) : (
           <AbsoluteFill style={{justifyContent: 'center', alignItems: 'center', position: 'relative'}}>
-            <NobanMark size={400} color={brand.colors.brand} />
+            <Mark size={400} color={brand.colors.brand} />
           </AbsoluteFill>
         )}
       </div>
@@ -79,19 +80,18 @@ const LogoAct: React.FC<{assets: Props['assets']; len: number}> = ({assets, len}
   );
 };
 
-const HookAct: React.FC<{kicker: string; headline: string; len: number}> = ({kicker, headline, len}) => {
+const HookAct: React.FC<{kicker: string; headline: string; len: number; brand: Brand}> = ({kicker, headline, len, brand}) => {
   const fade = useActFade(len);
   return (
     <AbsoluteFill style={{opacity: fade}}>
-      <Headline kicker={kicker} headline={headline} />
+      <Headline kicker={kicker} headline={headline} brand={brand} />
     </AbsoluteFill>
   );
 };
 
-const DemoAct: React.FC<{demo: Props['demo']; len: number}> = ({demo, len}) => {
+const DemoAct: React.FC<{demo: Props['demo']; len: number; brand: Brand}> = ({demo, len, brand}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
-  const brand = getBrand('noban');
   const fade = useActFade(len);
   const timeMs = (frame / fps) * 1000;
   const stepList = demo.telemetry ? steps(demo.telemetry) : [];
@@ -99,7 +99,7 @@ const DemoAct: React.FC<{demo: Props['demo']; len: number}> = ({demo, len}) => {
   return (
     <AbsoluteFill style={{opacity: fade, justifyContent: 'center', alignItems: 'center'}}>
       <div style={{transform: 'scale(0.9) translateY(-28px)'}}>
-        <DemoStage video={demo.video} telemetry={demo.telemetry} timeMs={timeMs} />
+        <DemoStage video={demo.video} telemetry={demo.telemetry} timeMs={timeMs} brand={brand} />
       </div>
       {activeStep ? (
         <div style={{position: 'absolute', bottom: 108}}>
@@ -110,8 +110,7 @@ const DemoAct: React.FC<{demo: Props['demo']; len: number}> = ({demo, len}) => {
   );
 };
 
-const FeatureAct: React.FC<{feature: Props['features'][number]; len: number}> = ({feature, len}) => {
-  const brand = getBrand('noban');
+const FeatureAct: React.FC<{feature: Props['features'][number]; len: number; brand: Brand}> = ({feature, len, brand}) => {
   const fonts = loadBrandFonts();
   const fade = useActFade(len);
   const frame = useCurrentFrame();
@@ -136,42 +135,42 @@ const FeatureAct: React.FC<{feature: Props['features'][number]; len: number}> = 
         {feature.heading}
       </div>
       <AbsoluteFill style={{paddingTop: 96}}>
-        <FeaturePanel screenshot={feature.screenshot} lines={feature.lines} zoom={{from: 1, to: 1.04, origin: '50% 30%'}} />
+        <FeaturePanel screenshot={feature.screenshot} lines={feature.lines} brand={brand} zoom={{from: 1, to: 1.04, origin: '50% 30%'}} />
       </AbsoluteFill>
     </AbsoluteFill>
   );
 };
 
-export const LaunchVideo: React.FC<Props> = ({kicker, headline, demo, features, cta, assets}) => {
+export const LaunchVideo: React.FC<Props> = ({brandId, kicker, headline, demo, features, cta, assets}) => {
   const frame = useCurrentFrame();
   const {durationInFrames} = useVideoConfig();
-  const brand = getBrand('noban');
+  const brand = getBrand(brandId);
   const t = launchTiming(demo.telemetry?.durationMs ?? null, features.length);
   return (
     <AbsoluteFill style={{backgroundColor: brand.colors.bg}}>
       {/* loop backdrop behind every act; the demo stage covers most of it */}
-      <BackgroundLoop dir={assets.loopSequence} frameCount={assets.loopFrames} opacity={0.55} />
+      <BackgroundLoop dir={assets.loopSequence} frameCount={assets.loopFrames} brand={brand} opacity={0.55} />
       <AbsoluteFill
         style={{
           background: `radial-gradient(70% 55% at 50% 32%, ${brand.colors.brand}26, transparent 72%)`,
         }}
       />
       <Sequence durationInFrames={t.logo.len}>
-        <LogoAct assets={assets} len={t.logo.len} />
+        <LogoAct assets={assets} len={t.logo.len} brand={brand} />
       </Sequence>
       <Sequence from={t.hook.from} durationInFrames={t.hook.len}>
-        <HookAct kicker={kicker} headline={headline} len={t.hook.len} />
+        <HookAct kicker={kicker} headline={headline} len={t.hook.len} brand={brand} />
       </Sequence>
       <Sequence from={t.demo.from} durationInFrames={t.demo.len}>
-        <DemoAct demo={demo} len={t.demo.len} />
+        <DemoAct demo={demo} len={t.demo.len} brand={brand} />
       </Sequence>
       {features.map((feature, i) => (
         <Sequence key={i} from={t.features[i].from} durationInFrames={t.features[i].len}>
-          <FeatureAct feature={feature} len={t.features[i].len} />
+          <FeatureAct feature={feature} len={t.features[i].len} brand={brand} />
         </Sequence>
       ))}
       <Sequence from={t.end.from} durationInFrames={t.end.len}>
-        <EndCard cta={cta} />
+        <EndCard cta={cta} brand={brand} />
       </Sequence>
       <div style={{position: 'absolute', bottom: 40, left: 0, right: 0, display: 'flex', justifyContent: 'center'}}>
         <FloatBar progress={frame / (durationInFrames - 1)} brand={brand} width={640} />

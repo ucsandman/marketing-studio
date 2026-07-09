@@ -1,16 +1,16 @@
 import React from 'react';
 import {AbsoluteFill, Img, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
-import {getBrand} from '../lib/brand';
+import type {Brand} from '../lib/brand';
 import {loadBrandFonts} from '../lib/fonts';
 
 export const FeaturePanel: React.FC<{
   screenshot: string | null;
   lines: string[];
+  brand: Brand;
   zoom?: {from: number; to: number; origin: string};
-}> = ({screenshot, lines, zoom = {from: 1.5, to: 1.6, origin: '58% 30%'}}) => {
+}> = ({screenshot, lines, brand, zoom = {from: 1.5, to: 1.6, origin: '58% 30%'}}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
-  const brand = getBrand('noban');
   const fonts = loadBrandFonts();
   const panelIn = spring({frame, fps, config: {damping: 200}});
   const zoomNow = interpolate(frame, [0, 170], [zoom.from, zoom.to]);

@@ -19,10 +19,10 @@ type Props = z.infer<typeof productDemoSchema>;
 
 const STAGE_SCALE = 0.9; // 1600x1000 stage inside 1920x1080 with caption room
 
-export const ProductDemo: React.FC<Props> = ({video, cta, telemetry}) => {
+export const ProductDemo: React.FC<Props> = ({brandId, video, cta, telemetry}) => {
   const frame = useCurrentFrame();
   const {fps, durationInFrames} = useVideoConfig();
-  const brand = getBrand('noban');
+  const brand = getBrand(brandId);
   const timeMs = (frame / fps) * 1000;
 
   const stepList = telemetry ? steps(telemetry) : [];
@@ -42,7 +42,7 @@ export const ProductDemo: React.FC<Props> = ({video, cta, telemetry}) => {
         {/* stage: viewport-sized panel, scaled to fit with caption room */}
         <AbsoluteFill style={{justifyContent: 'center', alignItems: 'center'}}>
           <div style={{transform: `scale(${STAGE_SCALE}) translateY(-28px)`}}>
-            <DemoStage video={video} telemetry={telemetry} timeMs={timeMs} />
+            <DemoStage video={video} telemetry={telemetry} timeMs={timeMs} brand={brand} />
           </div>
           {activeStep ? (
             <div style={{position: 'absolute', bottom: 108}}>
@@ -56,7 +56,7 @@ export const ProductDemo: React.FC<Props> = ({video, cta, telemetry}) => {
         </AbsoluteFill>
       </Sequence>
       <Sequence from={bodyFrames}>
-        <EndCard cta={cta} />
+        <EndCard cta={cta} brand={brand} />
       </Sequence>
       <div style={{position: 'absolute', bottom: 40, left: 0, right: 0, display: 'flex', justifyContent: 'center'}}>
         <FloatBar progress={frame / (durationInFrames - 1)} brand={brand} width={640} />
