@@ -8,7 +8,7 @@ const easeOutExpo = Easing.out(Easing.exp);
 export const Headline: React.FC<{kicker: string; headline: string; brand: Brand}> = ({kicker, headline, brand}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
-  const fonts = loadBrandFonts();
+  const fonts = loadBrandFonts(brand);
   const words = headline.split(' ');
   const kickerIn = interpolate(frame, [0, 12], [0, 1], {
     extrapolateRight: 'clamp',

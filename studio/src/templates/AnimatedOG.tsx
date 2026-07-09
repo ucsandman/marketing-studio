@@ -22,7 +22,7 @@ export const AnimatedOG: React.FC<Props> = ({brandId, tagline, cta, heroImage, l
   const frame = useCurrentFrame();
   const {durationInFrames} = useVideoConfig();
   const brand = getBrand(brandId);
-  const fonts = loadBrandFonts();
+  const fonts = loadBrandFonts(brand);
   const Mark = getMark(brand.id);
   const cycle = frame / durationInFrames; // 0..1, and frame N == frame 0 on loop
   // triangular ping-pong: 0 -> 1 -> 0 across the loop, continuous at the seam

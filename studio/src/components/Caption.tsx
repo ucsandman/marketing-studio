@@ -10,7 +10,7 @@ export const Caption: React.FC<{
   brand: Brand;
   enteredMsAgo: number;
 }> = ({label, brand, enteredMsAgo}) => {
-  const fonts = loadBrandFonts();
+  const fonts = loadBrandFonts(brand);
   const p = easeInOutCubic(Math.min(Math.max(enteredMsAgo / IN_MS, 0), 1));
   return (
     <div

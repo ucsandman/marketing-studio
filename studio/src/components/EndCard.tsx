@@ -7,7 +7,7 @@ import {getMark} from '../brands/marks';
 export const EndCard: React.FC<{cta: string; brand: Brand}> = ({cta, brand}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
-  const fonts = loadBrandFonts();
+  const fonts = loadBrandFonts(brand);
   const s = spring({frame, fps, config: {damping: 200}});
   const Mark = getMark(brand.id);
   return (

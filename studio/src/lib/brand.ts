@@ -1,5 +1,6 @@
 import {z} from 'zod';
 import noban from '../../../brands/noban.json';
+import dashclaw from '../../../brands/dashclaw.json';
 
 const hex = z.string().regex(/^#[0-9a-f]{6}$/i, 'expected #rrggbb hex color');
 
@@ -28,12 +29,28 @@ export const brandSchema = z.object({
     body: z.string().min(1),
     mono: z.string().min(1),
   }),
+  // How loudly the brand mark is allowed to bloom. `wash` is the alpha of the
+  // radial backdrop behind the mark, `glow` the alpha of its drop-shadow. Brands
+  // whose rules forbid a hero wash (dashclaw: orange is signal, never decoration)
+  // set wash to 0. Defaults reproduce the values these were hardcoded to.
+  effects: z
+    .object({
+      wash: z.number().min(0).max(1),
+      glow: z.number().min(0).max(1),
+    })
+    .default({wash: 0.165, glow: 0.4}),
   voice: z.string().min(1),
 });
 
+/** 0..1 alpha -> the two-digit hex suffix of an #rrggbbaa color. */
+export const alphaHex = (a: number): string =>
+  Math.round(a * 255)
+    .toString(16)
+    .padStart(2, '0');
+
 export type Brand = z.infer<typeof brandSchema>;
 
-const registry: Record<string, unknown> = {noban};
+const registry: Record<string, unknown> = {noban, dashclaw};
 
 export const getBrand = (id: string): Brand => {
   const raw = registry[id];

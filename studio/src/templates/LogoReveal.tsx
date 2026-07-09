@@ -7,7 +7,7 @@ import {
   useVideoConfig,
 } from 'remotion';
 import {z} from 'zod';
-import {getBrand} from '../lib/brand';
+import {alphaHex, getBrand} from '../lib/brand';
 import {loadBrandFonts} from '../lib/fonts';
 import {getMark} from '../brands/marks';
 import {PngSequence} from '../components/PngSequence';
@@ -25,7 +25,7 @@ export const LogoReveal: React.FC<Props> = ({brandId, sequence, frameCount, cta}
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   const brand = getBrand(brandId);
-  const fonts = loadBrandFonts();
+  const fonts = loadBrandFonts(brand);
   const Mark = getMark(brand.id);
   const wordmarkIn = spring({frame: frame - 66, fps, config: {damping: 200}});
   const ctaIn = interpolate(frame, [96, 110], [0, 1], {
@@ -36,11 +36,11 @@ export const LogoReveal: React.FC<Props> = ({brandId, sequence, frameCount, cta}
     <AbsoluteFill style={{backgroundColor: brand.colors.bg}}>
       <AbsoluteFill
         style={{
-          background: `radial-gradient(55% 45% at 50% 40%, ${brand.colors.brand}2a, transparent 70%)`,
+          background: `radial-gradient(55% 45% at 50% 40%, ${brand.colors.brand}${alphaHex(brand.effects.wash)}, transparent 70%)`,
         }}
       />
       <AbsoluteFill style={{justifyContent: 'center', alignItems: 'center', gap: 28}}>
-        <div style={{width: 520, height: 520, filter: `drop-shadow(0 0 42px ${brand.colors.brand}66)`}}>
+        <div style={{width: 520, height: 520, filter: `drop-shadow(0 0 42px ${brand.colors.brand}${alphaHex(brand.effects.glow)})`}}>
           {sequence ? (
             <PngSequence
               dir={sequence}

@@ -1,0 +1,31 @@
+{
+  "id": "dashclaw",
+  "name": "DashClaw",
+  "tagline": "Agent decision infrastructure",
+  "url": "dashclaw.io",
+  "colors": {
+    "bg": "#0e1014",
+    "surface": "#15171c",
+    "surface2": "#1d2026",
+    "line": "#272b32",
+    "ink": "#fafafa",
+    "ink2": "#c2c2cc",
+    "ink3": "#9b9ba8",
+    "brand": "#f97316",
+    "profit": "#fb923c",
+    "safe": "#22c55e",
+    "loss": "#ef4444",
+    "info": "#3b82f6",
+    "rare": "#eab308"
+  },
+  "fonts": {
+    "display": "Inter",
+    "body": "Inter",
+    "mono": "JetBrains Mono"
+  },
+  "effects": {
+    "wash": 0,
+    "glow": 0.22
+  },
+  "voice": "Governance runtime that sits between an agent's intent and the real world. Serious, precise, trustworthy. Verbs: intercept, enforce, record, verify. No hype, no exclamation marks. Brand orange #f97316 is a SIGNAL, never decoration: the mark, a focused state, a primary CTA, attention required. Never a hero wash or ambient glow-spam. The accent 'profit' slot is the lighter brand orange #fb923c and is reserved for CTA text. Dark mode only. Not generic SaaS, not consumer-AI, not heavy-enterprise, not crypto/web3."
+}

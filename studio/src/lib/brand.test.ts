@@ -10,6 +10,14 @@ describe('getBrand', () => {
     expect(b.fonts.display).toBe('Saira');
   });
 
+  it('loads the dashclaw brand with validated tokens', () => {
+    const b = getBrand('dashclaw');
+    expect(b.name).toBe('DashClaw');
+    expect(b.colors.brand).toBe('#f97316');
+    expect(b.fonts.display).toBe('Inter');
+    expect(b.fonts.mono).toBe('JetBrains Mono');
+  });
+
   it('rejects hex colors that are not #rrggbb', () => {
     // schema-level guarantee: every color token matches /^#[0-9a-f]{6}$/i
     const b = getBrand('noban');

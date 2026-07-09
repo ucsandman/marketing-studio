@@ -17,7 +17,7 @@ export const ComponentGallery: React.FC = () => {
   const frame = useCurrentFrame();
   const {durationInFrames, fps} = useVideoConfig();
   const brand = getBrand('noban');
-  const fonts = loadBrandFonts();
+  const fonts = loadBrandFonts(brand);
   const progress = interpolate(frame, [0, durationInFrames - 1], [0, 1]);
   const timeMs = (frame / fps) * 1000;
   return (

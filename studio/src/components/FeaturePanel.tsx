@@ -11,7 +11,7 @@ export const FeaturePanel: React.FC<{
 }> = ({screenshot, lines, brand, zoom = {from: 1.5, to: 1.6, origin: '58% 30%'}}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
-  const fonts = loadBrandFonts();
+  const fonts = loadBrandFonts(brand);
   const panelIn = spring({frame, fps, config: {damping: 200}});
   const zoomNow = interpolate(frame, [0, 170], [zoom.from, zoom.to]);
   return (

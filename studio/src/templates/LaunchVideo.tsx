@@ -111,7 +111,7 @@ const DemoAct: React.FC<{demo: Props['demo']; len: number; brand: Brand}> = ({de
 };
 
 const FeatureAct: React.FC<{feature: Props['features'][number]; len: number; brand: Brand}> = ({feature, len, brand}) => {
-  const fonts = loadBrandFonts();
+  const fonts = loadBrandFonts(brand);
   const fade = useActFade(len);
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
