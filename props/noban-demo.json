@@ -1,0 +1,52 @@
+{
+  "brandId": "noban",
+  "video": "noban/demo.webm",
+  "cta": "Simulate free at noban.gg",
+  "telemetry": {
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    },
+    "durationMs": 14633,
+    "events": [
+      {
+        "type": "step",
+        "t": 835,
+        "label": "The live trading desk. Simulation on by default."
+      },
+      {
+        "type": "step",
+        "t": 4062,
+        "label": "Detected opportunities, ranked by net dollars"
+      },
+      {
+        "type": "click",
+        "t": 4062,
+        "x": 120,
+        "y": 178
+      },
+      {
+        "type": "step",
+        "t": 7329,
+        "label": "Every simulated trade lands in the ledger"
+      },
+      {
+        "type": "click",
+        "t": 7329,
+        "x": 120,
+        "y": 557
+      },
+      {
+        "type": "step",
+        "t": 10598,
+        "label": "Spend caps and approvals on every action"
+      },
+      {
+        "type": "click",
+        "t": 10598,
+        "x": 120,
+        "y": 873
+      }
+    ]
+  }
+}
