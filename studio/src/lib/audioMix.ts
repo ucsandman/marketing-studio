@@ -1,4 +1,5 @@
 import {z} from 'zod';
+import type {Act} from './launchTiming';
 
 export const audioSchema = z.object({
   music: z.object({src: z.string(), durationMs: z.number().positive()}).nullable(),
@@ -14,7 +15,6 @@ export const audioSchema = z.object({
 
 export type AudioManifest = z.infer<typeof audioSchema>;
 
-type Act = {from: number; len: number};
 type Timing = {logo: Act; hook: Act; demo: Act; features: Act[]; end: Act};
 
 const FPS = 30;

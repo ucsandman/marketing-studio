@@ -13,6 +13,7 @@ import type {Brand} from '../lib/brand';
 import {loadBrandFonts} from '../lib/fonts';
 import {telemetrySchema, steps} from '../lib/telemetry';
 import {launchTiming} from '../lib/launchTiming';
+import {audioSchema} from '../lib/audioMix';
 import {BackgroundLoop} from '../components/BackgroundLoop';
 import {PngSequence} from '../components/PngSequence';
 import {Headline} from '../components/Headline';
@@ -21,6 +22,7 @@ import {DemoStage} from '../components/DemoStage';
 import {EndCard} from '../components/EndCard';
 import {Caption} from '../components/Caption';
 import {FloatBar} from '../components/FloatBar';
+import {SoundTrack} from '../components/SoundTrack';
 import {getMark} from '../brands/marks';
 
 export const launchVideoSchema = z.object({
@@ -42,6 +44,7 @@ export const launchVideoSchema = z.object({
     loopSequence: z.string().nullable(),
     loopFrames: z.number().int().positive(),
   }),
+  audio: audioSchema.nullable().default(null),
 });
 
 type Props = z.infer<typeof launchVideoSchema>;
@@ -141,7 +144,7 @@ const FeatureAct: React.FC<{feature: Props['features'][number]; len: number; bra
   );
 };
 
-export const LaunchVideo: React.FC<Props> = ({brandId, kicker, headline, demo, features, cta, assets}) => {
+export const LaunchVideo: React.FC<Props> = ({brandId, kicker, headline, demo, features, cta, assets, audio}) => {
   const frame = useCurrentFrame();
   const {durationInFrames} = useVideoConfig();
   const brand = getBrand(brandId);
@@ -172,6 +175,7 @@ export const LaunchVideo: React.FC<Props> = ({brandId, kicker, headline, demo, f
       <Sequence from={t.end.from} durationInFrames={t.end.len}>
         <EndCard cta={cta} brand={brand} />
       </Sequence>
+      {audio ? <SoundTrack audio={audio} timing={t} /> : null}
       <div style={{position: 'absolute', bottom: 40, left: 0, right: 0, display: 'flex', justifyContent: 'center'}}>
         <FloatBar progress={frame / (durationInFrames - 1)} brand={brand} width={640} />
       </div>

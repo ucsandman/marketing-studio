@@ -92,6 +92,7 @@ export const RemotionRoot: React.FC = () => {
           features: [],
           cta: "Simulate free at noban.gg",
           assets: {logoSequence: null, logoFrames: 90, loopSequence: null, loopFrames: 240},
+          audio: null,
         }}
         calculateMetadata={({props}) => ({
           durationInFrames: launchTiming(
