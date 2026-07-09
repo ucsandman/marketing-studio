@@ -29,7 +29,7 @@ export const buildMusicBody = (prompt, lengthMs) => ({
 });
 
 export const parseFfprobeDuration = (text) => {
-  const m = text.match(/Duration:\s*(\d+):(\d+):(\d+)\.(\d+)/);
+  const m = text.match(/Duration:\s*(\d+):(\d+):(\d+)\.(\d{2})/);
   if (!m) return null;
   const [, h, min, s, cs] = m.map(Number);
   return (h * 3600 + min * 60 + s) * 1000 + cs * 10;

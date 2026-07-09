@@ -36,6 +36,7 @@ const MUSIC_PROMPT =
 // total duration in ms; constants mirror studio/src/lib/launchTiming.ts
 const telemetry = JSON.parse(readFileSync(join(root, 'props', 'noban-demo.json'), 'utf8')).telemetry;
 const demoLen = Math.ceil((telemetry.durationMs / 1000) * 30) + 24;
+// the `2 *` must track this brand's feature count in build-launch-props.mjs
 const totalFrames = 150 + 186 + demoLen + 2 * 180 + 150;
 const totalMs = Math.round((totalFrames / 30) * 1000);
 
