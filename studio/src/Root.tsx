@@ -32,7 +32,7 @@ export const RemotionRoot: React.FC = () => {
             "Float and pattern aware spreads",
             "Hard spend caps on every trade",
           ],
-          screenshot: null,
+          screenshot: "noban/cockpit.webp",
           cta: "Free in simulation",
         }}
       />

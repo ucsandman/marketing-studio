@@ -9,9 +9,10 @@ configs live in `brands/`. Spec: `docs/superpowers/specs/2026-07-09-animation-st
 
 Manual equivalents:
 
-    cd studio && npm install     # once
-    cd studio && npm run dev     # Remotion Studio
-    node scripts/smoke.mjs       # frame-0 still of every composition
+    cd studio && npm install            # once
+    node scripts/fetch-noban-assets.mjs # once: copy noban screenshots (gitignored) into studio/public/
+    cd studio && npm run dev            # Remotion Studio
+    node scripts/smoke.mjs              # frame-0 still of every composition
 
 ## Render
 
