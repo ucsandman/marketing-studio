@@ -1,21 +1,12 @@
 import React from 'react';
-import {
-  AbsoluteFill,
-  OffthreadVideo,
-  Sequence,
-  staticFile,
-  useCurrentFrame,
-  useVideoConfig,
-} from 'remotion';
+import {AbsoluteFill, Sequence, useCurrentFrame, useVideoConfig} from 'remotion';
 import {z} from 'zod';
 import {getBrand} from '../lib/brand';
-import {NobanMark} from '../brands/NobanMark';
 import {FloatBar} from '../components/FloatBar';
-import {DemoCursor} from '../components/DemoCursor';
 import {Caption} from '../components/Caption';
 import {EndCard} from '../components/EndCard';
-import {telemetrySchema, clicks, steps, focuses} from '../lib/telemetry';
-import {cameraAt} from '../lib/camera';
+import {DemoStage} from '../components/DemoStage';
+import {telemetrySchema, steps} from '../lib/telemetry';
 
 export const productDemoSchema = z.object({
   brandId: z.string(),
@@ -34,11 +25,8 @@ export const ProductDemo: React.FC<Props> = ({video, cta, telemetry}) => {
   const brand = getBrand('noban');
   const timeMs = (frame / fps) * 1000;
 
-  const clickList = telemetry ? clicks(telemetry) : [];
   const stepList = telemetry ? steps(telemetry) : [];
   const activeStep = [...stepList].reverse().find((s) => s.t <= timeMs);
-  const vp = telemetry?.viewport ?? {width: 1600, height: 1000};
-  const cam = cameraAt(telemetry ? focuses(telemetry) : [], timeMs, vp);
   const bodyFrames = telemetry
     ? Math.ceil((telemetry.durationMs / 1000) * fps)
     : durationInFrames - 60;
@@ -53,52 +41,8 @@ export const ProductDemo: React.FC<Props> = ({video, cta, telemetry}) => {
       <Sequence durationInFrames={bodyFrames}>
         {/* stage: viewport-sized panel, scaled to fit with caption room */}
         <AbsoluteFill style={{justifyContent: 'center', alignItems: 'center'}}>
-          <div
-            style={{
-              width: vp.width,
-              height: vp.height,
-              transform: `scale(${STAGE_SCALE}) translateY(-28px)`,
-              borderRadius: 14,
-              border: `1px solid ${brand.colors.line}`,
-              background: brand.colors.surface,
-              overflow: 'hidden',
-              boxShadow: `0 40px 120px ${brand.colors.bg}`,
-              position: 'relative',
-            }}
-          >
-            {/* camera: zooms video and cursor together */}
-            <div
-              style={{
-                width: '100%',
-                height: '100%',
-                // scale about the stage center, then shift so the camera's
-                // focus center (originX/Y, clamped in camera.ts) sits centered
-                transform: `scale(${cam.scale}) translate(${vp.width / 2 - cam.originX}px, ${vp.height / 2 - cam.originY}px)`,
-                position: 'relative',
-              }}
-            >
-              {video ? (
-                <OffthreadVideo
-                  src={staticFile(video)}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    display: 'block',
-                    filter: 'brightness(1.12) contrast(1.03)',
-                  }}
-                  muted
-                />
-              ) : (
-                <AbsoluteFill
-                  style={{background: brand.colors.surface2, justifyContent: 'center', alignItems: 'center'}}
-                >
-                  <NobanMark size={120} color={brand.colors.line} />
-                </AbsoluteFill>
-              )}
-              {telemetry ? (
-                <DemoCursor clickList={clickList} timeMs={timeMs} brand={brand} />
-              ) : null}
-            </div>
+          <div style={{transform: `scale(${STAGE_SCALE}) translateY(-28px)`}}>
+            <DemoStage video={video} telemetry={telemetry} timeMs={timeMs} />
           </div>
           {activeStep ? (
             <div style={{position: 'absolute', bottom: 108}}>

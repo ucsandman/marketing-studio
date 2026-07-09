@@ -1,0 +1,64 @@
+import React from 'react';
+import {AbsoluteFill, Img, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
+import {getBrand} from '../lib/brand';
+import {loadBrandFonts} from '../lib/fonts';
+
+export const FeaturePanel: React.FC<{
+  screenshot: string | null;
+  lines: string[];
+  zoom?: {from: number; to: number; origin: string};
+}> = ({screenshot, lines, zoom = {from: 1.5, to: 1.6, origin: '58% 30%'}}) => {
+  const frame = useCurrentFrame();
+  const {fps} = useVideoConfig();
+  const brand = getBrand('noban');
+  const fonts = loadBrandFonts();
+  const panelIn = spring({frame, fps, config: {damping: 200}});
+  const zoomNow = interpolate(frame, [0, 170], [zoom.from, zoom.to]);
+  return (
+    <AbsoluteFill style={{flexDirection: 'row', alignItems: 'center', padding: 72, gap: 72}}>
+      <div
+        style={{
+          flex: 1.4,
+          borderRadius: 16,
+          border: `1px solid ${brand.colors.line}`,
+          background: brand.colors.surface,
+          overflow: 'hidden',
+          opacity: panelIn,
+          transform: `translateY(${(1 - panelIn) * 60}px)`,
+          boxShadow: `0 40px 120px ${brand.colors.bg}`,
+        }}
+      >
+        {screenshot ? (
+          <Img
+            src={staticFile(screenshot)}
+            style={{width: '100%', display: 'block', transform: `scale(${zoomNow})`, transformOrigin: zoom.origin}}
+          />
+        ) : (
+          <div style={{width: '100%', aspectRatio: '16/10', background: brand.colors.surface2}} />
+        )}
+      </div>
+      <div style={{flex: 1, display: 'flex', flexDirection: 'column', gap: 40}}>
+        {lines.map((line, i) => {
+          const s = spring({frame: frame - 15 - i * 10, fps, config: {damping: 200}});
+          return (
+            <div
+              key={i}
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 20,
+                opacity: s,
+                transform: `translateX(${(1 - s) * 40}px)`,
+              }}
+            >
+              <div style={{width: 10, height: 10, borderRadius: 5, background: brand.colors.brand, marginTop: 22}} />
+              <div style={{fontFamily: fonts.body, fontWeight: 600, fontSize: 40, color: brand.colors.ink2}}>
+                {line}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </AbsoluteFill>
+  );
+};
