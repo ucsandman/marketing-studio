@@ -1,10 +1,8 @@
 import React from 'react';
 import {
   AbsoluteFill,
-  Img,
   interpolate,
   spring,
-  staticFile,
   useCurrentFrame,
   useVideoConfig,
 } from 'remotion';
@@ -12,6 +10,7 @@ import {z} from 'zod';
 import {getBrand} from '../lib/brand';
 import {loadBrandFonts} from '../lib/fonts';
 import {NobanMark} from '../brands/NobanMark';
+import {PngSequence} from '../components/PngSequence';
 
 export const logoRevealSchema = z.object({
   brandId: z.string(),
@@ -27,7 +26,6 @@ export const LogoReveal: React.FC<Props> = ({sequence, frameCount, cta}) => {
   const {fps} = useVideoConfig();
   const brand = getBrand('noban');
   const fonts = loadBrandFonts();
-  const seqFrame = Math.min(frame + 1, frameCount); // sequence is 1-indexed
   const wordmarkIn = spring({frame: frame - 66, fps, config: {damping: 200}});
   const ctaIn = interpolate(frame, [96, 110], [0, 1], {
     extrapolateLeft: 'clamp',
@@ -43,8 +41,10 @@ export const LogoReveal: React.FC<Props> = ({sequence, frameCount, cta}) => {
       <AbsoluteFill style={{justifyContent: 'center', alignItems: 'center', gap: 28}}>
         <div style={{width: 520, height: 520, filter: `drop-shadow(0 0 42px ${brand.colors.brand}66)`}}>
           {sequence ? (
-            <Img
-              src={staticFile(`${sequence}/frame_${String(seqFrame).padStart(4, '0')}.png`)}
+            <PngSequence
+              dir={sequence}
+              frameCount={frameCount}
+              mode="clamp"
               style={{width: '100%', height: '100%', display: 'block'}}
             />
           ) : (

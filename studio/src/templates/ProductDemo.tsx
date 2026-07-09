@@ -3,18 +3,17 @@ import {
   AbsoluteFill,
   OffthreadVideo,
   Sequence,
-  spring,
   staticFile,
   useCurrentFrame,
   useVideoConfig,
 } from 'remotion';
 import {z} from 'zod';
 import {getBrand} from '../lib/brand';
-import {loadBrandFonts} from '../lib/fonts';
 import {NobanMark} from '../brands/NobanMark';
 import {FloatBar} from '../components/FloatBar';
 import {DemoCursor} from '../components/DemoCursor';
 import {Caption} from '../components/Caption';
+import {EndCard} from '../components/EndCard';
 import {telemetrySchema, clicks, steps, focuses} from '../lib/telemetry';
 import {cameraAt} from '../lib/camera';
 
@@ -28,27 +27,6 @@ export const productDemoSchema = z.object({
 type Props = z.infer<typeof productDemoSchema>;
 
 const STAGE_SCALE = 0.9; // 1600x1000 stage inside 1920x1080 with caption room
-
-const EndCard: React.FC<{cta: string}> = ({cta}) => {
-  const frame = useCurrentFrame();
-  const {fps} = useVideoConfig();
-  const brand = getBrand('noban');
-  const fonts = loadBrandFonts();
-  const s = spring({frame, fps, config: {damping: 200}});
-  return (
-    <AbsoluteFill
-      style={{justifyContent: 'center', alignItems: 'center', gap: 32, opacity: s}}
-    >
-      <NobanMark size={110} color={brand.colors.brand} />
-      <div style={{fontFamily: fonts.display, fontWeight: 800, fontSize: 96, color: brand.colors.ink}}>
-        {brand.name}
-      </div>
-      <div style={{fontFamily: fonts.mono, fontSize: 34, letterSpacing: '0.2em', color: brand.colors.profit}}>
-        {cta.toUpperCase()}
-      </div>
-    </AbsoluteFill>
-  );
-};
 
 export const ProductDemo: React.FC<Props> = ({video, cta, telemetry}) => {
   const frame = useCurrentFrame();
