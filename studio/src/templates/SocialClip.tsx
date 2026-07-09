@@ -84,9 +84,9 @@ const Feature: React.FC<{screenshot: string | null; lines: string[]}> = ({screen
   const brand = getBrand('noban');
   const fonts = loadBrandFonts();
   const panelIn = spring({frame, fps, config: {damping: 200}});
-  const zoom = interpolate(frame, [0, 170], [1, 1.06]);
+  const zoom = interpolate(frame, [0, 170], [1.5, 1.6]);
   return (
-    <AbsoluteFill style={{flexDirection: 'row', alignItems: 'center', padding: 100, gap: 80}}>
+    <AbsoluteFill style={{flexDirection: 'row', alignItems: 'center', padding: 72, gap: 72}}>
       <div
         style={{
           flex: 1.4,
@@ -102,7 +102,7 @@ const Feature: React.FC<{screenshot: string | null; lines: string[]}> = ({screen
         {screenshot ? (
           <Img
             src={staticFile(screenshot)}
-            style={{width: '100%', display: 'block', transform: `scale(${zoom})`, transformOrigin: '30% 20%'}}
+            style={{width: '100%', display: 'block', transform: `scale(${zoom})`, transformOrigin: '58% 30%'}}
           />
         ) : (
           <div style={{width: '100%', aspectRatio: '16/10', background: brand.colors.surface2}} />
