@@ -5,3 +5,5 @@ studio/public/*/
 .env
 *.log
 .superpowers/
+__pycache__/
+*.pyc

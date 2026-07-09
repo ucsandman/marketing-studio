@@ -32,7 +32,8 @@ def sv(x: float, y: float):
     return ((x - 16.0) * SIZE, (16.0 - y) * SIZE, 0.0)
 
 
-def emission_material(name: str, color, strength: float = 4.0):
+# default 1.0: higher strengths clip brand hues under the Standard view transform
+def emission_material(name: str, color, strength: float = 1.0):
     mat = bpy.data.materials.new(name)
     mat.use_nodes = True  # noqa: vulture
     nodes = mat.node_tree.nodes
