@@ -22,6 +22,8 @@ repo. Assets are copied out to the calling repo at the end.
 | Stage Blender output | `scripts/stage-blender-assets.mjs [brandId]` | assets/<brand>/ -> studio/public/<brand>/ |
 | Launch props builder | `scripts/build-launch-props.mjs` | copy source of truth (JSON is generated) |
 | Static presets | `scripts/render-statics.mjs` | og.mp4 / og.gif / readme.gif |
+| Audio feeder (ElevenLabs) | `feeders/audio/client.mjs vo\|music\|probe` | needs ELEVENLABS_API_KEY in .env; exit 2 = silent fallback |
+| Audio build + merge | `scripts/build-<brand>-audio.mjs`, `scripts/merge-launch-audio.mjs` | VO/music copy source of truth -> props/<brand>-audio.json |
 
 Compositions: SocialClip, ProductDemo, LogoReveal, LaunchVideo, AnimatedOG,
 ComponentGallery (test bench). All schemas carry `brandId`; templates resolve
