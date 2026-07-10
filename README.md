@@ -69,8 +69,8 @@ https://github.com/user-attachments/assets/1bf89936-4f8b-405a-b507-5f051ae18ef8
 Requirements: [Claude Code](https://claude.com/claude-code), Node 20+, Python 3.10+. Optional: Blender (3D logo reveals), an ElevenLabs API key (audio), ComfyUI (AI backdrops); everything falls back cleanly without them.
 
 ```bash
-git clone git@github.com:ucsandman/animation-studio.git
-cd animation-studio
+git clone git@github.com:ucsandman/marketing-studio.git
+cd marketing-studio
 cd studio && npm install && cd ..
 cp .env.example .env            # set BLENDER_PATH / ELEVENLABS_API_KEY if you have them
 node scripts/install-skills.mjs # installs /marketing and friends into ~/.claude/skills
