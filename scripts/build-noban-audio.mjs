@@ -100,5 +100,17 @@ const manifest = {
     text: l.text,
   })),
 };
+
+// Sound-design cue gate: enable the sfx layer only when the shared library is staged
+// (run scripts/build-sfx.mjs first). Cue FRAMES are NOT written here — they are derived
+// at render time from launchTiming by studio/src/lib/sfxCues.ts (mirrors how voWindows
+// derives VO timing), so the builder only flips the presence flag. Absent library =>
+// key omitted => renders stay byte-identical to today.
+const sfxLib = ['whoosh', 'tick', 'riser'].map((k) => join(root, 'studio', 'public', 'sfx', `${k}.mp3`));
+if (sfxLib.every((f) => existsSync(f))) {
+  manifest.sfx = {enabled: true};
+  console.log('sfx: library present -> manifest.sfx.enabled = true');
+}
+
 writeFileSync(join(root, 'props', 'noban-audio.json'), JSON.stringify(manifest, null, 2) + '\n');
 console.log(`wrote props/noban-audio.json (${totalMs}ms track, ${LINES.length} lines)`);

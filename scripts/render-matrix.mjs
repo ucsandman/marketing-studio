@@ -20,17 +20,10 @@
 // line). LaunchVideo reads caption text from the merged `audio` manifest; SocialClip
 // from a merged `voLines` array (it has no audio track).
 import {execSync} from 'node:child_process';
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  renameSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs';
+import {existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {makeBaseLoader, withFormat} from './lib/matrix-props.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -59,29 +52,6 @@ const audioManifest = existsSync(audioPropsPath)
   ? JSON.parse(readFileSync(audioPropsPath, 'utf8'))
   : null;
 
-// Base props per composition. Launch is the canonical <brand>-launch.json; social
-// prefers <brand>-social-launch.json, falling back to the first <brand>-social-*.json.
-const resolveBase = (comp) => {
-  if (comp === 'LaunchVideo') {
-    const p = join(root, 'props', `${brand}-launch.json`);
-    if (!existsSync(p)) {
-      console.error(`missing base props for LaunchVideo: ${p}`);
-      process.exit(1);
-    }
-    return p;
-  }
-  const direct = join(root, 'props', `${brand}-social-launch.json`);
-  if (existsSync(direct)) return direct;
-  const match = readdirSync(join(root, 'props')).find(
-    (f) => f.startsWith(`${brand}-social-`) && f.endsWith('.json'),
-  );
-  if (!match) {
-    console.error(`missing base props for SocialClip (${brand}-social-*.json)`);
-    process.exit(1);
-  }
-  return join(root, 'props', match);
-};
-
 // A text-bearing frame per composition (headline act) — the layout proof frame.
 const stillFrame = (comp) => (comp === 'LaunchVideo' ? 240 : 40);
 
@@ -89,11 +59,7 @@ const outDir = join(root, 'out', brand, 'matrix');
 const propsDir = join(outDir, '.props');
 mkdirSync(propsDir, {recursive: true});
 
-const baseCache = new Map();
-const loadBase = (comp) => {
-  if (!baseCache.has(comp)) baseCache.set(comp, JSON.parse(readFileSync(resolveBase(comp), 'utf8')));
-  return baseCache.get(comp);
-};
+const loadBase = makeBaseLoader(root, brand);
 
 // Render one variant (props already merged), verify it landed, return its manifest row.
 const renderVariant = (id, comp, width, height, props) => {
@@ -126,7 +92,7 @@ const withCaptions = (comp, base) =>
 const rendered = [];
 for (const p of platforms) {
   if (compFilter && p.comp !== compFilter) continue;
-  const base = {...loadBase(p.comp), formatWidth: p.width, formatHeight: p.height};
+  const base = withFormat(loadBase(p.comp), p.width, p.height);
   rendered.push(renderVariant(p.id, p.comp, p.width, p.height, base));
 
   if (p.captioned) {

@@ -29,13 +29,48 @@ import {copyFileSync, mkdirSync, writeFileSync} from 'node:fs';
 import {dirname, join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {Recorder} from './recorder.mjs';
+import {cacheKey, checkCache, storeCache} from '../../scripts/lib/cache.mjs';
+import {captureKeyParts} from './capture-cache.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PORT = process.env.DC_PORT ?? '3001';
+// Product repo: the app is reached over the port, but the cache must fingerprint
+// the source it films. Default matches the launch command in this file's header.
+const DC_ROOT = process.env.DC_ROOT ?? 'C:/Projects/DashClaw';
 const base = `http://localhost:${PORT}`;
 const VIEWPORT = {width: 1440, height: 900};
 const VIEW_HOLD_MS = 3800;
 const SETTLE_MS = 750; // let entrance animations / scroll settle before measuring
+
+// --- Footage cache gate (before the app-reachability check or browser launch) ---
+const argv = process.argv.slice(2);
+const FORCE = argv.includes('--force');
+const CHECK_ONLY = argv.includes('--cache-check-only');
+const videoOut = join(ROOT, 'studio', 'public', 'dashclaw', 'demo.webm');
+const propsOut = join(ROOT, 'props', 'dashclaw-demo.json');
+const CACHE_ARTIFACTS = [videoOut, propsOut];
+const keyParts = captureKeyParts({
+  repo: DC_ROOT,
+  scriptPath: fileURLToPath(import.meta.url),
+  config: {viewport: VIEWPORT, holdMs: VIEW_HOLD_MS, settleMs: SETTLE_MS},
+});
+const CACHE_KEY = cacheKey(keyParts);
+const CACHE_ENABLED = keyParts.productHead !== null; // null => product repo unresolvable, cannot verify inputs
+
+if (CHECK_ONLY) {
+  const {hit} = CACHE_ENABLED ? checkCache('dashclaw', 'capture', CACHE_KEY, CACHE_ARTIFACTS) : {hit: false};
+  console.log(hit ? 'HIT' : 'MISS');
+  process.exit(0);
+}
+if (!CACHE_ENABLED) {
+  console.log(`capture cache: product git state unavailable at ${DC_ROOT} — caching disabled this run`);
+} else if (!FORCE) {
+  const {hit} = checkCache('dashclaw', 'capture', CACHE_KEY, CACHE_ARTIFACTS);
+  if (hit) {
+    console.log(`capture cache hit — reusing ${videoOut}`);
+    process.exit(0);
+  }
+}
 
 try {
   const res = await fetch(`${base}/api/actions?status=pending_approval`, {signal: AbortSignal.timeout(3000)});
@@ -221,6 +256,7 @@ try {
     telemetry,
   };
   writeFileSync(join(ROOT, 'props', 'dashclaw-demo.json'), JSON.stringify(props, null, 2) + '\n');
+  if (CACHE_ENABLED) storeCache('dashclaw', 'capture', CACHE_KEY, CACHE_ARTIFACTS);
   console.log(`capture OK: ${telemetry.durationMs}ms, ${telemetry.events.length} events`);
   console.log('wrote studio/public/dashclaw/demo.webm and props/dashclaw-demo.json');
 } catch (err) {

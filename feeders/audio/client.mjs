@@ -6,6 +6,7 @@
  * Usage:
  *   node feeders/audio/client.mjs vo --script <script.json> --out <dir>
  *   node feeders/audio/client.mjs music --prompt "<text>" --length-ms <n> --out <file>
+ *   node feeders/audio/client.mjs sfx --prompt "<text>" --duration-sec <n> --out <file>
  *   node feeders/audio/client.mjs probe --file <mp3>
  */
 import {mkdirSync, readFileSync, writeFileSync} from 'node:fs';
@@ -18,6 +19,7 @@ const API = 'https://api.elevenlabs.io';
 const DEFAULT_VOICE = '21m00Tcm4TlvDq8ikWAM'; // Rachel (premade)
 const TTS_TIMEOUT = 60_000;
 const MUSIC_TIMEOUT = 300_000;
+const SFX_TIMEOUT = 120_000;
 
 export const buildTtsUrl = (voiceId) =>
   `${API}/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`;
@@ -26,6 +28,14 @@ export const buildMusicBody = (prompt, lengthMs) => ({
   prompt,
   music_length_ms: lengthMs,
   model_id: 'music_v2',
+});
+
+// Text-to-sound-effects (verified endpoint, Context7): POST /v1/sound-generation,
+// body {text, duration_seconds (0.5-30), model_id}, header xi-api-key, returns mp3.
+export const buildSfxBody = (prompt, durationSec) => ({
+  text: prompt,
+  duration_seconds: durationSec,
+  model_id: 'eleven_text_to_sound_v2',
 });
 
 export const parseFfprobeDuration = (text) => {
@@ -154,8 +164,36 @@ const main = async () => {
       const ms = measureMs(outFile);
       if (!ms) throw new Error(`could not measure duration of ${outFile}`);
       console.log(`music OK: ${resolve(outFile)} ${ms}ms`);
+    } else if (mode === 'sfx') {
+      const prompt = argValue(args, '--prompt');
+      const durationSec = Number(argValue(args, '--duration-sec'));
+      const outFile = argValue(args, '--out');
+      if (!prompt || !Number.isFinite(durationSec) || durationSec <= 0 || !outFile)
+        throw new Error('sfx requires --prompt, --duration-sec > 0, --out');
+      // The cue layer is a non-essential accent: if sound-generation is unavailable
+      // on this plan/account or errors for any reason, fall back SILENTLY (exit 2, the
+      // repo's documented missing-audio convention) instead of hard-failing the run.
+      let bytes;
+      try {
+        bytes = await generate(
+          `${API}/v1/sound-generation?output_format=mp3_44100_128`,
+          buildSfxBody(prompt, durationSec),
+          key,
+          SFX_TIMEOUT,
+        );
+      } catch (err) {
+        console.error(
+          `sound-generation unavailable (${redact(err?.message ?? String(err), key)}); skipping sfx (silent fallback).`,
+        );
+        process.exit(2);
+      }
+      mkdirSync(dirname(resolve(outFile)), {recursive: true});
+      writeFileSync(resolve(outFile), bytes);
+      const ms = measureMs(outFile);
+      if (!ms) throw new Error(`could not measure duration of ${outFile}`);
+      console.log(`sfx OK: ${resolve(outFile)} ${ms}ms`);
     } else {
-      throw new Error('usage: client.mjs vo --script <json> --out <dir> | music --prompt <p> --length-ms <n> --out <file> | probe --file <mp3>');
+      throw new Error('usage: client.mjs vo --script <json> --out <dir> | music --prompt <p> --length-ms <n> --out <file> | sfx --prompt <p> --duration-sec <n> --out <file> | probe --file <mp3>');
     }
   } catch (err) {
     console.error(redact(err?.message ?? String(err), key));

@@ -1,5 +1,6 @@
 import {describe, expect, it} from 'vitest';
-import {audioSchema, voWindows, duckedVolume} from './audioMix';
+import {audioSchema, voWindows, duckedVolume, resolveSfxLayers, SFX_SRC, SFX_VOLUME} from './audioMix';
+import type {SfxCue} from './sfxCues';
 
 const TIMING = {
   logo: {from: 0, len: 150},
@@ -16,6 +17,46 @@ describe('audioSchema', () => {
       lines: [{act: 'hook', src: 'noban/audio/hook.mp3', durationMs: 3900, text: 'x'}],
     });
     expect(m.lines).toHaveLength(1);
+  });
+
+  it('leaves sfx undefined when the block is absent (byte-identical default)', () => {
+    const m = audioSchema.parse({music: null, lines: []});
+    expect(m.sfx).toBeUndefined();
+  });
+
+  it('accepts an optional sfx enable gate', () => {
+    const m = audioSchema.parse({music: null, lines: [], sfx: {enabled: true}});
+    expect(m.sfx).toEqual({enabled: true});
+  });
+});
+
+describe('resolveSfxLayers', () => {
+  const cues: SfxCue[] = [
+    {kind: 'whoosh', frame: 150},
+    {kind: 'tick', frame: 858},
+    {kind: 'riser', frame: 1158},
+  ];
+
+  it('maps cues to src + volume layers when all files exist', () => {
+    const layers = resolveSfxLayers(cues, () => true);
+    expect(layers).toEqual([
+      {src: SFX_SRC.whoosh, frame: 150, volume: SFX_VOLUME.whoosh},
+      {src: SFX_SRC.tick, frame: 858, volume: SFX_VOLUME.tick},
+      {src: SFX_SRC.riser, frame: 1158, volume: SFX_VOLUME.riser},
+    ]);
+  });
+
+  it('drops cues whose file is missing (silent-skip rule)', () => {
+    const layers = resolveSfxLayers(cues, (src) => src !== SFX_SRC.tick);
+    expect(layers.map((l) => l.src)).toEqual([SFX_SRC.whoosh, SFX_SRC.riser]);
+  });
+
+  it('returns nothing when no files exist', () => {
+    expect(resolveSfxLayers(cues, () => false)).toEqual([]);
+  });
+
+  it('ducks the tick under the transition cues', () => {
+    expect(SFX_VOLUME.tick).toBeLessThan(SFX_VOLUME.whoosh);
   });
 });
 

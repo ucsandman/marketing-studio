@@ -31,7 +31,9 @@ Around those assets, the pipeline adds:
 - **A copy linter.** Every generated line is gated for em dashes, hype, and AI-slop vocabulary before it can reach a render.
 - **A film grade and per-brand motion personality.** Grain, vignette, and bloom tuned per brand, and a `motion` token block so each brand's choreography feels like itself.
 - **An export matrix.** The picture-locked launch video and social clips fan into 16:9, 9:16, 1:1, and 4:5 through responsive layout (not crops), with burned-caption variants for muted autoplay and SRT/VTT sidecars.
-- **Mission Control.** A local click-to-approve gallery: watch assets land, approve or request a redo with a note, and the run reacts — no terminal required.
+- **Mission Control.** A local click-to-approve gallery: watch assets land, review act-boundary contact sheets before the expensive render, approve or request a redo with a note, and the run reacts — no terminal required.
+- **Designed sound.** Whooshes on act cuts, ticks on feature reveals, and a riser into the CTA, generated once as a shared SFX library and mixed under the voiceover automatically.
+- **Paste-ready post kits and a footage cache.** Every platform gets a folder with the right-aspect video, a lint-gated caption, alt text, and a posting checklist; unchanged product UIs are never re-filmed thanks to content-hash caching of capture and Blender staging.
 
 Each asset also works standalone: run `/logo-reveal`, `/product-demo`, `/launch-video`, `/audio-track`, `/social-clip`, or `/og-assets` on its own from any repo.
 
@@ -131,7 +133,8 @@ feeders/comfy/     ComfyUI client (optional AI backdrops)
 skills/            the Claude Code skills that drive all of this
 examples/          real output: full asset suites for two shipped products
 scripts/           props builders, staging, statics, smoke, copy linter, brief
-                   gatherer, storyboard board, export matrix, captions,
+                   gatherer, storyboard board, export matrix, captions, thumbs,
+                   post kit, contact sheets, footage cache, SFX library,
                    Mission Control review server
 props/             generated render props (edit via their builder scripts only)
 docs/PLAYBOOK.md   the operational reference: engine map, onboarding, gotchas

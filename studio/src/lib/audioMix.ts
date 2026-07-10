@@ -1,5 +1,6 @@
 import {z} from 'zod';
 import type {Act} from './launchTiming';
+import type {SfxCue, SfxKind} from './sfxCues';
 
 export const audioSchema = z.object({
   music: z.object({src: z.string(), durationMs: z.number().positive()}).nullable(),
@@ -11,6 +12,12 @@ export const audioSchema = z.object({
       text: z.string(),
     }),
   ),
+  // Optional sound-design cue layer. Absent (the default for every existing
+  // manifest) => no sfx layers => renders stay byte-identical. `enabled` is set by
+  // the brand audio builder only after the shared sfx library is staged to
+  // studio/public/sfx/, so it doubles as the file-presence gate; cue FRAMES are
+  // never stored here, they are derived at render time from launchTiming (sfxCues).
+  sfx: z.object({enabled: z.boolean()}).optional(),
 });
 
 export type AudioManifest = z.infer<typeof audioSchema>;
@@ -67,3 +74,35 @@ export const duckedVolume = (
   const fadeOut = Math.min(1, (totalFrames - 1 - frame) / FADE_OUT);
   return level * Math.max(0, fadeIn) * Math.max(0, fadeOut);
 };
+
+// --- Sound-design cue layer ------------------------------------------------
+// Static file per cue kind, staged under studio/public/ by scripts/build-sfx.mjs.
+export const SFX_SRC: Record<SfxKind, string> = {
+  whoosh: 'sfx/whoosh.mp3',
+  tick: 'sfx/tick.mp3',
+  riser: 'sfx/riser.mp3',
+};
+
+// Cue volumes sit under full-scale VO (VO Audios play at 1.0) and track the music
+// ducking constants: transitions/riser near the music BASE, the soft UI tick at the
+// ducked-music floor so it reads as an accent, never a competing element.
+const SFX_TRANSITION = BASE; // whoosh + riser build
+export const SFX_VOLUME: Record<SfxKind, number> = {
+  whoosh: SFX_TRANSITION,
+  riser: SFX_TRANSITION,
+  tick: DUCKED,
+};
+
+export type SfxLayer = {src: string; frame: number; volume: number};
+
+// Pure: maps derived cues to the <Audio> layers the SoundTrack renders, dropping any
+// whose file the caller reports missing (nullable-asset / silent-skip rule). At render
+// time presence is guaranteed by the manifest's `sfx.enabled` gate; the fileExists
+// hook keeps the resolution unit-testable and future-proofs a real per-file check.
+export const resolveSfxLayers = (
+  cues: SfxCue[],
+  fileExists: (src: string) => boolean,
+): SfxLayer[] =>
+  cues
+    .map((c) => ({src: SFX_SRC[c.kind], frame: c.frame, volume: SFX_VOLUME[c.kind]}))
+    .filter((layer) => fileExists(layer.src));

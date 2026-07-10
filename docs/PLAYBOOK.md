@@ -30,6 +30,11 @@ repo. Assets are copied out to the calling repo at the end.
 | Mission Control | `scripts/mission-control.mjs <brand> [--port 4600]` | live run console over run.json; Approve/Redo buttons write manifest + review.json atomically |
 | Export matrix | `scripts/render-matrix.mjs <brand> [--comp] [--stills-only]` + `scripts/platforms.json` | fans LaunchVideo/SocialClip into 16:9/9:16/1:1/4:5 via calculateMetadata props (no --width CLI flag in Remotion 4.0.486); captioned variants for muted-autoplay rows when audio props exist |
 | Caption sidecars | `scripts/build-captions.mjs <brand> [--check]` | props/<brand>-audio.json -> out/<brand>/captions/launch.srt + .vtt |
+| Thumbnails | `scripts/extract-thumbs.mjs <brand> [--comp]` | poster JPG per aspect -> out/<brand>/thumbs/ |
+| Post kit | `scripts/build-postkit.mjs <brand>` | per-platform folders (video, lint-gated caption.txt, alt.txt, thumb, POST.md, SRT/VTT for yt/li) -> out/<brand>/postkit/ |
+| Contact sheets | `scripts/contact-sheet.mjs <brand> <Comp>` | act-boundary stills + sheet HTML -> out/<brand>/marketing/stills/; Mission Control shows the strip |
+| Footage cache | `scripts/lib/cache.mjs`; capture scripts + stage-blender-assets consult it | key = product git HEAD+porcelain + script source + config; `--force` re-captures; caching disabled when product git state is unresolvable |
+| SFX library | `scripts/build-sfx.mjs` (one-time, idempotent) | ElevenLabs sound-generation -> assets/sfx/ + studio/public/sfx/ (whoosh/tick/riser, exit 2 = silent fallback); cues derived at render from launchTiming via `studio/src/lib/sfxCues.ts`, gated by `sfx.enabled` in the audio manifest (builder flips it only when files are staged) |
 
 Compositions: SocialClip, ProductDemo, LogoReveal, LaunchVideo, AnimatedOG,
 ComponentGallery (test bench). All schemas carry `brandId`; templates resolve

@@ -211,7 +211,14 @@ export const LaunchVideo: React.FC<Props> = ({brandId, kicker, headline, demo, f
       <Sequence from={t.end.from} durationInFrames={t.end.len}>
         <EndCard cta={cta} brand={brand} />
       </Sequence>
-      {audio ? <SoundTrack audio={audio} timing={t} /> : null}
+      {audio ? (
+        <SoundTrack
+          audio={audio}
+          timing={t}
+          featureLineCounts={features.map((f) => f.lines.length)}
+          motion={brand.motion}
+        />
+      ) : null}
       <div style={{position: 'absolute', bottom: Math.max(Math.round(40 * scale), safe.bottom), left: 0, right: 0, display: 'flex', justifyContent: 'center'}}>
         <FloatBar progress={frame / (durationInFrames - 1)} brand={brand} width={Math.round(640 * scale)} />
       </div>

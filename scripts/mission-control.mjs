@@ -12,6 +12,7 @@ import http from 'node:http';
 import {
   existsSync,
   readFileSync,
+  readdirSync,
   writeFileSync,
   renameSync,
   statSync,
@@ -141,7 +142,45 @@ function enrichAsset(entry) {
       }
     }
   }
-  return {...entry, _artifact};
+  return {...entry, _artifact, _stills: enrichStills(entry)};
+}
+
+// ---- contact-sheet stills (scripts/contact-sheet.mjs) ----------------------
+// Maps an asset's skill to the composition its contact sheet was generated
+// for. Assets with no still-first comp (product-demo, audio-track) get none.
+const SKILL_TO_COMP = {
+  '/launch-video': 'LaunchVideo',
+  '/social-clip': 'SocialClip',
+  '/logo-reveal': 'LogoReveal',
+  '/og-assets': 'AnimatedOG',
+};
+const STILLS_DIR_REL = 'marketing/stills'; // relative to brandOut, same media root as run.json
+
+function mediaUrl(relToBrandOut) {
+  return '/media/' + relToBrandOut.split('/').map(encodeURIComponent).join('/');
+}
+
+// Returns {sheetUrl, thumbs:[{label,url}]} when scripts/contact-sheet.mjs has
+// produced a sheet for this asset's composition, else null. Never mutates the
+// manifest on disk (same contract as enrichAsset).
+function enrichStills(entry) {
+  const comp = SKILL_TO_COMP[entry.skill];
+  if (!comp) return null;
+  const stillsDir = join(brandOut, STILLS_DIR_REL);
+  if (!existsSync(join(stillsDir, `${comp}-sheet.html`))) return null;
+  let thumbs = [];
+  try {
+    thumbs = readdirSync(stillsDir)
+      .filter((f) => f.startsWith(`${comp}-`) && f.endsWith('.png'))
+      .sort()
+      .map((f) => ({
+        label: f.slice(comp.length + 1, -'.png'.length),
+        url: mediaUrl(`${STILLS_DIR_REL}/${f}`),
+      }));
+  } catch {
+    thumbs = [];
+  }
+  return {sheetUrl: mediaUrl(`${STILLS_DIR_REL}/${comp}-sheet.html`), thumbs};
 }
 
 // ---- media path safety -----------------------------------------------------
@@ -367,6 +406,14 @@ header .started{color:#8a929b;font-size:13px;}
 .variants{padding:10px 14px;border-bottom:1px solid #21262c;}
 .variants .vtitle{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#8a929b;margin-bottom:6px;}
 .variants label{display:flex;align-items:center;gap:7px;font-size:13px;padding:3px 0;cursor:pointer;}
+.stills{padding:10px 14px;border-bottom:1px solid #21262c;}
+.stills-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+.stills-head .vtitle{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#8a929b;}
+.sheet-link{font-size:11px;color:#7fb2ff;text-decoration:none;}
+.sheet-link:hover{text-decoration:underline;}
+.stills-strip{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;}
+.still-thumb{flex:0 0 auto;display:block;border-radius:6px;overflow:hidden;border:1px solid #262b31;line-height:0;}
+.still-thumb img{display:block;height:44px;width:auto;}
 .controls{padding:12px 14px;display:flex;flex-direction:column;gap:10px;margin-top:auto;}
 .controls .row{display:flex;gap:9px;}
 .btn{font:inherit;font-size:13px;font-weight:600;border-radius:8px;border:1px solid;padding:8px 14px;cursor:pointer;transition:filter .12s;}
@@ -418,6 +465,12 @@ function variantValue(v,i){
   if(v&&typeof v==='object')return v.id||v.label||v.name||String(i);
   return String(i);
 }
+function stillsHtml(e){
+  const st=e._stills;
+  if(!st||!st.thumbs.length)return'';
+  const thumbs=st.thumbs.map(t=>'<a class="still-thumb" href="'+esc(t.url)+'" target="_blank" title="'+esc(t.label)+'"><img loading="lazy" src="'+esc(t.url)+'" alt="'+esc(t.label)+'"></a>').join('');
+  return '<div class="stills"><div class="stills-head"><span class="vtitle">Stills</span><a class="sheet-link" href="'+esc(st.sheetUrl)+'" target="_blank">contact sheet &#8599;</a></div><div class="stills-strip">'+thumbs+'</div></div>';
+}
 
 function cardHtml(e){
   const status=STATUSES.indexOf(e.status)>=0?e.status:'unknown';
@@ -448,7 +501,7 @@ function cardHtml(e){
       +(e.skill?'<span class="skill">'+esc(e.skill)+'</span>':'')
     +'</div>'
     +'<div class="media">'+media+'</div>'
-    +meta+redo+variants
+    +meta+redo+stillsHtml(e)+variants
     +'<div class="controls">'
       +'<div class="row"><button class="btn approve" data-act="approve">Approve</button></div>'
       +'<textarea placeholder="Redo note: what should change"></textarea>'
