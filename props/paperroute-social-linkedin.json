@@ -1,0 +1,12 @@
+{
+  "brandId": "paperroute",
+  "kicker": "paperroute.gg",
+  "headline": "An auditable 50/50 ledger.",
+  "lines": [
+    "Balance is a sum of append-only entries, never a counter",
+    "The split is fixed. You keep half.",
+    "Every constant is public at paperroute.gg/transparency"
+  ],
+  "screenshot": "paperroute/ledger.png",
+  "cta": "See every number at paperroute.gg"
+}

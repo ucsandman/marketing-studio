@@ -1,0 +1,31 @@
+{
+  "id": "paperroute",
+  "name": "PaperRoute",
+  "tagline": "Visibility-paid wallpaper ads with an auditable 50/50 ledger",
+  "url": "paperroute.gg",
+  "colors": {
+    "bg": "#e6e3db",
+    "surface": "#edeae2",
+    "surface2": "#f5f3ec",
+    "line": "#d1cdc1",
+    "ink": "#232118",
+    "ink2": "#57534a",
+    "ink3": "#6d685c",
+    "brand": "#137437",
+    "profit": "#137437",
+    "safe": "#137437",
+    "loss": "#b91c1c",
+    "info": "#57534a",
+    "rare": "#a16207"
+  },
+  "fonts": {
+    "display": "Libre Franklin",
+    "body": "Libre Franklin",
+    "mono": "JetBrains Mono"
+  },
+  "effects": {
+    "wash": 0,
+    "glow": 0.12
+  },
+  "voice": "Paper under a desk lamp, not a lightbox: warm putty LIGHT surfaces (#e6e3db page, never dark mode), warm near-black ink text, soft warm-tinted shadows (rgb(48 40 24 / a)), never cool gray. The register is a ledger: quiet and exact. Money, minutes, and measurements always render in mono with tabular numerals; labels are small tracked uppercase mono tags; label-value pairs join across receipt-style dotted leaders. THE ONE GREEN RULE: ledger green #137437 is the single accent, only on primary actions, live state, and the mark; never decoration, never a hero wash, never a large fill. No second accent, no gradient text, no glassmorphism. Rejects adware/bloatware feel and passive-income hype: no popups, no breathless claims; it earns trust by showing the math. Copy: no em dashes, no hype words, verbs like measure, compose, restore, split."
+}

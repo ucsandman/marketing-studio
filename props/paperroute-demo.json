@@ -1,0 +1,79 @@
+{
+  "brandId": "paperroute",
+  "video": "paperroute/demo.webm",
+  "cta": "Put the idle corner to work · paperroute.gg",
+  "telemetry": {
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "durationMs": 27204,
+    "events": [
+      {
+        "type": "step",
+        "t": 1483,
+        "label": "Available balance, summed from the ledger. Never a counter."
+      },
+      {
+        "type": "focus",
+        "t": 2214,
+        "x": 720,
+        "y": 163,
+        "w": 1056,
+        "h": 271
+      },
+      {
+        "type": "step",
+        "t": 6219,
+        "label": "Fourteen days of earnings, measured by the minute."
+      },
+      {
+        "type": "focus",
+        "t": 6955,
+        "x": 720,
+        "y": 510,
+        "w": 1014,
+        "h": 429
+      },
+      {
+        "type": "step",
+        "t": 10963,
+        "label": "Every earning day prints a receipt. The first dollar is marked."
+      },
+      {
+        "type": "focus",
+        "t": 11703,
+        "x": 720,
+        "y": 450,
+        "w": 1014,
+        "h": 273
+      },
+      {
+        "type": "step",
+        "t": 17112,
+        "label": "The whole product: one ad, the measured rectangle, the running total."
+      },
+      {
+        "type": "focus",
+        "t": 17846,
+        "x": 1116,
+        "y": 546,
+        "w": 500,
+        "h": 402
+      },
+      {
+        "type": "step",
+        "t": 22472,
+        "label": "The math is public. The code runs these exact constants."
+      },
+      {
+        "type": "focus",
+        "t": 23200,
+        "x": 720,
+        "y": 378,
+        "w": 840,
+        "h": 361
+      }
+    ]
+  }
+}

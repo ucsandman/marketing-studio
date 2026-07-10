@@ -8,7 +8,7 @@ import {
   useVideoConfig,
 } from 'remotion';
 import {z} from 'zod';
-import {getBrand} from '../lib/brand';
+import {alphaHex, getBrand} from '../lib/brand';
 import type {Brand} from '../lib/brand';
 import {loadBrandFonts} from '../lib/fonts';
 import {telemetrySchema, steps} from '../lib/telemetry';
@@ -65,7 +65,7 @@ const LogoAct: React.FC<{assets: Props['assets']; len: number; brand: Brand}> = 
   const Mark = getMark(brand.id);
   return (
     <AbsoluteFill style={{opacity: fade, justifyContent: 'center', alignItems: 'center'}}>
-      <div style={{width: 500, height: 500, filter: `drop-shadow(0 0 42px ${brand.colors.brand}66)`}}>
+      <div style={{width: 500, height: 500, filter: `drop-shadow(0 0 42px ${brand.colors.brand}${alphaHex(brand.effects.glow)})`}}>
         {assets.logoSequence ? (
           <PngSequence
             dir={assets.logoSequence}
@@ -155,7 +155,7 @@ export const LaunchVideo: React.FC<Props> = ({brandId, kicker, headline, demo, f
       <BackgroundLoop dir={assets.loopSequence} frameCount={assets.loopFrames} brand={brand} opacity={0.55} />
       <AbsoluteFill
         style={{
-          background: `radial-gradient(70% 55% at 50% 32%, ${brand.colors.brand}26, transparent 72%)`,
+          background: `radial-gradient(70% 55% at 50% 32%, ${brand.colors.brand}${alphaHex(brand.effects.wash)}, transparent 72%)`,
         }}
       />
       <Sequence durationInFrames={t.logo.len}>

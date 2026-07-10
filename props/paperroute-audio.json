@@ -1,0 +1,38 @@
+{
+  "music": {
+    "src": "paperroute/audio/music.mp3",
+    "durationMs": 56270
+  },
+  "lines": [
+    {
+      "act": "hook",
+      "src": "paperroute/audio/hook.mp3",
+      "durationMs": 4020,
+      "text": "There's a sponsor in the corner of your wallpaper that was sitting idle."
+    },
+    {
+      "act": "demo",
+      "src": "paperroute/audio/demo.mp3",
+      "durationMs": 7970,
+      "text": "It measures what's actually visible on your screen. Only while you're at the machine. Everything ties back to the ledger."
+    },
+    {
+      "act": "feature-0",
+      "src": "paperroute/audio/feature-0.mp3",
+      "durationMs": 3420,
+      "text": "No estimates. It counts the pixels that are really on screen."
+    },
+    {
+      "act": "feature-1",
+      "src": "paperroute/audio/feature-1.mp3",
+      "durationMs": 5560,
+      "text": "It pays fifty fifty, down the middle. The ledger only adds; nothing gets edited."
+    },
+    {
+      "act": "end",
+      "src": "paperroute/audio/end.mp3",
+      "durationMs": 2270,
+      "text": "Try it free at paperroute dot gg."
+    }
+  ]
+}

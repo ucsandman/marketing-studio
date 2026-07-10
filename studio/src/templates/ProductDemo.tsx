@@ -1,7 +1,7 @@
 import React from 'react';
 import {AbsoluteFill, Sequence, useCurrentFrame, useVideoConfig} from 'remotion';
 import {z} from 'zod';
-import {getBrand} from '../lib/brand';
+import {alphaHex, getBrand} from '../lib/brand';
 import {FloatBar} from '../components/FloatBar';
 import {Caption} from '../components/Caption';
 import {EndCard} from '../components/EndCard';
@@ -35,7 +35,7 @@ export const ProductDemo: React.FC<Props> = ({brandId, video, cta, telemetry}) =
     <AbsoluteFill style={{backgroundColor: brand.colors.bg}}>
       <AbsoluteFill
         style={{
-          background: `radial-gradient(70% 55% at 50% 32%, ${brand.colors.brand}30, transparent 72%)`,
+          background: `radial-gradient(70% 55% at 50% 32%, ${brand.colors.brand}${alphaHex(brand.effects.wash)}, transparent 72%)`,
         }}
       />
       <Sequence durationInFrames={bodyFrames}>

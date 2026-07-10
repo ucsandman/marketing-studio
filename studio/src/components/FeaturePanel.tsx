@@ -10,15 +10,23 @@ export const FeaturePanel: React.FC<{
   zoom?: {from: number; to: number; origin: string};
 }> = ({screenshot, lines, brand, zoom = {from: 1.5, to: 1.6, origin: '58% 30%'}}) => {
   const frame = useCurrentFrame();
-  const {fps} = useVideoConfig();
+  const {fps, width, height} = useVideoConfig();
+  const isPortrait = height > width;
   const fonts = loadBrandFonts(brand);
   const panelIn = spring({frame, fps, config: {damping: 200}});
   const zoomNow = interpolate(frame, [0, 170], [zoom.from, zoom.to]);
   return (
-    <AbsoluteFill style={{flexDirection: 'row', alignItems: 'center', padding: 72, gap: 72}}>
+    <AbsoluteFill
+      style={
+        isPortrait
+          ? {flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 64, gap: 64}
+          : {flexDirection: 'row', alignItems: 'center', padding: 72, gap: 72}
+      }
+    >
       <div
         style={{
-          flex: 1.4,
+          flex: isPortrait ? 'none' : 1.4,
+          width: isPortrait ? '100%' : undefined,
           borderRadius: 16,
           border: `1px solid ${brand.colors.line}`,
           background: brand.colors.surface,
@@ -37,7 +45,15 @@ export const FeaturePanel: React.FC<{
           <div style={{width: '100%', aspectRatio: '16/10', background: brand.colors.surface2}} />
         )}
       </div>
-      <div style={{flex: 1, display: 'flex', flexDirection: 'column', gap: 40}}>
+      <div
+        style={{
+          flex: isPortrait ? 'none' : 1,
+          width: isPortrait ? '100%' : undefined,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 40,
+        }}
+      >
         {lines.map((line, i) => {
           const s = spring({frame: frame - 15 - i * 10, fps, config: {damping: 200}});
           return (

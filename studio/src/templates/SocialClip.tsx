@@ -1,7 +1,7 @@
 import React from 'react';
 import {AbsoluteFill, Sequence, interpolate, useCurrentFrame, useVideoConfig} from 'remotion';
 import {z} from 'zod';
-import {getBrand} from '../lib/brand';
+import {alphaHex, getBrand} from '../lib/brand';
 import {FloatBar} from '../components/FloatBar';
 import {EndCard} from '../components/EndCard';
 import {Headline} from '../components/Headline';
@@ -29,10 +29,9 @@ export const SocialClip: React.FC<Props> = ({brandId, kicker, headline, lines, s
     });
   return (
     <AbsoluteFill style={{backgroundColor: brand.colors.bg}}>
-      {/* violet glow */}
       <AbsoluteFill
         style={{
-          background: `radial-gradient(60% 50% at 50% 35%, ${brand.colors.brand}22, transparent 70%)`,
+          background: `radial-gradient(60% 50% at 50% 35%, ${brand.colors.brand}${alphaHex(brand.effects.wash)}, transparent 70%)`,
         }}
       />
       <Sequence durationInFrames={90}>
@@ -42,7 +41,12 @@ export const SocialClip: React.FC<Props> = ({brandId, kicker, headline, lines, s
       </Sequence>
       <Sequence from={78} durationInFrames={162}>
         <AbsoluteFill style={{opacity: fadeAt(78, 240)}}>
-          <FeaturePanel screenshot={screenshot} lines={lines} brand={brand} />
+          <FeaturePanel
+            screenshot={screenshot}
+            lines={lines}
+            brand={brand}
+            zoom={{from: 1, to: 1.04, origin: '50% 30%'}}
+          />
         </AbsoluteFill>
       </Sequence>
       <Sequence from={228}>
