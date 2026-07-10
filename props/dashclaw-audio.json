@@ -1,0 +1,38 @@
+{
+  "music": {
+    "src": "dashclaw/audio/music.mp3",
+    "durationMs": 55200
+  },
+  "lines": [
+    {
+      "act": "hook",
+      "src": "dashclaw/audio/hook.mp3",
+      "durationMs": 2530,
+      "text": "Nothing sensitive runs until you allow it."
+    },
+    {
+      "act": "demo",
+      "src": "dashclaw/audio/demo.mp3",
+      "durationMs": 19170,
+      "text": "Every action your unattended agent tries is intercepted and held here, risk scored, and bound to the exact command. One click releases it, and the decision is recorded, chained to every governed action that follows. One ledger, many lenses, every rule that governs your agents."
+    },
+    {
+      "act": "feature-0",
+      "src": "dashclaw/audio/feature-0.mp3",
+      "durationMs": 4310,
+      "text": "Held before they run. Risk scored. One click to allow or deny."
+    },
+    {
+      "act": "feature-1",
+      "src": "dashclaw/audio/feature-1.mp3",
+      "durationMs": 4680,
+      "text": "One ledger, chained to the decision. Spend and risk verified, on the record."
+    },
+    {
+      "act": "end",
+      "src": "dashclaw/audio/end.mp3",
+      "durationMs": 2770,
+      "text": "Govern your agents at dashclaw dot io."
+    }
+  ]
+}

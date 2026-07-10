@@ -1,0 +1,115 @@
+{
+  "brandId": "dashclaw",
+  "kicker": "dashclaw.io",
+  "headline": "Nothing sensitive runs until you allow it",
+  "demo": {
+    "video": "dashclaw/demo.webm",
+    "telemetry": {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "durationMs": 26166,
+      "events": [
+        {
+          "type": "step",
+          "t": 892,
+          "label": "Every action your unattended agent tries is intercepted and held here."
+        },
+        {
+          "type": "focus",
+          "t": 1681,
+          "x": 832,
+          "y": 384,
+          "w": 1112,
+          "h": 631
+        },
+        {
+          "type": "step",
+          "t": 5492,
+          "label": "Risk scored, systems named, bound to the exact command."
+        },
+        {
+          "type": "focus",
+          "t": 6277,
+          "x": 832,
+          "y": 384,
+          "w": 1104,
+          "h": 423
+        },
+        {
+          "type": "step",
+          "t": 10082,
+          "label": "One click releases it. The decision is recorded."
+        },
+        {
+          "type": "click",
+          "t": 10091,
+          "x": 1235,
+          "y": 337
+        },
+        {
+          "type": "focus",
+          "t": 11726,
+          "x": 720,
+          "y": 430,
+          "w": 1180,
+          "h": 720
+        },
+        {
+          "type": "step",
+          "t": 16436,
+          "label": "Every governed action, chained to the decision that allowed it."
+        },
+        {
+          "type": "focus",
+          "t": 17223,
+          "x": 832,
+          "y": 568,
+          "w": 1214,
+          "h": 467
+        },
+        {
+          "type": "step",
+          "t": 22362,
+          "label": "One ledger, many lenses. Every rule that governs your agents."
+        },
+        {
+          "type": "focus",
+          "t": 22362,
+          "x": 720,
+          "y": 360,
+          "w": 1220,
+          "h": 620
+        }
+      ]
+    }
+  },
+  "features": [
+    {
+      "screenshot": "dashclaw/feature-approvals.png",
+      "heading": "Intercept and hold",
+      "lines": [
+        "Sensitive actions are held before they run",
+        "Risk scored and bound to the exact command",
+        "One click to allow or deny in the inbox"
+      ]
+    },
+    {
+      "screenshot": "dashclaw/feature-ledger.png",
+      "heading": "Recorded and verified",
+      "lines": [
+        "Every governed action lands in one ledger",
+        "Chained to the decision that allowed it",
+        "Outcomes verified, spend and risk on the record"
+      ]
+    }
+  ],
+  "cta": "Govern your agents at dashclaw.io",
+  "assets": {
+    "logoSequence": "dashclaw/logo-reveal",
+    "logoFrames": 90,
+    "loopSequence": null,
+    "loopFrames": 1
+  }
+}
