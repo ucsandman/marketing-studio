@@ -19,7 +19,13 @@ export const FeaturePanel: React.FC<{
     <AbsoluteFill
       style={
         isPortrait
-          ? {flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 64, gap: 64}
+          ? {
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'flex-start',
+              padding: '220px 64px 64px',
+              gap: 64,
+            }
           : {flexDirection: 'row', alignItems: 'center', padding: 72, gap: 72}
       }
     >
@@ -27,22 +33,29 @@ export const FeaturePanel: React.FC<{
         style={{
           flex: isPortrait ? 'none' : 1.4,
           width: isPortrait ? '100%' : undefined,
+          aspectRatio: isPortrait ? '7/5' : undefined,
           borderRadius: 16,
           border: `1px solid ${brand.colors.line}`,
           background: brand.colors.surface,
           overflow: 'hidden',
           opacity: panelIn,
-          transform: `translateY(${(1 - panelIn) * 60}px)`,
+          transform: isPortrait
+            ? `translateY(${(1 - panelIn) * 60}px) scale(${zoomNow})`
+            : `translateY(${(1 - panelIn) * 60}px)`,
           boxShadow: `0 40px 120px ${brand.colors.bg}`,
         }}
       >
         {screenshot ? (
           <Img
             src={staticFile(screenshot)}
-            style={{width: '100%', display: 'block', transform: `scale(${zoomNow})`, transformOrigin: zoom.origin}}
+            style={
+              isPortrait
+                ? {width: '100%', height: '100%', objectFit: 'cover', objectPosition: zoom.origin, display: 'block'}
+                : {width: '100%', display: 'block', transform: `scale(${zoomNow})`, transformOrigin: zoom.origin}
+            }
           />
         ) : (
-          <div style={{width: '100%', aspectRatio: '16/10', background: brand.colors.surface2}} />
+          <div style={{width: '100%', aspectRatio: isPortrait ? '7/5' : '16/10', background: brand.colors.surface2}} />
         )}
       </div>
       <div
@@ -51,7 +64,7 @@ export const FeaturePanel: React.FC<{
           width: isPortrait ? '100%' : undefined,
           display: 'flex',
           flexDirection: 'column',
-          gap: 40,
+          gap: isPortrait ? 48 : 40,
         }}
       >
         {lines.map((line, i) => {
@@ -67,8 +80,23 @@ export const FeaturePanel: React.FC<{
                 transform: `translateX(${(1 - s) * 40}px)`,
               }}
             >
-              <div style={{width: 10, height: 10, borderRadius: 5, background: brand.colors.brand, marginTop: 22}} />
-              <div style={{fontFamily: fonts.body, fontWeight: 600, fontSize: 40, color: brand.colors.ink2}}>
+              <div
+                style={{
+                  width: isPortrait ? 12 : 10,
+                  height: isPortrait ? 12 : 10,
+                  borderRadius: isPortrait ? 6 : 5,
+                  background: brand.colors.brand,
+                  marginTop: isPortrait ? 26 : 22,
+                }}
+              />
+              <div
+                style={{
+                  fontFamily: fonts.body,
+                  fontWeight: 600,
+                  fontSize: isPortrait ? 46 : 40,
+                  color: brand.colors.ink2,
+                }}
+              >
                 {line}
               </div>
             </div>
