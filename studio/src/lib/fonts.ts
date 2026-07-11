@@ -4,6 +4,7 @@ import {loadFont as loadGeistMono} from '@remotion/google-fonts/GeistMono';
 import {loadFont as loadInter} from '@remotion/google-fonts/Inter';
 import {loadFont as loadJetBrainsMono} from '@remotion/google-fonts/JetBrainsMono';
 import {loadFont as loadLibreFranklin} from '@remotion/google-fonts/LibreFranklin';
+import {loadFont as loadPlusJakartaSans} from '@remotion/google-fonts/PlusJakartaSans';
 import type {Brand} from './brand';
 
 // Load once at module scope; Remotion delays render until fonts resolve.
@@ -18,6 +19,10 @@ const families: Record<string, string> = {
   'JetBrains Mono': loadJetBrainsMono('normal', {weights: ['400', '500'], subsets: ['latin']})
     .fontFamily,
   'Libre Franklin': loadLibreFranklin('normal', {
+    weights: ['400', '600', '800'],
+    subsets: ['latin'],
+  }).fontFamily,
+  'Plus Jakarta Sans': loadPlusJakartaSans('normal', {
     weights: ['400', '600', '800'],
     subsets: ['latin'],
   }).fontFamily,

@@ -2,6 +2,7 @@ import type React from 'react';
 import {NobanMark} from './NobanMark';
 import {DashClawMark} from './DashClawMark';
 import {PaperRouteMark} from './PaperRouteMark';
+import {SynthaconMark} from './SynthaconMark';
 
 export type MarkComponent = React.FC<{size: number; color: string}>;
 
@@ -9,6 +10,7 @@ const registry: Record<string, MarkComponent> = {
   noban: NobanMark,
   dashclaw: DashClawMark,
   paperroute: PaperRouteMark,
+  synthacon: SynthaconMark,
 };
 
 export const getMark = (id: string): MarkComponent => {

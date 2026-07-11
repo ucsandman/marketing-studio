@@ -2,9 +2,7 @@
 
 An agent-driven marketing studio for Claude Code. You type `/marketing` in your product's repo; the agent onboards your brand, films your app, renders a full marketing asset suite in this engine, and copies the finished files back to you.
 
-![Animated OG loop rendered by the studio](examples/paperroute/readme.gif)
-
-*An animated OG loop the studio rendered for a real product, from brand tokens alone. More in [`examples/`](examples/).*
+*This fork drops the upstream `examples/` asset suites (~90MB of demo video) to keep the clone lean; see [upstream](https://github.com/ucsandman/marketing-studio) for rendered example output.*
 
 ## The one command
 
@@ -39,32 +37,7 @@ Each asset also works standalone: run `/logo-reveal`, `/product-demo`, `/launch-
 
 ## Example output
 
-Everything below was produced by `/marketing` runs against two real products, unedited. Turn the sound on: the voiceover and music are generated too.
-
-### noban.gg (CS2 skin arbitrage dashboard)
-
-https://github.com/user-attachments/assets/7d184b12-1afc-4129-a4f0-87a33da986e3
-
-| File | Asset |
-|------|-------|
-| [`launch.mp4`](examples/noban/launch.mp4) | 60s launch video with generated voiceover and music |
-| [`demo.mp4`](examples/noban/demo.mp4) | Product demo with measured camera zooms ([preview still](examples/noban/demo-still.png)) |
-| [`logo-reveal.mp4`](examples/noban/logo-reveal.mp4) | Blender draw-on logo reveal |
-| [`social-launch.mp4`](examples/noban/social-launch.mp4) | X/LinkedIn announcement clip |
-| [`og.mp4`](examples/noban/og.mp4) | Animated OG loop |
-
-### paperroute.gg (wallpaper ad network)
-
-https://github.com/user-attachments/assets/1bf89936-4f8b-405a-b507-5f051ae18ef8
-
-| File | Asset |
-|------|-------|
-| [`launch.mp4`](examples/paperroute/launch.mp4) | Launch video with audio |
-| [`demo.mp4`](examples/paperroute/demo.mp4) | Product demo |
-| [`logo-reveal.mp4`](examples/paperroute/logo-reveal.mp4) | Blender logo reveal |
-| [`social-x.mp4`](examples/paperroute/social-x.mp4), [`social-linkedin.mp4`](examples/paperroute/social-linkedin.mp4), [`social-vertical.mp4`](examples/paperroute/social-vertical.mp4) | Per-platform social clips |
-| [`og.png`](examples/paperroute/og.png), [`og.gif`](examples/paperroute/og.gif), [`og.mp4`](examples/paperroute/og.mp4) | OG image, loop, and video |
-| [`readme.gif`](examples/paperroute/readme.gif) | README-sized GIF (the one at the top of this page) |
+Full unedited asset suites for two real products (launch videos with generated voiceover and music, demos, logo reveals, social clips, OG loops) live in the [upstream repo's `examples/`](https://github.com/ucsandman/marketing-studio/tree/main/examples); this fork omits them for clone weight.
 
 ## How it works
 
@@ -131,7 +104,6 @@ feeders/capture/   Playwright recorder (product demos)
 feeders/audio/     ElevenLabs client (voiceover + music)
 feeders/comfy/     ComfyUI client (optional AI backdrops)
 skills/            the Claude Code skills that drive all of this
-examples/          real output: full asset suites for two shipped products
 scripts/           props builders, staging, statics, smoke, copy linter, brief
                    gatherer, storyboard board, export matrix, captions, thumbs,
                    post kit, contact sheets, footage cache, SFX library,

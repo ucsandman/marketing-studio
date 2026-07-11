@@ -1,0 +1,40 @@
+{
+  "id": "synthacon",
+  "name": "Synthacon",
+  "tagline": "Buy, sell, and rent studio and music gear",
+  "url": "synthacon.com",
+  "colors": {
+    "bg": "#0c0c0d",
+    "surface": "#171719",
+    "surface2": "#1d1d20",
+    "line": "#464450",
+    "ink": "#eeedf0",
+    "ink2": "#cdc6d8",
+    "ink3": "#747278",
+    "brand": "#a090dc",
+    "profit": "#e6b53d",
+    "safe": "#4ade80",
+    "loss": "#f06870",
+    "info": "#6898b8",
+    "rare": "#9870c8"
+  },
+  "fonts": {
+    "display": "Plus Jakarta Sans",
+    "body": "Inter",
+    "mono": "JetBrains Mono"
+  },
+  "effects": {
+    "wash": 0.1,
+    "glow": 0.3
+  },
+  "motion": {
+    "tempo": 1,
+    "exuberance": 0.25,
+    "stagger": 0.5,
+    "overshoot": 0.15,
+    "parallax": 0.2,
+    "settle": 0.25,
+    "textReveal": "maskWipe"
+  },
+  "voice": "A musician talking to another musician, never a brand talking at a customer. Plain, informed, peer-to-peer; the simplest word that carries the meaning; earn every adjective. Marketplace + community to buy, sell, and rent studio and music gear, in open beta; the rent/lend angle is the story. CTA: Join the beta. HARD rules: no marketing-speak category labels, no fake or invented metrics (prefer no numbers at all during beta), no em-dashes in any public copy, no unshipped features. Color rules: violet #a090dc is rich, never neon; heroes sit on a dark gradient, never a bright violet wash; gold #e6b53d is the events/promo accent only; green #4ade80 means success/online only; red #f06870 means error only; steel-blue #6898b8 is info, never pink. Prices and data render in JetBrains Mono."
+}

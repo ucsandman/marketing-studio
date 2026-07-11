@@ -18,6 +18,25 @@ describe('getBrand', () => {
     expect(b.fonts.mono).toBe('JetBrains Mono');
   });
 
+  it('loads the synthacon brand with validated tokens', () => {
+    const b = getBrand('synthacon');
+    expect(b.name).toBe('Synthacon');
+    // dark "Synthacon Lexicon" palette: violet primary, rich but never neon
+    expect(b.colors.brand).toBe('#a090dc');
+    expect(b.colors.bg).toBe('#0c0c0d');
+    // green is success/online ONLY, red is error ONLY, gold is the events accent
+    expect(b.colors.safe).toBe('#4ade80');
+    expect(b.colors.loss).toBe('#f06870');
+    expect(b.colors.profit).toBe('#e6b53d');
+    expect(b.fonts.display).toBe('Plus Jakarta Sans');
+    expect(b.fonts.mono).toBe('JetBrains Mono');
+    // hero rule: dark gradient, never the bright violet wash — below engine default
+    expect(b.effects.wash).toBeLessThan(0.165);
+    // calm, confident motion for a peer-to-peer gear community
+    expect(b.motion.exuberance).toBeLessThanOrEqual(0.3);
+    expect(b.motion.textReveal).toBe('maskWipe');
+  });
+
   it('rejects hex colors that are not #rrggbb', () => {
     // schema-level guarantee: every color token matches /^#[0-9a-f]{6}$/i
     const b = getBrand('noban');
