@@ -39,6 +39,7 @@ export const launchVideoSchema = z.object({
   features: z.array(
     z.object({
       screenshot: z.string().nullable(),
+      portraitScreenshot: z.string().optional(),
       heading: z.string(),
       lines: z.array(z.string()).min(1).max(4),
     }),
@@ -188,7 +189,13 @@ const FeatureAct: React.FC<{feature: Props['features'][number]; len: number; bra
         {feature.heading}
       </div>
       <AbsoluteFill style={{top: panelTop}}>
-        <FeaturePanel screenshot={feature.screenshot} lines={feature.lines} brand={brand} zoom={{from: 1, to: 1.04, origin: '50% 30%'}} />
+        <FeaturePanel
+          screenshot={feature.screenshot}
+          portraitScreenshot={feature.portraitScreenshot}
+          lines={feature.lines}
+          brand={brand}
+          zoom={{from: 1, to: 1.04, origin: '50% 30%'}}
+        />
       </AbsoluteFill>
     </AbsoluteFill>
   );

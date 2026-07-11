@@ -17,6 +17,7 @@ export const socialClipSchema = z.object({
   headline: z.string(),
   lines: z.array(z.string()).min(1).max(4),
   screenshot: z.string().nullable(),
+  portraitScreenshot: z.string().optional(),
   cta: z.string(),
   // Burn VO lines into on-screen captions for muted autoplay. SocialClip has no
   // audio track, so caption text arrives via the optional `voLines` prop (the
@@ -35,7 +36,17 @@ export const socialClipSchema = z.object({
 
 type Props = z.infer<typeof socialClipSchema>;
 
-export const SocialClip: React.FC<Props> = ({brandId, kicker, headline, lines, screenshot, cta, burnCaptions, voLines}) => {
+export const SocialClip: React.FC<Props> = ({
+  brandId,
+  kicker,
+  headline,
+  lines,
+  screenshot,
+  portraitScreenshot,
+  cta,
+  burnCaptions,
+  voLines,
+}) => {
   const frame = useCurrentFrame();
   const {durationInFrames, fps} = useVideoConfig();
   const {orientation, scale, safe} = useFormat();
@@ -68,6 +79,7 @@ export const SocialClip: React.FC<Props> = ({brandId, kicker, headline, lines, s
         <AbsoluteFill style={{opacity: fadeAt(78, 240)}}>
           <FeaturePanel
             screenshot={screenshot}
+            portraitScreenshot={portraitScreenshot}
             lines={lines}
             brand={brand}
             zoom={{from: 1, to: 1.04, origin: '50% 30%'}}

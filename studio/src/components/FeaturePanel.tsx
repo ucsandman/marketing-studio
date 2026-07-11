@@ -9,7 +9,8 @@ export const FeaturePanel: React.FC<{
   lines: string[];
   brand: Brand;
   zoom?: {from: number; to: number; origin: string};
-}> = ({screenshot, lines, brand, zoom = {from: 1.5, to: 1.6, origin: '58% 30%'}}) => {
+  portraitScreenshot?: string;
+}> = ({screenshot, lines, brand, zoom = {from: 1.5, to: 1.6, origin: '58% 30%'}, portraitScreenshot}) => {
   const frame = useCurrentFrame();
   const {fps, width, height} = useVideoConfig();
   const isPortrait = height > width;
@@ -48,7 +49,7 @@ export const FeaturePanel: React.FC<{
       >
         {screenshot ? (
           <Img
-            src={staticFile(screenshot)}
+            src={staticFile(isPortrait ? (portraitScreenshot ?? screenshot) : screenshot)}
             style={
               isPortrait
                 ? {width: '100%', height: '100%', objectFit: 'cover', objectPosition: zoom.origin, display: 'block'}

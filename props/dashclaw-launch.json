@@ -9,16 +9,16 @@
         "width": 1440,
         "height": 900
       },
-      "durationMs": 26166,
+      "durationMs": 26304,
       "events": [
         {
           "type": "step",
-          "t": 892,
+          "t": 1070,
           "label": "Every action your unattended agent tries is intercepted and held here."
         },
         {
           "type": "focus",
-          "t": 1681,
+          "t": 1863,
           "x": 832,
           "y": 384,
           "w": 1112,
@@ -26,12 +26,12 @@
         },
         {
           "type": "step",
-          "t": 5492,
+          "t": 5666,
           "label": "Risk scored, systems named, bound to the exact command."
         },
         {
           "type": "focus",
-          "t": 6277,
+          "t": 6442,
           "x": 832,
           "y": 384,
           "w": 1104,
@@ -39,18 +39,18 @@
         },
         {
           "type": "step",
-          "t": 10082,
+          "t": 10253,
           "label": "One click releases it. The decision is recorded."
         },
         {
           "type": "click",
-          "t": 10091,
+          "t": 10260,
           "x": 1235,
           "y": 337
         },
         {
           "type": "focus",
-          "t": 11726,
+          "t": 11897,
           "x": 720,
           "y": 430,
           "w": 1180,
@@ -58,12 +58,12 @@
         },
         {
           "type": "step",
-          "t": 16436,
+          "t": 16596,
           "label": "Every governed action, chained to the decision that allowed it."
         },
         {
           "type": "focus",
-          "t": 17223,
+          "t": 17386,
           "x": 832,
           "y": 568,
           "w": 1214,
@@ -71,12 +71,12 @@
         },
         {
           "type": "step",
-          "t": 22362,
+          "t": 22490,
           "label": "One ledger, many lenses. Every rule that governs your agents."
         },
         {
           "type": "focus",
-          "t": 22362,
+          "t": 22490,
           "x": 720,
           "y": 360,
           "w": 1220,
@@ -88,6 +88,7 @@
   "features": [
     {
       "screenshot": "dashclaw/feature-approvals.png",
+      "portraitScreenshot": "dashclaw/feature-approvals-portrait.png",
       "heading": "Intercept and hold",
       "lines": [
         "Sensitive actions are held before they run",
@@ -97,6 +98,7 @@
     },
     {
       "screenshot": "dashclaw/feature-ledger.png",
+      "portraitScreenshot": "dashclaw/feature-ledger-portrait.png",
       "heading": "Recorded and verified",
       "lines": [
         "Every governed action lands in one ledger",

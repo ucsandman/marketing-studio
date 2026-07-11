@@ -18,6 +18,7 @@ const launch = {
   features: [
     {
       screenshot: 'dashclaw/feature-approvals.png',
+      portraitScreenshot: 'dashclaw/feature-approvals-portrait.png',
       heading: 'Intercept and hold',
       lines: [
         'Sensitive actions are held before they run',
@@ -27,6 +28,7 @@ const launch = {
     },
     {
       screenshot: 'dashclaw/feature-ledger.png',
+      portraitScreenshot: 'dashclaw/feature-ledger-portrait.png',
       heading: 'Recorded and verified',
       lines: [
         'Every governed action lands in one ledger',

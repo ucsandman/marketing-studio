@@ -15,11 +15,20 @@ export const animatedOgSchema = z.object({
   heroImage: z.string().nullable(),
   loopSequence: z.string().nullable(),
   loopFrames: z.number().int().positive(),
+  showFloatBar: z.boolean().optional(),
 });
 
 type Props = z.infer<typeof animatedOgSchema>;
 
-export const AnimatedOG: React.FC<Props> = ({brandId, tagline, cta, heroImage, loopSequence, loopFrames}) => {
+export const AnimatedOG: React.FC<Props> = ({
+  brandId,
+  tagline,
+  cta,
+  heroImage,
+  loopSequence,
+  loopFrames,
+  showFloatBar,
+}) => {
   const frame = useCurrentFrame();
   const {durationInFrames} = useVideoConfig();
   const brand = getBrand(brandId);
@@ -72,9 +81,11 @@ export const AnimatedOG: React.FC<Props> = ({brandId, tagline, cta, heroImage, l
           {cta.toUpperCase()}
         </div>
       </AbsoluteFill>
-      <div style={{position: 'absolute', bottom: 36, left: 0, right: 0, display: 'flex', justifyContent: 'center'}}>
-        <FloatBar progress={barProgress} brand={brand} width={480} />
-      </div>
+      {showFloatBar !== false ? (
+        <div style={{position: 'absolute', bottom: 36, left: 0, right: 0, display: 'flex', justifyContent: 'center'}}>
+          <FloatBar progress={barProgress} brand={brand} width={480} />
+        </div>
+      ) : null}
       <FilmGrade grade={brand.grade} accent={brand.colors.brand} />
     </AbsoluteFill>
   );
