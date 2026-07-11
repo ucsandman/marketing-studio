@@ -1,0 +1,72 @@
+{
+  "brandId": "synthacon",
+  "video": "synthacon/demo.webm",
+  "cta": "Join the beta at synthacon.com",
+  "telemetry": {
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "durationMs": 22283,
+    "events": [
+      {
+        "type": "step",
+        "t": 1762,
+        "label": "Buy, sell, and rent studio gear."
+      },
+      {
+        "type": "focus",
+        "t": 1777,
+        "x": 720,
+        "y": 289,
+        "w": 1440,
+        "h": 376
+      },
+      {
+        "type": "step",
+        "t": 8088,
+        "label": "Browse gear from people nearby."
+      },
+      {
+        "type": "focus",
+        "t": 8808,
+        "x": 283,
+        "y": 650,
+        "w": 566,
+        "h": 501
+      },
+      {
+        "type": "step",
+        "t": 13010,
+        "label": "Open a listing."
+      },
+      {
+        "type": "click",
+        "t": 13016,
+        "x": 157,
+        "y": 747
+      },
+      {
+        "type": "focus",
+        "t": 13879,
+        "x": 707,
+        "y": 317,
+        "w": 1415,
+        "h": 633
+      },
+      {
+        "type": "step",
+        "t": 18081,
+        "label": "Rent it by the day, week, or month."
+      },
+      {
+        "type": "focus",
+        "t": 18081,
+        "x": 1189,
+        "y": 205,
+        "w": 503,
+        "h": 410
+      }
+    ]
+  }
+}

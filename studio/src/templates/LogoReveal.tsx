@@ -9,6 +9,7 @@ import {alphaHex, getBrand, motionOverrideSchema} from '../lib/brand';
 import {loadBrandFonts} from '../lib/fonts';
 import {brandSpring, entrance} from '../lib/motion';
 import {getMark} from '../brands/marks';
+import {getReveal} from '../brands/reveals';
 import {PngSequence} from '../components/PngSequence';
 import {FilmGrade} from '../components/FilmGrade';
 
@@ -33,6 +34,7 @@ export const LogoReveal: React.FC<Props> = ({brandId, sequence, frameCount, cta,
   const motion = motionOverride ? {...brand.motion, ...motionOverride} : brand.motion;
   const fonts = loadBrandFonts(brand);
   const Mark = getMark(brand.id);
+  const Reveal = getReveal(brand.id);
   const wordmarkIn = brandSpring(frame, fps, motion, {delayFrames: 66});
   const ctaIn = entrance(frame, fps, motion, {delayFrames: 96, durFrames: 14});
   return (
@@ -44,7 +46,11 @@ export const LogoReveal: React.FC<Props> = ({brandId, sequence, frameCount, cta,
       />
       <AbsoluteFill style={{justifyContent: 'center', alignItems: 'center', gap: 28}}>
         <div style={{width: 520, height: 520, filter: `drop-shadow(0 0 42px ${brand.colors.brand}${alphaHex(brand.effects.glow)})`}}>
-          {sequence ? (
+          {Reveal ? (
+            <AbsoluteFill style={{justifyContent: 'center', alignItems: 'center', position: 'relative'}}>
+              <Reveal size={420} brand={brand} />
+            </AbsoluteFill>
+          ) : sequence ? (
             <PngSequence
               dir={sequence}
               frameCount={frameCount}
