@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {trimToBudget, buildCaption, buildAlt, PLATFORM_MAP} from './build-postkit.mjs';
+import {trimToBudget, buildCaption, buildAlt, manifestEntry, buildManifest, PLATFORM_MAP} from './build-postkit.mjs';
 
 // --- trimToBudget ---
 
@@ -89,4 +89,35 @@ test('buildAlt uses the brief hook when present', () => {
 test('buildAlt falls back to brand tagline when brief is null', () => {
   const alt = buildAlt(null, brand);
   assert.match(alt, new RegExp(brand.tagline));
+});
+
+// --- manifest ---
+
+test('manifestEntry maps assembled artifacts to kit-relative paths', () => {
+  const entry = manifestEntry('x', PLATFORM_MAP.x, {hasVideo: true, thumbFile: 'thumb.jpg', srtCopied: false, vttCopied: false});
+  assert.deepEqual(entry, {
+    video: 'x/social-16x9.mp4',
+    caption: 'x/caption.txt',
+    alt: 'x/alt.txt',
+    thumb: 'x/thumb.jpg',
+    srt: null,
+    vtt: null,
+    note: PLATFORM_MAP.x.note,
+  });
+});
+
+test('manifestEntry uses null for missing artifacts (partial kit)', () => {
+  const entry = manifestEntry('linkedin', PLATFORM_MAP.linkedin, {hasVideo: false, thumbFile: null, srtCopied: true, vttCopied: true});
+  assert.equal(entry.video, null);
+  assert.equal(entry.thumb, null);
+  assert.equal(entry.srt, 'linkedin/launch.srt');
+  assert.equal(entry.vtt, 'linkedin/launch.vtt');
+});
+
+test('buildManifest wraps platforms with version and brand', () => {
+  const m = buildManifest('noban', '2026-07-11T00:00:00.000Z', {x: manifestEntry('x', PLATFORM_MAP.x, {hasVideo: false, thumbFile: null, srtCopied: false, vttCopied: false})});
+  assert.equal(m.version, 1);
+  assert.equal(m.brand, 'noban');
+  assert.equal(m.generatedAt, '2026-07-11T00:00:00.000Z');
+  assert.ok(m.platforms.x);
 });

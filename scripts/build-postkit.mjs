@@ -14,6 +14,9 @@
 //   - launch.srt/launch.vtt — copied in for youtube + linkedin only
 //   - POST.md — human checklist: what to upload, which file, caption, notes
 //
+// Also writes manifest.json at the kit root — machine-readable kit index
+// consumed by launch-engine.
+//
 // caption.txt is gated by scripts/lint-copy.mjs (imported directly, not spawned):
 // any ERROR-level violation FAILS the whole build. Exits non-zero only if NOTHING
 // could be assembled across every platform; partial kits are the expected outcome
@@ -120,6 +123,25 @@ export function buildAlt(brief, brand) {
   return `${brand.name} launch video: ${headline}.`;
 }
 
+// Manifest entry for one platform folder. Paths are relative to the postkit
+// root; null means that artifact was not assembled (partial kits are normal).
+export function manifestEntry(platformKey, cfg, {hasVideo, thumbFile, srtCopied, vttCopied}) {
+  return {
+    video: hasVideo ? `${platformKey}/${cfg.videoSource}.mp4` : null,
+    caption: `${platformKey}/caption.txt`,
+    alt: `${platformKey}/alt.txt`,
+    thumb: thumbFile ? `${platformKey}/${thumbFile}` : null,
+    srt: srtCopied ? `${platformKey}/launch.srt` : null,
+    vtt: vttCopied ? `${platformKey}/launch.vtt` : null,
+    note: cfg.note,
+  };
+}
+
+// The machine-readable interface consumed by launch-engine (PostKitManifestSchema).
+export function buildManifest(brand, generatedAt, platforms) {
+  return {version: 1, brand, generatedAt, platforms};
+}
+
 function postMd(brandLabel, platformKey, cfg, videoStatus, thumbStatus, captionFilesLine) {
   const label = PLATFORM_LABELS[platformKey];
   return `# ${brandLabel} — ${label} post kit
@@ -185,6 +207,7 @@ function main() {
   const postkitDir = join(root, 'out', brand, 'postkit');
 
   let assembledCount = 0;
+  const manifestPlatforms = {};
 
   for (const [platformKey, cfg] of Object.entries(PLATFORM_MAP)) {
     const dir = join(postkitDir, platformKey);
@@ -218,6 +241,7 @@ function main() {
       thumbStatus = `NOT INCLUDED (missing out/${brand}/thumbs/thumb-${cfg.aspect}.jpg — run extract-thumbs.mjs)`;
       console.log(`postkit: ${platformKey}: skipped thumbnail, thumb-${cfg.aspect}.(jpg|png) not found in out/${brand}/thumbs/`);
     }
+    const thumbFile = thumbStatus.startsWith('NOT') ? null : thumbStatus;
 
     // Caption, gated by lint-copy before it is trusted.
     const captionText = buildCaption(platformKey, brief, brandData);
@@ -237,6 +261,8 @@ function main() {
 
     // Caption sidecars (youtube + linkedin only).
     let captionFilesLine = '';
+    let srtCopied = false;
+    let vttCopied = false;
     if (cfg.captionFile) {
       const srtSrc = join(captionsDir, 'launch.srt');
       const vttSrc = join(captionsDir, 'launch.vtt');
@@ -244,10 +270,12 @@ function main() {
       if (existsSync(srtSrc)) {
         copyFileSync(srtSrc, join(dir, 'launch.srt'));
         copied.push('launch.srt');
+        srtCopied = true;
       }
       if (existsSync(vttSrc)) {
         copyFileSync(vttSrc, join(dir, 'launch.vtt'));
         copied.push('launch.vtt');
+        vttCopied = true;
       }
       if (copied.length) {
         captionFilesLine = `- Captions: ${copied.join(', ')} (upload alongside the video)`;
@@ -261,6 +289,13 @@ function main() {
     writeFileSync(join(dir, 'POST.md'), postMd(brandData.name ?? brand, platformKey, cfg, videoStatus, thumbStatus, captionFilesLine));
     assembledCount += 1;
 
+    manifestPlatforms[platformKey] = manifestEntry(platformKey, cfg, {
+      hasVideo: existsSync(videoSrc),
+      thumbFile,
+      srtCopied,
+      vttCopied,
+    });
+
     console.log(`postkit: wrote out/${brand}/postkit/${platformKey}/ (video: ${existsSync(videoSrc) ? 'yes' : 'skipped'}, thumb: ${thumbStatus.startsWith('NOT') ? 'skipped' : 'yes'})`);
   }
 
@@ -268,6 +303,12 @@ function main() {
     console.error(`build-postkit: FAILED — nothing could be assembled for ${brand}`);
     process.exit(1);
   }
+
+  writeFileSync(
+    join(postkitDir, 'manifest.json'),
+    JSON.stringify(buildManifest(brand, new Date().toISOString(), manifestPlatforms), null, 2) + '\n',
+  );
+  console.log(`postkit: wrote out/${brand}/postkit/manifest.json`);
 
   console.log(`postkit OK: ${Object.keys(PLATFORM_MAP).length} platform folders in out/${brand}/postkit/`);
 }
