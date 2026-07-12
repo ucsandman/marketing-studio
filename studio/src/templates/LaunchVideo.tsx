@@ -7,7 +7,7 @@ import {
   useVideoConfig,
 } from 'remotion';
 import {z} from 'zod';
-import {alphaHex, getBrand, motionOverrideSchema} from '../lib/brand';
+import {alphaHex, getBrand, markColorOf, motionOverrideSchema} from '../lib/brand';
 import type {Brand} from '../lib/brand';
 import {loadBrandFonts} from '../lib/fonts';
 import {brandSpring} from '../lib/motion';
@@ -113,7 +113,7 @@ const LogoAct: React.FC<{assets: Props['assets']; len: number; brand: Brand}> = 
           />
         ) : (
           <AbsoluteFill style={{justifyContent: 'center', alignItems: 'center', position: 'relative'}}>
-            <Mark size={Math.round(400 * scale)} color={brand.colors.brand} />
+            <Mark size={Math.round(400 * scale)} color={markColorOf(brand)} />
           </AbsoluteFill>
         )}
       </div>

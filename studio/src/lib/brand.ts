@@ -44,6 +44,12 @@ export const brandSchema = z.object({
     info: hex,
     rare: hex,
   }),
+  // Which color TOKEN templates hand the brand mark component (getMark/getReveal
+  // consumers): 'brand' (the accent hue, default — reproduces every existing
+  // brand's output byte-identically) or 'ink' for a brand whose voice forbids a
+  // colored mark (synthacon: the S renders in ink/white, never violet). Resolve
+  // with markColorOf() below rather than reading brand.colors.brand directly.
+  markColor: z.enum(['brand', 'ink']).default('brand'),
   fonts: z.object({
     display: z.string().min(1),
     body: z.string().min(1),
@@ -107,6 +113,12 @@ export const alphaHex = (a: number): string =>
     .padStart(2, '0');
 
 export type Brand = z.infer<typeof brandSchema>;
+
+/** The resolved hex a template should hand a brand's mark component, per
+ * brand.markColor. Every getMark/getReveal call site routes through this
+ * instead of reading brand.colors.brand directly. */
+export const markColorOf = (brand: Brand): string =>
+  brand.markColor === 'ink' ? brand.colors.ink : brand.colors.brand;
 
 const registry: Record<string, unknown> = {noban, dashclaw, paperroute, synthacon};
 

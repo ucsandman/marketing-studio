@@ -55,3 +55,34 @@ export const revealTiming = (frame: number, fps: number, tempo: number): RevealS
 
   return {dashoffset, bottom, top};
 };
+
+export type LoopRevealState = RevealState & {groupOpacity: number};
+
+/**
+ * Frames in one seamless embed-loop cycle (fps x tempo-scaled DURATION_S,
+ * rounded to a whole frame so `frame % loopCycleFrames(...)` wraps on an exact
+ * frame boundary — PLAYBOOK seamless-loop rule: f(0) == f(cycle end)). A caller
+ * that renders a fixed-length composition around a looping reveal (AnimatedOG)
+ * should size its total duration as a whole multiple of this value so the
+ * rendered mp4/gif loops without a visible jump.
+ */
+export const loopCycleFrames = (fps: number, tempo: number): number =>
+  Math.round((fps * DURATION_S) / tempo);
+
+/**
+ * Looping variant of revealTiming for embeds (AnimatedOG's mark slot), per the
+ * design doc's `grpFade` keyframe (Animated Logos.dc.html): the draw-on/terminal
+ * choreography within each cycle is IDENTICAL to the play-once reveal (computed
+ * via revealTiming on the frame wrapped into [0, cycleFrames)); the whole group
+ * additionally fades opacity 1->0 over t=[0.84, 0.95] and holds at 0 until the
+ * cycle wraps. The wrap lands on an already-invisible frame on both sides (the
+ * stroke is undrawn / terminals hidden at t=0; the group has faded to 0 by
+ * t=0.95..1.0), so the loop reads seamless through that empty state. Play-once
+ * revealTiming (LogoReveal, EndCard) is untouched by this function.
+ */
+export const revealLoopTiming = (frame: number, fps: number, tempo: number): LoopRevealState => {
+  const cycleFrames = loopCycleFrames(fps, tempo);
+  const cycleFrame = frame % cycleFrames;
+  const t = cycleFrame / fps / (DURATION_S / tempo);
+  return {...revealTiming(cycleFrame, fps, tempo), groupOpacity: ramp(t, 1, 0, [0.84, 0.95])};
+};

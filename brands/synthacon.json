@@ -12,12 +12,13 @@
     "ink2": "#cdc6d8",
     "ink3": "#747278",
     "brand": "#a090dc",
-    "profit": "#e6b53d",
+    "profit": "#b8a8f0",
     "safe": "#4ade80",
     "loss": "#f06870",
     "info": "#6898b8",
     "rare": "#9870c8"
   },
+  "markColor": "ink",
   "fonts": {
     "display": "Plus Jakarta Sans",
     "body": "Inter",
@@ -25,7 +26,14 @@
   },
   "effects": {
     "wash": 0.1,
-    "glow": 0.3
+    "glow": 0
+  },
+  "grade": {
+    "grain": 0.12,
+    "vignette": 0.18,
+    "bloom": 0,
+    "aberration": 0,
+    "letterbox": 0
   },
   "motion": {
     "tempo": 1,
@@ -36,5 +44,5 @@
     "settle": 0.25,
     "textReveal": "maskWipe"
   },
-  "voice": "A musician talking to another musician, never a brand talking at a customer. Plain, informed, peer-to-peer; the simplest word that carries the meaning; earn every adjective. Marketplace + community to buy, sell, and rent studio and music gear, in open beta; the rent/lend angle is the story. CTA: Join the beta. HARD rules: no marketing-speak category labels, no fake or invented metrics (prefer no numbers at all during beta), no em-dashes in any public copy, no unshipped features. Color rules: violet #a090dc is rich, never neon; heroes sit on a dark gradient, never a bright violet wash; gold #e6b53d is the events/promo accent only; green #4ade80 means success/online only; red #f06870 means error only; steel-blue #6898b8 is info, never pink. Prices and data render in JetBrains Mono."
+  "voice": "A musician talking to another musician, never a brand talking at a customer. Plain, informed, peer-to-peer; the simplest word that carries the meaning; earn every adjective. Marketplace + community to buy, sell, and rent studio and music gear, in open beta; the rent/lend angle is the story. CTA: Join the beta. HARD rules: no marketing-speak category labels, no fake or invented metrics (prefer no numbers at all during beta), no em-dashes in any public copy, no unshipped features. Marketing palette is violet, white, and black ONLY: the S mark renders in ink (white) with its two identity dots, accents stay in the violet family (#a090dc / #b8a8f0), no gold or yellow anywhere, no glow, no bloom. In product screenshots green means success/online only and red means error only. Prices and data render in JetBrains Mono."
 }

@@ -8,6 +8,9 @@ import { LogoReveal, logoRevealSchema } from "./templates/LogoReveal";
 import { LaunchVideo, launchVideoSchema } from "./templates/LaunchVideo";
 import { AnimatedOG, animatedOgSchema } from "./templates/AnimatedOG";
 import { launchTiming } from "./lib/launchTiming";
+import { getBrand } from "./lib/brand";
+import { getReveal } from "./brands/reveals";
+import { loopCycleFrames } from "./lib/revealTiming";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -127,6 +130,18 @@ export const RemotionRoot: React.FC = () => {
           heroImage: null,
           loopSequence: null,
           loopFrames: 240,
+        }}
+        calculateMetadata={({props}) => {
+          // Brands with a registered vector reveal (synthacon) render it LOOPING
+          // in the mark slot (AnimatedOG.tsx); size the composition's total
+          // duration to a whole multiple of the reveal's own cycle length so the
+          // rendered mp4/gif loops without a visible jump (PLAYBOOK: f(0) ==
+          // f(duration)). Brands with no reveal keep the declared 240 unchanged.
+          if (!getReveal(props.brandId)) return {};
+          const brand = getBrand(props.brandId);
+          const cycle = loopCycleFrames(30, brand.motion.tempo);
+          const cycles = Math.max(1, Math.round(240 / cycle));
+          return {durationInFrames: cycles * cycle};
         }}
       />
     </>

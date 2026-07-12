@@ -1,9 +1,10 @@
 import React from 'react';
 import {AbsoluteFill, Img, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
 import {z} from 'zod';
-import {alphaHex, getBrand} from '../lib/brand';
+import {alphaHex, getBrand, markColorOf} from '../lib/brand';
 import {loadBrandFonts} from '../lib/fonts';
 import {getMark} from '../brands/marks';
+import {getReveal} from '../brands/reveals';
 import {FloatBar} from '../components/FloatBar';
 import {BackgroundLoop} from '../components/BackgroundLoop';
 import {FilmGrade} from '../components/FilmGrade';
@@ -25,6 +26,7 @@ export const AnimatedOG: React.FC<Props> = ({brandId, tagline, cta, heroImage, l
   const brand = getBrand(brandId);
   const fonts = loadBrandFonts(brand);
   const Mark = getMark(brand.id);
+  const Reveal = getReveal(brand.id);
   const cycle = frame / durationInFrames; // 0..1, and frame N == frame 0 on loop
   // triangular ping-pong: 0 -> 1 -> 0 across the loop, continuous at the seam
   const barProgress = cycle < 0.5 ? cycle * 2 : 2 - cycle * 2;
@@ -54,7 +56,7 @@ export const AnimatedOG: React.FC<Props> = ({brandId, tagline, cta, heroImage, l
       />
       <AbsoluteFill style={{justifyContent: 'center', alignItems: 'center', gap: 18}}>
         <div style={{display: 'flex', alignItems: 'center', gap: 24}}>
-          <Mark size={84} color={brand.colors.brand} />
+          {Reveal ? <Reveal size={84} brand={brand} loop /> : <Mark size={84} color={markColorOf(brand)} />}
           <div style={{fontFamily: fonts.display, fontWeight: 800, fontSize: 88, color: brand.colors.ink}}>
             {brand.name}
           </div>

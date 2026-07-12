@@ -5,7 +5,7 @@ import {
   useVideoConfig,
 } from 'remotion';
 import {z} from 'zod';
-import {alphaHex, getBrand, motionOverrideSchema} from '../lib/brand';
+import {alphaHex, getBrand, markColorOf, motionOverrideSchema} from '../lib/brand';
 import {loadBrandFonts} from '../lib/fonts';
 import {brandSpring, entrance} from '../lib/motion';
 import {getMark} from '../brands/marks';
@@ -59,7 +59,7 @@ export const LogoReveal: React.FC<Props> = ({brandId, sequence, frameCount, cta,
             />
           ) : (
             <AbsoluteFill style={{justifyContent: 'center', alignItems: 'center', position: 'relative'}}>
-              <Mark size={420} color={brand.colors.brand} />
+              <Mark size={420} color={markColorOf(brand)} />
             </AbsoluteFill>
           )}
         </div>

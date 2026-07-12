@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {brandSchema, getBrand} from './brand';
+import {brandSchema, getBrand, markColorOf} from './brand';
 
 describe('getBrand', () => {
   it('loads the noban brand with validated tokens', () => {
@@ -26,17 +26,45 @@ describe('getBrand', () => {
     // dark "Synthacon Lexicon" palette: violet primary, rich but never neon
     expect(b.colors.brand).toBe('#a090dc');
     expect(b.colors.bg).toBe('#0c0c0d');
-    // green is success/online ONLY, red is error ONLY, gold is the events accent
+    // green is success/online ONLY, red is error ONLY; palette is violet/white/black
+    // only — no gold or yellow anywhere (profit is a light-violet CTA accent, not gold)
     expect(b.colors.safe).toBe('#4ade80');
     expect(b.colors.loss).toBe('#f06870');
-    expect(b.colors.profit).toBe('#e6b53d');
+    expect(b.colors.profit).toBe('#b8a8f0');
     expect(b.fonts.display).toBe('Plus Jakarta Sans');
     expect(b.fonts.mono).toBe('JetBrains Mono');
     // hero rule: dark gradient, never the bright violet wash — below engine default
     expect(b.effects.wash).toBeLessThan(0.165);
+    // no glow effect on any asset (the animated S reveal's drop-shadow is
+    // brand.effects.glow-driven; 0 means SynthaconReveal renders no filter at all)
+    expect(b.effects.glow).toBe(0);
+    // the S mark renders in ink (white), never the brand violet
+    expect(b.markColor).toBe('ink');
+    expect(markColorOf(b)).toBe(b.colors.ink);
+    // no bloom accent either — FilmGrade's bloom layer is fully off
+    expect(b.grade.bloom).toBe(0);
     // calm, confident motion for a peer-to-peer gear community
     expect(b.motion.exuberance).toBeLessThanOrEqual(0.3);
     expect(b.motion.textReveal).toBe('maskWipe');
+  });
+
+  it('resolves markColorOf per brand.markColor (ink for synthacon, brand accent for brands that omit it)', () => {
+    expect(markColorOf(getBrand('synthacon'))).toBe(getBrand('synthacon').colors.ink);
+    expect(markColorOf(getBrand('noban'))).toBe(getBrand('noban').colors.brand);
+  });
+
+  it('defaults markColor to "brand" when a brand omits the field (byte-identical mark color)', () => {
+    const parsed = brandSchema.parse({
+      id: 'x',
+      name: 'x',
+      tagline: 'x',
+      url: 'x',
+      colors: getBrand('noban').colors,
+      fonts: getBrand('noban').fonts,
+      voice: 'x',
+    });
+    expect(parsed.markColor).toBe('brand');
+    expect(markColorOf(parsed)).toBe(parsed.colors.brand);
   });
 
   it('rejects hex colors that are not #rrggbb', () => {
