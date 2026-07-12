@@ -49,6 +49,7 @@ function validateBrief(b) {
   const hook = {
     headline: typeof hookIn.headline === 'string' ? hookIn.headline : '',
     altHeadlines: Array.isArray(hookIn.altHeadlines) ? hookIn.altHeadlines.filter((s) => typeof s === 'string') : [],
+    strategies: Array.isArray(hookIn.strategies) ? hookIn.strategies.filter((s) => typeof s === 'string') : [],
   };
 
   const featuresIn = Array.isArray(b.features) ? b.features : [];
@@ -223,20 +224,34 @@ function provenanceLine() {
   if (briefInputs.landing) {
     landingLabel = briefInputs.landing.text ? 'yes' : `error (${esc(briefInputs.landing.error ?? 'unknown')})`;
   }
-  return `Grounding sources — README: ${readmeYes} &middot; routes: ${routesLabel} &middot; landing DOM captured: ${landingLabel}`;
+  const changelogLabel = briefInputs.changelog ? `yes (${esc(briefInputs.changelog.file)})` : 'no';
+  let issuesLabel = 'no';
+  if (briefInputs.issues) {
+    issuesLabel = briefInputs.issues.skipped
+      ? `skipped (${esc(briefInputs.issues.skipped)})`
+      : `${briefInputs.issues.count} from ${esc(briefInputs.issues.repo)}`;
+  }
+  return (
+    `Grounding sources — README: ${readmeYes} &middot; routes: ${routesLabel} &middot; landing DOM captured: ${landingLabel}` +
+    ` &middot; changelog: ${changelogLabel} &middot; issues: ${issuesLabel}`
+  );
 }
 
 const generatedAt = new Date().toISOString();
 
 // --- sections ----------------------------------------------------------------
+// strategies[i] labels [headline, ...altHeadlines][i] with its hook category.
+const strategyChip = (i) =>
+  brief.hook.strategies[i] ? ` <code class="chip">${esc(brief.hook.strategies[i])}</code>` : '';
+
 const altHeadlinesHtml = brief.hook.altHeadlines.length
-  ? `<ul class="alt-headlines">${brief.hook.altHeadlines.map((h) => `<li>${esc(h)}</li>`).join('')}</ul>`
+  ? `<ul class="alt-headlines">${brief.hook.altHeadlines.map((h, i) => `<li>${esc(h)}${strategyChip(i + 1)}</li>`).join('')}</ul>`
   : '<p class="muted">No alt headlines.</p>';
 
 const hookSection = `
 <section class="block">
   <h2 class="block-title">Hook</h2>
-  <p class="headline">${esc(brief.hook.headline) || '<span class="muted">(no headline)</span>'}</p>
+  <p class="headline">${esc(brief.hook.headline) || '<span class="muted">(no headline)</span>'}${strategyChip(0)}</p>
   <div class="alt-headlines-wrap">
     <p class="label">Alt headlines</p>
     ${altHeadlinesHtml}

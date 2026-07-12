@@ -141,7 +141,7 @@ try {
     telemetry,
   };
   writeFileSync(join(ROOT, 'props', 'noban-demo.json'), JSON.stringify(props, null, 2) + '\n');
-  if (CACHE_ENABLED) storeCache('noban', 'capture', CACHE_KEY, CACHE_ARTIFACTS);
+  if (CACHE_ENABLED) storeCache('noban', 'capture', CACHE_KEY, CACHE_ARTIFACTS, {productRepo: NOBAN, productHead: keyParts.productHead});
   console.log(`capture OK: ${telemetry.durationMs}ms, ${telemetry.events.length} events`);
   console.log('wrote studio/public/noban/demo.webm and props/noban-demo.json');
 } catch (err) {

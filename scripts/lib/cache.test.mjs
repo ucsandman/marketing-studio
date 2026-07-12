@@ -88,6 +88,22 @@ test('miss when an artifact is empty (size 0)', () => {
   }
 });
 
+test('storeCache persists meta and omits it when not given', () => {
+  const dir = tmp();
+  const art = join(dir, 'a.webm');
+  writeFileSync(art, 'data');
+  const key = cacheKey({n: 5});
+  try {
+    const withMeta = storeCache(BRAND, 'capture', key, [art], {productRepo: 'C:/x', productHead: 'abc123'});
+    assert.deepEqual(withMeta.meta, {productRepo: 'C:/x', productHead: 'abc123'});
+    assert.equal(checkCache(BRAND, 'capture', key, [art]).entry.meta.productHead, 'abc123');
+    const without = storeCache(BRAND, 'capture', key, [art]);
+    assert.equal('meta' in without, false);
+  } finally {
+    rmSync(dir, {recursive: true, force: true});
+  }
+});
+
 test('separate stages do not collide', () => {
   const dir = tmp();
   const art = join(dir, 'a.webm');

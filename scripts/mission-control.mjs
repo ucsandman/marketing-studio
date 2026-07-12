@@ -9,6 +9,7 @@
 // request and all writes are atomic (temp file + rename). Read-modify-write on a
 // POST re-reads the manifest at write time — never a stale in-memory copy.
 import http from 'node:http';
+import {execFileSync} from 'node:child_process';
 import {
   existsSync,
   readFileSync,
@@ -338,6 +339,96 @@ async function handleAssetPost(req, res, id) {
   res.end(JSON.stringify({ok: true, id, status: entry.status}));
 }
 
+// ---- read-only advisories (judges / results / staleness) --------------------
+// All three are computed from files other tools write; Mission Control never
+// mutates them. They ride on /state so the operator approves with the machine
+// verdicts, engagement numbers, and footage freshness in view.
+
+// Quality-judge verdict summaries from out/<brand>/marketing/judge-*.json.
+function readJudges() {
+  let files = [];
+  try {
+    files = readdirSync(marketingDir).filter((f) => /^judge-.+\.json$/.test(f));
+  } catch {
+    return [];
+  }
+  const judges = [];
+  for (const f of files) {
+    try {
+      const r = JSON.parse(readFileSync(join(marketingDir, f), 'utf8'));
+      const findings = Array.isArray(r.findings) ? r.findings : [];
+      judges.push({
+        judge: r.judge ?? f.replace(/^judge-|\.json$/g, ''),
+        verdict: r.verdict ?? 'UNKNOWN',
+        warns: findings.filter((x) => x.level === 'WARN').length,
+        fails: findings.filter((x) => x.level === 'FAIL' || x.level === 'ERROR').length,
+        generatedAt: r.generatedAt ?? null,
+        messages: findings.slice(0, 6).map((x) => `[${x.level}] ${x.message ?? x.check ?? ''}`),
+      });
+    } catch {
+      judges.push({judge: f, verdict: 'UNREADABLE', warns: 0, fails: 0, generatedAt: null, messages: []});
+    }
+  }
+  return judges;
+}
+
+// Engagement results (scripts/fetch-results.mjs) aggregated per variant id so
+// the variant radio can show what each hook actually did.
+function readResults() {
+  const p = join(marketingDir, 'results.json');
+  if (!existsSync(p)) return null;
+  try {
+    const r = JSON.parse(readFileSync(p, 'utf8'));
+    const posts = Array.isArray(r.posts) ? r.posts : [];
+    const variantStats = {};
+    for (const post of posts) {
+      if (!post.variant || !post.metrics) continue;
+      const v = (variantStats[post.variant] ??= {likes: 0, reposts: 0, replies: 0, impressions: 0, posts: 0});
+      v.likes += post.metrics.likes ?? 0;
+      v.reposts += post.metrics.reposts ?? 0;
+      v.replies += post.metrics.replies ?? 0;
+      v.impressions += post.metrics.impressions ?? 0;
+      v.posts += 1;
+    }
+    return {fetchedAt: r.fetchedAt ?? null, postCount: posts.length, variantStats};
+  } catch {
+    return null;
+  }
+}
+
+// Footage staleness: cache.json entries that recorded {productRepo, productHead}
+// meta are compared against the product repo's CURRENT git state. Memoized for
+// 30s — /state polls every 2s and git subprocesses are not free.
+let stalenessMemo = {at: 0, value: []};
+function readStaleness() {
+  if (Date.now() - stalenessMemo.at < 30_000) return stalenessMemo.value;
+  const value = [];
+  try {
+    const store = JSON.parse(readFileSync(join(marketingDir, 'cache.json'), 'utf8'));
+    for (const [stage, entry] of Object.entries(store)) {
+      const meta = entry?.meta;
+      if (!meta?.productRepo || !meta?.productHead) continue;
+      try {
+        const opts = {cwd: meta.productRepo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore']};
+        const behind = parseInt(
+          execFileSync('git', ['rev-list', '--count', `${meta.productHead}..HEAD`], opts).trim(),
+          10,
+        );
+        const dirty = execFileSync('git', ['status', '--porcelain'], opts).trim().length > 0;
+        if (behind > 0 || dirty) {
+          value.push({stage, productRepo: meta.productRepo, commitsBehind: behind, dirty, storedAt: entry.storedAt ?? null});
+        }
+      } catch {
+        value.push({stage, productRepo: meta.productRepo, commitsBehind: null, dirty: null, storedAt: entry.storedAt ?? null});
+      }
+    }
+  } catch {
+    // no cache.json — nothing to report
+  }
+  stalenessMemo = {at: Date.now(), value};
+  return value;
+}
+
 // ---- state -----------------------------------------------------------------
 // Serves the run manifest, each asset enriched with a computed _artifact
 // (url/kind/sizeBytes) resolved against the disk at read time. The file is
@@ -352,6 +443,9 @@ function serveState(res) {
   const enriched = {
     ...run,
     assets: Array.isArray(run.assets) ? run.assets.map(enrichAsset) : [],
+    _judges: readJudges(),
+    _results: readResults(),
+    _staleness: readStaleness(),
   };
   res.writeHead(200, {'content-type': 'application/json', 'cache-control': 'no-store'});
   res.end(JSON.stringify(enriched));
@@ -386,6 +480,20 @@ header .started{color:#8a929b;font-size:13px;}
 .count{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-variant-numeric:tabular-nums;padding:3px 10px;border-radius:999px;border:1px solid #2b3138;background:#181c21;}
 .count b{font-size:13px;}
 .dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
+.advisories{padding:10px 22px;background:#101317;border-bottom:1px solid #21262c;display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;font-size:12px;}
+.advisories:empty{display:none;}
+.judge{position:relative;}
+.judge summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-variant-numeric:tabular-nums;padding:3px 10px;border-radius:999px;border:1px solid #2b3138;background:#181c21;}
+.judge summary::-webkit-details-marker{display:none;}
+.judge .verdict{font-weight:700;letter-spacing:.4px;}
+.judge .v-pass{color:#8ce6a5;}
+.judge .v-warn{color:#e6b45a;}
+.judge .v-fail{color:#ff8a8a;}
+.judge .findings{position:absolute;z-index:20;top:calc(100% + 6px);left:0;min-width:320px;max-width:520px;background:#181c21;border:1px solid #2b3138;border-radius:10px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,.5);}
+.judge .findings li{margin:4px 0 4px 16px;color:#c9d1d9;}
+.stale{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;border:1px solid #6b4f1f;background:#332612;color:#e6b45a;}
+.results-chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;border:1px solid #284876;background:#13233d;color:#7fb2ff;font-variant-numeric:tabular-nums;}
+.vstats{color:#8a929b;font-size:11px;font-variant-numeric:tabular-nums;margin-left:4px;}
 .wrap{padding:22px;display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:18px;max-width:1500px;margin:0 auto;}
 .card{background:#14171b;border:1px solid #262b31;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;}
 .card-head{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #21262c;}
@@ -437,6 +545,7 @@ function consolePage() {
   <span class="started" id="hStarted"></span>
   <div class="counts" id="hCounts"></div>
 </header>
+<div class="advisories" id="advisories"></div>
 <main class="wrap" id="cards"></main>
 <script>
 const STATUSES = ['planned','rendered','approved','delivered'];
@@ -491,7 +600,9 @@ function cardHtml(e){
   if(Array.isArray(e.variants)&&e.variants.length){
     const opts=e.variants.map((v,i)=>{
       const val=variantValue(v,i);const checked=e.selectedVariant===val?' checked':'';
-      return '<label><input type="radio" name="var-'+esc(e.id)+'" value="'+esc(val)+'"'+checked+'>'+esc(variantLabel(v,i))+'</label>';
+      const st=lastResults&&lastResults.variantStats&&lastResults.variantStats[val];
+      const stats=st?'<span class="vstats">'+st.likes+' likes · '+st.reposts+' reposts · '+st.replies+' replies'+(st.impressions?' · '+st.impressions+' impr':'')+'</span>':'';
+      return '<label><input type="radio" name="var-'+esc(e.id)+'" value="'+esc(val)+'"'+checked+'>'+esc(variantLabel(v,i))+stats+'</label>';
     }).join('');
     variants='<div class="variants"><div class="vtitle">Variant</div>'+opts+'</div>';
   }
@@ -546,8 +657,38 @@ function renderHeader(run){
   ).join('');
 }
 
+let lastAdvisories='';
+function renderAdvisories(run){
+  const bits=[];
+  (run._judges||[]).forEach(j=>{
+    const cls=j.verdict==='PASS'?(j.warns?'v-warn':'v-pass'):'v-fail';
+    const label=j.verdict+(j.fails?' ('+j.fails+')':j.warns?' ('+j.warns+' warn)':'');
+    const list=j.messages&&j.messages.length
+      ?'<div class="findings"><ul>'+j.messages.map(m=>'<li>'+esc(m)+'</li>').join('')+'</ul></div>'
+      :'';
+    bits.push('<details class="judge"><summary>judge:'+esc(j.judge)+' <span class="verdict '+cls+'">'+esc(label)+'</span></summary>'+list+'</details>');
+  });
+  (run._staleness||[]).forEach(s=>{
+    const what=s.commitsBehind==null
+      ?'product repo unreachable ('+esc(s.productRepo)+')'
+      :esc(s.stage)+' footage: '+(s.commitsBehind?s.commitsBehind+' commit(s) behind':'')+(s.commitsBehind&&s.dirty?', ':'')+(s.dirty?'dirty tree':'');
+    bits.push('<span class="stale">&#9888; '+what+'</span>');
+  });
+  if(run._results&&run._results.postCount){
+    bits.push('<span class="results-chip">results: '+run._results.postCount+' post(s), fetched '+esc((run._results.fetchedAt||'').slice(0,16).replace('T',' '))+'</span>');
+  }
+  const html=bits.join('');
+  if(html!==lastAdvisories){lastAdvisories=html;document.getElementById('advisories').innerHTML=html;}
+}
+
+let lastResults=null;
 function render(run){
   renderHeader(run);
+  // results feed variant stat lines inside cards: when they change, force
+  // affected cards to re-render by clearing their lastRender entries.
+  const resKey=JSON.stringify(run._results||null);
+  if(JSON.stringify(lastResults||null)!==resKey){lastResults=run._results||null;Object.keys(lastRender).forEach(k=>delete lastRender[k]);}
+  renderAdvisories(run);
   const assets=run.assets||[];
   const seen=new Set();
   assets.forEach(e=>{

@@ -5,7 +5,7 @@ describe('briefSchema', () => {
   it('parses a full brief with every field populated', () => {
     const b = briefSchema.parse({
       brandId: 'noban',
-      hook: {headline: 'CS2 skin arbitrage with guardrails', altHeadlines: ['Trade with a net']},
+      hook: {headline: 'CS2 skin arbitrage with guardrails', altHeadlines: ['Trade with a net'], strategies: ['value', 'curiosity']},
       features: [
         {
           key: 'guardrails',
@@ -36,6 +36,7 @@ describe('briefSchema', () => {
     });
     expect(b.brandId).toBe('noban');
     expect(b.hook.headline).toBe('CS2 skin arbitrage with guardrails');
+    expect(b.hook.strategies).toEqual(['value', 'curiosity']);
     expect(b.features[0].sourceRoute).toBe('/governance');
     expect(b.social?.x?.hook).toBe('Skin arbitrage');
     expect(b.audience?.painPoints).toHaveLength(1);
@@ -48,7 +49,7 @@ describe('briefSchema', () => {
   it('fills sane defaults for a brandId-only brief', () => {
     // schema-level guarantee: a partial brief never breaks a downstream builder
     const b = briefSchema.parse({brandId: 'noban'});
-    expect(b.hook).toEqual({headline: '', altHeadlines: []});
+    expect(b.hook).toEqual({headline: '', altHeadlines: [], strategies: []});
     expect(b.features).toEqual([]);
     expect(b.positioning).toBeNull();
     expect(b.cta).toBe('');

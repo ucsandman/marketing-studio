@@ -7,7 +7,7 @@ description: Use when a product or feature is ready to go public — after shipp
 
 Chains existing capabilities into one launch pass. Draft everything, send nothing without approval — external comms are a CLAUDE.md Hard Stop.
 
-The announcement rules below are distilled from sharing research and current platform-algorithm behavior; the full notes (per-platform signal weights, HN/PH/Reddit norms, sources) are in `references/virality.md` — read it when drafting for a channel not covered here or when the user asks why a rule exists.
+The announcement rules below are distilled from sharing research and current platform-algorithm behavior; the full notes (per-platform signal weights, HN/PH/Reddit norms, sources) are in `references/virality.md` — read it when drafting for a channel not covered here or when the user asks why a rule exists. For strategy above the per-post mechanics (ORB channel portfolio, five-phase rollout, relaunch cadence, measurement loop), read `references/strategy.md` — especially when planning a launch rather than executing one.
 
 ## 1. Pre-flight (verify, don't assume)
 

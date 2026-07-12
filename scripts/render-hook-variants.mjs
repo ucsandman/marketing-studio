@@ -39,6 +39,9 @@ if (!brand) {
 const launchPath = resolveBaseProps(root, brand, 'LaunchVideo');
 const launch = JSON.parse(readFileSync(launchPath, 'utf8'));
 
+// Returns [{headline, strategy|null}] — strategy is the hook category from
+// brief.json's hook.strategies (index-aligned with [headline, ...altHeadlines])
+// so the A/B pick teaches which CATEGORY won, not just which sentence.
 function resolveHeadlines() {
   if (headlinesFlag) {
     let parsed;
@@ -52,7 +55,7 @@ function resolveHeadlines() {
       console.error('render-hook-variants: --headlines must be a JSON array of non-empty strings');
       process.exit(1);
     }
-    return {headlines: parsed.slice(0, 3), source: '--headlines flag'};
+    return {hooks: parsed.slice(0, 3).map((h) => ({headline: h, strategy: null})), source: '--headlines flag'};
   }
   const briefPath = join(root, 'out', brand, 'marketing', 'brief.json');
   if (existsSync(briefPath)) {
@@ -60,9 +63,14 @@ function resolveHeadlines() {
       const brief = JSON.parse(readFileSync(briefPath, 'utf8'));
       const headline = brief?.hook?.headline;
       const alts = Array.isArray(brief?.hook?.altHeadlines) ? brief.hook.altHeadlines : [];
+      const strategies = Array.isArray(brief?.hook?.strategies) ? brief.hook.strategies : [];
       if (typeof headline === 'string' && headline.trim()) {
         const list = [headline, ...alts.filter((h) => typeof h === 'string' && h.trim())];
-        return {headlines: list.slice(0, 3), source: `out/${brand}/marketing/brief.json`};
+        const hooks = list.slice(0, 3).map((h, i) => ({
+          headline: h,
+          strategy: typeof strategies[i] === 'string' && strategies[i].trim() ? strategies[i] : null,
+        }));
+        return {hooks, source: `out/${brand}/marketing/brief.json`};
       }
     } catch {
       // malformed brief.json — fall through to the launch-props fallback below
@@ -72,11 +80,11 @@ function resolveHeadlines() {
     'render-hook-variants: no --headlines and no usable brief.json hook.altHeadlines — ' +
       'falling back to the single launch-props headline; A/B needs at least one alternative.',
   );
-  return {headlines: [launch.headline], source: 'props (single headline, no alternatives)'};
+  return {hooks: [{headline: launch.headline, strategy: null}], source: 'props (single headline, no alternatives)'};
 }
 
-const {headlines, source} = resolveHeadlines();
-console.log(`render-hook-variants: ${headlines.length} headline(s) from ${source}`);
+const {hooks, source} = resolveHeadlines();
+console.log(`render-hook-variants: ${hooks.length} headline(s) from ${source}`);
 
 function esc(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
@@ -88,7 +96,7 @@ function buildPickerHtml(brandId, rows) {
       (r) => `
     <div class="card">
       <video controls preload="metadata" poster="${esc(r.posterRel)}" src="${esc(r.videoRel)}"></video>
-      <div class="headline">${esc(r.headline)}</div>
+      <div class="headline">${r.strategy ? `<span class="strategy">${esc(r.strategy)}</span>` : ''}${esc(r.headline)}</div>
     </div>`,
     )
     .join('');
@@ -102,6 +110,7 @@ h1{font-size:18px;font-weight:650;margin:0 0 22px;}
 .card{background:#14171b;border:1px solid #262b31;border-radius:12px;overflow:hidden;}
 .card video{display:block;width:100%;background:#000;}
 .headline{padding:14px 16px;font-size:14px;line-height:1.4;color:#c9d1d9;}
+.strategy{display:inline-block;margin-right:8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#7fb2ff;background:#13233d;border:1px solid #284876;border-radius:5px;padding:1px 7px;vertical-align:1px;}
 </style>
 <h1>Hook A/B &mdash; ${esc(brandId)}</h1>
 <div class="grid">${cards}</div>`;
@@ -115,7 +124,7 @@ async function main() {
   const outDir = join(root, 'out', brand, 'marketing', 'hooks');
   const variants = [];
   const rows = [];
-  headlines.forEach((headline, i) => {
+  hooks.forEach(({headline, strategy}, i) => {
     const n = i + 1;
     const props = {...launch, headline, formatWidth: 1920, formatHeight: 1080};
     const outPath = join(outDir, `hook-${n}.mp4`);
@@ -123,9 +132,9 @@ async function main() {
     const posterPath = posterFor(outPath);
     const relPath = relative(root, path).replace(/\\/g, '/');
     const relPoster = relative(root, posterPath).replace(/\\/g, '/');
-    variants.push({id: `hook-${n}`, path: relPath, label: headline});
-    rows.push({headline, videoRel: `hook-${n}.mp4`, posterRel: `hook-${n}.jpg`});
-    console.log(`render-hook-variants: hook-${n} -> ${relPath} (${bytes} bytes); poster ${relPoster}`);
+    variants.push({id: `hook-${n}`, path: relPath, label: strategy ? `[${strategy}] ${headline}` : headline, strategy});
+    rows.push({headline, strategy, videoRel: `hook-${n}.mp4`, posterRel: `hook-${n}.jpg`});
+    console.log(`render-hook-variants: hook-${n}${strategy ? ` (${strategy})` : ''} -> ${relPath} (${bytes} bytes); poster ${relPoster}`);
   });
 
   const pickerPath = join(outDir, 'picker.html');

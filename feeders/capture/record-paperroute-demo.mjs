@@ -171,7 +171,7 @@ try {
     telemetry,
   };
   writeFileSync(join(ROOT, 'props', 'paperroute-demo.json'), JSON.stringify(props, null, 2) + '\n');
-  if (CACHE_ENABLED) storeCache('paperroute', 'capture', CACHE_KEY, CACHE_ARTIFACTS);
+  if (CACHE_ENABLED) storeCache('paperroute', 'capture', CACHE_KEY, CACHE_ARTIFACTS, {productRepo: PR_ROOT, productHead: keyParts.productHead});
   console.log(`capture OK: ${telemetry.durationMs}ms, ${telemetry.events.length} events`);
   console.log('wrote studio/public/paperroute/demo.webm and props/paperroute-demo.json');
 } catch (err) {

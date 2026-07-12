@@ -16,12 +16,17 @@ export const briefSchema = z.object({
   // The one required field — a brief is always about a specific brand.
   brandId: z.string().min(1),
   // The headline plus alternates the agent can swap for A/B or platform fit.
+  // `strategies` labels the hook category of each entry, index-aligned with
+  // [headline, ...altHeadlines] (skills/marketing/references/hook-formulas.md:
+  // curiosity|story|value|contrarian) — a hook A/B teaches nothing unless the
+  // variants come from different categories, so the labels travel with them.
   hook: z
     .object({
       headline: z.string(),
       altHeadlines: z.array(z.string()),
+      strategies: z.array(z.string()).default([]),
     })
-    .default({headline: '', altHeadlines: []}),
+    .default({headline: '', altHeadlines: [], strategies: []}),
   // Feature stories ranked best-first. `benefitLines` caps at 3 to match the
   // launch template's three-line FeaturePanel. `sourceRoute` records which
   // product route grounded the feature (null when it came from README/other).

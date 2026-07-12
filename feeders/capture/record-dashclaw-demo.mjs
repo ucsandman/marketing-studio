@@ -256,7 +256,7 @@ try {
     telemetry,
   };
   writeFileSync(join(ROOT, 'props', 'dashclaw-demo.json'), JSON.stringify(props, null, 2) + '\n');
-  if (CACHE_ENABLED) storeCache('dashclaw', 'capture', CACHE_KEY, CACHE_ARTIFACTS);
+  if (CACHE_ENABLED) storeCache('dashclaw', 'capture', CACHE_KEY, CACHE_ARTIFACTS, {productRepo: DC_ROOT, productHead: keyParts.productHead});
   console.log(`capture OK: ${telemetry.durationMs}ms, ${telemetry.events.length} events`);
   console.log('wrote studio/public/dashclaw/demo.webm and props/dashclaw-demo.json');
 } catch (err) {

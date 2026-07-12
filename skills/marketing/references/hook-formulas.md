@@ -8,8 +8,9 @@ STRATEGIES, not three phrasings of the same idea.
 ## The rule for altHeadlines
 
 `hook.altHeadlines` gets up to two alternates (render-hook-variants caps at 3 total).
-Draw the headline and each alternate from a DIFFERENT category below, and note the
-category in the feature `rationale`-style annotations when presenting the storyboard.
+Draw the headline and each alternate from a DIFFERENT category below, and record the
+category names in `hook.strategies` (index-aligned with [headline, ...altHeadlines]) —
+the storyboard, hook picker, and Mission Control variant radio all display them.
 A/B between two curiosity hooks teaches nothing; curiosity vs value vs contrarian does.
 
 ## Hook categories (with the source's formula lines)

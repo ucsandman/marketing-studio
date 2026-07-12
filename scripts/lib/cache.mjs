@@ -64,12 +64,17 @@ export function checkCache(brand, stage, key, artifacts = []) {
   return {hit: true, entry};
 }
 
-/** Records/overwrites the entry for one stage. Atomic (temp file + rename). */
-export function storeCache(brand, stage, key, artifacts = []) {
+/**
+ * Records/overwrites the entry for one stage. Atomic (temp file + rename).
+ * `meta` is optional READABLE provenance (e.g. {productRepo, productHead}) —
+ * the key is an opaque hash, so staleness checks (Mission Control's "footage
+ * is N commits behind" warning) need the raw inputs recorded alongside it.
+ */
+export function storeCache(brand, stage, key, artifacts = [], meta = null) {
   const f = cacheFile(brand);
   mkdirSync(dirname(f), {recursive: true});
   const store = readStore(brand);
-  store[stage] = {key, artifacts, storedAt: new Date().toISOString()};
+  store[stage] = {key, artifacts, storedAt: new Date().toISOString(), ...(meta ? {meta} : {})};
   const tmp = `${f}.${process.pid}.tmp`;
   writeFileSync(tmp, JSON.stringify(store, null, 2) + '\n');
   renameSync(tmp, f); // atomic replace on the same volume

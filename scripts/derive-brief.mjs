@@ -5,8 +5,15 @@
 //   node scripts/derive-brief.mjs <brandId> <productRepoPath> [--url <landingUrl>]
 //
 // Token-redaction rule (PLAYBOOK): NEVER read or print .env contents from the
-// product repo. This script only reads README.md, package.json, and the NAMES
-// of route directories/files — never .env, never arbitrary source contents.
+// product repo. This script only reads README.md, CHANGELOG.md, package.json,
+// the NAMES of route directories/files, and PUBLIC GitHub issue titles/labels
+// — never .env, never arbitrary source contents.
+//
+// The issues + changelog sources exist for the brief's grounding sections
+// (customerLanguage/objections/proofPoints in brief.ts): issue titles are the
+// closest thing a repo has to verbatim customer language, and the changelog
+// carries dated, sourceable claims.
+import {execFileSync} from 'node:child_process';
 import {readFileSync, existsSync, readdirSync, statSync, mkdirSync, writeFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
@@ -127,6 +134,64 @@ function collectRoutes(repo) {
   return null; // not a Next.js app — skip
 }
 
+// --- CHANGELOG (dated, sourceable claims for proofPoints) ----------------
+const CHANGELOG_MAX_LINES = 200;
+function readChangelog(repo) {
+  for (const name of ['CHANGELOG.md', 'changelog.md', 'CHANGES.md']) {
+    const p = join(repo, name);
+    if (!existsSync(p)) continue;
+    const lines = readFileSync(p, 'utf8').split('\n');
+    return {
+      file: name,
+      truncated: lines.length > CHANGELOG_MAX_LINES,
+      text: lines.slice(0, CHANGELOG_MAX_LINES).join('\n'),
+    };
+  }
+  return null;
+}
+
+// --- GitHub issues via gh CLI (public titles/labels only) ----------------
+export function parseGitHubSlug(remoteUrl) {
+  const m = /github\.com[:/]([^/\s]+)\/([^/\s]+?)(\.git)?$/.exec(remoteUrl.trim());
+  return m ? `${m[1]}/${m[2]}` : null;
+}
+
+// Most-commented first: discussion volume is the strongest customer-language
+// signal. Never fatal — a missing remote/gh just records why it was skipped so
+// the synthesizer sees the gap instead of assuming coverage.
+function fetchIssues(repo) {
+  let remote;
+  try {
+    remote = execFileSync('git', ['-C', repo, 'remote', 'get-url', 'origin'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim();
+  } catch {
+    return {skipped: 'no git remote "origin" in the product repo'};
+  }
+  const slug = parseGitHubSlug(remote);
+  if (!slug) return {skipped: `origin remote is not GitHub (${remote})`};
+  try {
+    const raw = execFileSync(
+      'gh',
+      ['api', `repos/${slug}/issues?state=all&per_page=50&sort=comments&direction=desc`],
+      {encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']},
+    );
+    const items = JSON.parse(raw)
+      .filter((i) => !i.pull_request)
+      .map((i) => ({
+        title: i.title,
+        state: i.state,
+        comments: i.comments,
+        labels: (i.labels ?? []).map((l) => l.name),
+      }));
+    return {repo: slug, count: items.length, items};
+  } catch (err) {
+    const detail = (err.stderr || err.message || '').toString().split('\n')[0];
+    return {skipped: `gh api failed: ${detail}`};
+  }
+}
+
 // --- landing-page DOM text via one-shot Playwright (only with --url) ----
 async function fetchLanding(landingUrl) {
   // Reuse Playwright already installed for feeders/capture; resolved from there.
@@ -152,6 +217,8 @@ const inputs = {
   readme: readReadme(productRepoPath),
   package: readPackage(productRepoPath),
   nextRoutes: collectRoutes(productRepoPath),
+  changelog: readChangelog(productRepoPath),
+  issues: fetchIssues(productRepoPath),
   landing: null,
 };
 
