@@ -42,6 +42,62 @@ export const briefSchema = z.object({
     })
     .nullable()
     .default(null),
+  // Grounding sections below adapted from Corey Haines' marketingskills
+  // `product-marketing` skill (github.com/coreyhaines31/marketingskills, MIT).
+  // They exist so hooks/narration/social copy trace to real audience facts
+  // instead of generic product praise; the storyboard renders them so the
+  // approver can check the copy against its grounding.
+  //
+  // Who the copy speaks to and what the problem costs them; painPoints feed
+  // hook/problem framing.
+  audience: z
+    .object({
+      who: z.string(),
+      painPoints: z.array(z.string()),
+    })
+    .nullable()
+    .default(null),
+  // Verbatim customer phrasing from the grounding (README issues, landing DOM,
+  // reviews). Copy synthesis mirrors `use` and never emits `avoid`.
+  customerLanguage: z
+    .object({
+      use: z.array(z.string()),
+      avoid: z.array(z.string()),
+    })
+    .default({use: [], avoid: []}),
+  // Top objections plus the response the copy should carry — objection
+  // handling is a copy angle, not a FAQ dump.
+  objections: z
+    .array(
+      z.object({
+        objection: z.string(),
+        response: z.string(),
+      }),
+    )
+    .default([]),
+  // JTBD Four Forces of switching: push (frustration with the current way),
+  // pull (what attracts them here), habit (what keeps them stuck), anxiety
+  // (what worries them about switching — CTA/end-card reassurance feeds on it).
+  switchingForces: z
+    .object({
+      push: z.string(),
+      pull: z.string(),
+      habit: z.string(),
+      anxiety: z.string(),
+    })
+    .nullable()
+    .default(null),
+  // Receipts for claims made in copy. `source` is REQUIRED and non-empty: an
+  // unsourced number or quote is fabrication (trust + legal liability), a hard
+  // stop — omit the proof point rather than invent a source.
+  proofPoints: z
+    .array(
+      z.object({
+        claim: z.string(),
+        source: z.string().min(1),
+      }),
+    )
+    .default([]),
   cta: z.string().default(''),
   // Voiceover lines keyed by launch act. `act` matches launchTiming.ts act
   // names as used by the audio manifest: `logo|hook|demo|feature-N|end`.

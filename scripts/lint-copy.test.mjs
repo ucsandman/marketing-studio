@@ -113,6 +113,14 @@ test('Allows/Enables/Provides/Supports opener over 30 chars fires WARN', () => {
   assert.equal(violationsFor('feature-speak', violations).length, 1);
 });
 
+test('gerund openers in brief grounding sections do not fire feature-speak', () => {
+  const violations = lintJson({
+    switchingForces: {anxiety: 'Losing final say over what goes out the door'},
+    objections: [{objection: 'Generating video sounds like templated slop output', response: 'ok'}],
+  });
+  assert.equal(violationsFor('feature-speak', violations).length, 0);
+});
+
 test('short gerund opener under 30 chars does not fire', () => {
   const violations = lintJson({copy: 'Running fast'});
   assert.equal(violationsFor('feature-speak', violations).length, 0);
@@ -122,6 +130,115 @@ test('feature-speak violation does not affect exit code (WARN only)', () => {
   const violations = lintJson({copy: 'Providing real-time sync across every device you own'});
   const errorCount = violations.filter((v) => v.level === 'ERROR').length;
   assert.equal(errorCount, 0);
+});
+
+// --- Rule 2 additions: Corey Haines buzzword list ---
+
+test('each added buzzword fires slop-lexicon', () => {
+  const samples = [
+    'streamline your workflow',
+    'a streamlined process',
+    'an innovative approach',
+    'utilize the dashboard',
+    'facilitates faster onboarding',
+    'best-in-class tooling',
+    'a world class experience',
+    'take it to the next-level',
+    'state-of-the-art rendering',
+  ];
+  for (const s of samples) {
+    const violations = lintJson({copy: s});
+    assert.ok(violationsFor('slop-lexicon', violations).length >= 1, `expected slop-lexicon hit for: ${s}`);
+  }
+});
+
+// --- Rule 5: weak language (WARN) ---
+
+test('qualifiers and "optimize" fire WARN weak-language', () => {
+  for (const s of ['very fast trades', 'really simple setup', 'almost instant', 'optimize your loadout']) {
+    const violations = lintJson({copy: s});
+    const hits = violationsFor('weak-language', violations);
+    assert.equal(hits.length, 1, `expected weak-language hit for: ${s}`);
+    assert.equal(hits[0].level, 'WARN');
+  }
+});
+
+test('weak-language does not fire on confident copy', () => {
+  const violations = lintJson({copy: 'Trades settle in 40 seconds'});
+  assert.equal(violationsFor('weak-language', violations).length, 0);
+});
+
+// --- Rule 6: announcement opener (ERROR) ---
+
+test('excited-to-announce openers fire ERROR announcement-opener', () => {
+  const samples = [
+    "We're excited to announce noban 2.0",
+    'We are thrilled to share our new dashboard',
+    'I am proud to introduce spend caps',
+    "We're so pumped to launch today",
+  ];
+  for (const s of samples) {
+    const violations = lintJson({copy: s});
+    const hits = violationsFor('announcement-opener', violations);
+    assert.equal(hits.length, 1, `expected announcement-opener hit for: ${s}`);
+    assert.equal(hits[0].level, 'ERROR');
+  }
+});
+
+test('excitement mid-sentence does not fire announcement-opener', () => {
+  const violations = lintJson({copy: 'Traders told us they were excited to announce trades to their group'});
+  assert.equal(violationsFor('announcement-opener', violations).length, 0);
+});
+
+// --- Rule 7: weak CTA (WARN, cta keys only) ---
+
+test('generic CTA labels on cta keys fire WARN weak-cta', () => {
+  for (const cta of ['Get Started', 'Learn More', 'Sign Up', 'Submit', 'Click Here']) {
+    const violations = lintJson({cta});
+    const hits = violationsFor('weak-cta', violations);
+    assert.equal(hits.length, 1, `expected weak-cta hit for: ${cta}`);
+    assert.equal(hits[0].level, 'WARN');
+  }
+});
+
+test('specific CTA on a cta key does not fire weak-cta', () => {
+  const violations = lintJson({cta: 'Simulate your first trade free'});
+  assert.equal(violationsFor('weak-cta', violations).length, 0);
+});
+
+test('generic phrase on a non-cta key does not fire weak-cta', () => {
+  const violations = lintJson({headline: 'Get Started'});
+  assert.equal(violationsFor('weak-cta', violations).length, 0);
+});
+
+// --- Rule 8: unsourced stats in brief-shaped files (WARN) ---
+
+test('stat claim in a brief with no proofPoints fires WARN unsourced-stat', () => {
+  const brief = {brandId: 'noban', hook: {headline: '3x faster trade checks', altHeadlines: []}};
+  const violations = lintJson(brief);
+  const hits = violationsFor('unsourced-stat', violations);
+  assert.equal(hits.length, 1);
+  assert.equal(hits[0].level, 'WARN');
+  assert.equal(hits[0].text, '3x');
+});
+
+test('percent claim fires unsourced-stat', () => {
+  const brief = {brandId: 'noban', hook: {headline: 'Cuts losses by 58%', altHeadlines: []}};
+  assert.equal(violationsFor('unsourced-stat', lintJson(brief)).length, 1);
+});
+
+test('stat claim with proofPoints present does not fire unsourced-stat', () => {
+  const brief = {
+    brandId: 'noban',
+    hook: {headline: '3x faster trade checks', altHeadlines: []},
+    proofPoints: [{claim: '3x faster trade checks', source: 'README benchmark table'}],
+  };
+  assert.equal(violationsFor('unsourced-stat', lintJson(brief)).length, 0);
+});
+
+test('stats in non-brief files do not fire unsourced-stat', () => {
+  const violations = lintJson({headline: '3x faster trade checks'});
+  assert.equal(violationsFor('unsourced-stat', violations).length, 0);
 });
 
 // --- Skip rules: should NOT fire ---

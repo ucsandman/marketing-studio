@@ -38,6 +38,8 @@ Fresh runs only. Ask everything in a single AskUserQuestion, then run without as
 
 **Content approval gate.** Once `out/<brand>/marketing/brief.json` is synthesized and passes `node scripts/lint-copy.mjs`, run `node scripts/build-storyboard.mjs <brand>` and show the user `storyboard.html` for content approval BEFORE any rendering; in full-auto mode the main-loop judge reviews it instead.
 
+**Brief synthesis rules.** The zod schema (`studio/src/lib/brief.ts`) is the contract; fill the grounding sections, not just the copy: `audience` + `customerLanguage` + `objections` + `switchingForces` from the brief-inputs grounding, and a `proofPoints` entry (claim + source) for EVERY number the copy cites — an unsourced stat is fabrication, omit it instead (lint-copy WARNs on stat-shaped claims in a brief with no proofPoints). Draw `hook.headline` and each of the (up to two) `altHeadlines` from DIFFERENT hook categories per `references/hook-formulas.md` so the hook A/B compares strategies, and build `cta` with its [Action Verb] + [What They Get] formula. The storyboard renders the grounding sections so the approver can check copy against facts.
+
 ## Phase 2 — UI polish (only if opted in)
 
 In the PRODUCT repo: impeccable → polish → frontend-verify. Must fully complete before Phase 3 — re-shooting every asset because the UI changed after capture doubles the run. Commit product-repo polish separately from asset delivery.
@@ -89,7 +91,7 @@ Fable never goes inside a workflow (the model-guard hook blocks it in `parallel(
 ## Phase 4 — Final QA
 
 1. `node scripts/smoke.mjs` — must pass.
-1b. Mechanical judges before any agent sweep (cheap, run all four): `node scripts/judge-av-sync.mjs <brand>` (VO overruns/caption dwell), `node scripts/judge-demo-pacing.mjs <brand>` (dead air), `node scripts/judge-palette.mjs <brand> <still>` (forbidden colors; low-confidence findings are product-UI suspects, treat per step 2's false-positive rule), and `node scripts/check-budgets.mjs <brand>` (hard size gate — an OVER blocks delivery). Their JSON reports feed the judge; only findings the reports can't decide go to the agent sweep.
+1b. Mechanical judges before any agent sweep (cheap, run all five): `node scripts/judge-av-sync.mjs <brand>` (VO overruns/caption dwell), `node scripts/judge-demo-pacing.mjs <brand>` (dead air), `node scripts/judge-palette.mjs <brand> <still>` (forbidden colors; low-confidence findings are product-UI suspects, treat per step 2's false-positive rule), `node scripts/judge-motion.mjs <brand>` (motion-craft conventions in studio src + brand motion-token bands), and `node scripts/check-budgets.mjs <brand>` (hard size gate — an OVER blocks delivery). Their JSON reports feed the judge; only findings the reports can't decide go to the agent sweep.
 2. Brand-compliance sweep: one Sonnet subagent reviews a still from every asset against the brand's `voice` rules (e.g. noban: profit gold `#d6c23c`, never green). Re-render only violators — but VERIFY findings against the product repo's source first. Product screenshots inside assets show the PRODUCT's own fonts/tokens, not the engine brand's stand-ins; a reviewer expecting the engine's mono will misread the product's mono as a violation (paperroute run 2026-07-10: 4 of 5 sweep findings were this exact false positive; the fifth was a real product bug, fixed in the product repo, no asset re-render needed).
 
 ## Phase 5 — Delivery

@@ -16,6 +16,16 @@ describe('briefSchema', () => {
         },
       ],
       positioning: {differentiator: 'Guardrails run server-side, not in the client'},
+      audience: {who: 'CS2 skin traders running manual arbitrage', painPoints: ['One bad trade wipes a week of profit']},
+      customerLanguage: {use: ['float', 'pattern index'], avoid: ['synergy']},
+      objections: [{objection: 'Bots get banned', response: 'Guardrails keep every trade inside marketplace rules'}],
+      switchingForces: {
+        push: 'Manual price-checking eats hours',
+        pull: 'Hard spend caps enforced server-side',
+        habit: 'Spreadsheet workflow feels safe',
+        anxiety: 'Handing a bot wallet access',
+      },
+      proofPoints: [{claim: 'Backtested on 90 days of market data', source: 'README quickstart section'}],
       cta: 'Simulate free at noban.gg',
       narration: [{act: 'hook', text: 'noban dot gg gives you guardrails'}],
       social: {
@@ -28,6 +38,11 @@ describe('briefSchema', () => {
     expect(b.hook.headline).toBe('CS2 skin arbitrage with guardrails');
     expect(b.features[0].sourceRoute).toBe('/governance');
     expect(b.social?.x?.hook).toBe('Skin arbitrage');
+    expect(b.audience?.painPoints).toHaveLength(1);
+    expect(b.customerLanguage.use).toContain('float');
+    expect(b.objections[0].response).toMatch(/marketplace rules/);
+    expect(b.switchingForces?.anxiety).toMatch(/wallet access/);
+    expect(b.proofPoints[0].source).toBe('README quickstart section');
   });
 
   it('fills sane defaults for a brandId-only brief', () => {
@@ -39,6 +54,20 @@ describe('briefSchema', () => {
     expect(b.cta).toBe('');
     expect(b.narration).toEqual([]);
     expect(b.social).toBeNull();
+    expect(b.audience).toBeNull();
+    expect(b.customerLanguage).toEqual({use: [], avoid: []});
+    expect(b.objections).toEqual([]);
+    expect(b.switchingForces).toBeNull();
+    expect(b.proofPoints).toEqual([]);
+  });
+
+  it('rejects a proof point with an empty source (unsourced claims are fabrication)', () => {
+    expect(() =>
+      briefSchema.parse({
+        brandId: 'noban',
+        proofPoints: [{claim: '10x faster', source: ''}],
+      }),
+    ).toThrowError();
   });
 
   it('rejects a feature with more than three benefit lines', () => {

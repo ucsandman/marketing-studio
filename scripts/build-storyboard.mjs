@@ -91,7 +91,53 @@ function validateBrief(b) {
     social = {x: platform(b.social.x), linkedin: platform(b.social.linkedin), vertical: platform(b.social.vertical)};
   }
 
-  return {brandId: b.brandId, hook, features, positioning, cta, narration, social};
+  // Grounding sections (brief.ts additions, all optional) — lenient projection:
+  // malformed entries are dropped, never fatal, since they are approval context
+  // rather than render inputs.
+  const audience =
+    b.audience && typeof b.audience === 'object' && typeof b.audience.who === 'string'
+      ? {
+          who: b.audience.who,
+          painPoints: Array.isArray(b.audience.painPoints) ? b.audience.painPoints.filter((s) => typeof s === 'string') : [],
+        }
+      : null;
+
+  const langIn = b.customerLanguage && typeof b.customerLanguage === 'object' ? b.customerLanguage : {};
+  const customerLanguage = {
+    use: Array.isArray(langIn.use) ? langIn.use.filter((s) => typeof s === 'string') : [],
+    avoid: Array.isArray(langIn.avoid) ? langIn.avoid.filter((s) => typeof s === 'string') : [],
+  };
+
+  const objections = (Array.isArray(b.objections) ? b.objections : [])
+    .filter((o) => o && typeof o.objection === 'string' && typeof o.response === 'string')
+    .map((o) => ({objection: o.objection, response: o.response}));
+
+  const FORCE_KEYS = ['push', 'pull', 'habit', 'anxiety'];
+  const switchingForces =
+    b.switchingForces &&
+    typeof b.switchingForces === 'object' &&
+    FORCE_KEYS.every((k) => typeof b.switchingForces[k] === 'string')
+      ? Object.fromEntries(FORCE_KEYS.map((k) => [k, b.switchingForces[k]]))
+      : null;
+
+  const proofPoints = (Array.isArray(b.proofPoints) ? b.proofPoints : [])
+    .filter((p) => p && typeof p.claim === 'string' && typeof p.source === 'string' && p.source.length > 0)
+    .map((p) => ({claim: p.claim, source: p.source}));
+
+  return {
+    brandId: b.brandId,
+    hook,
+    features,
+    positioning,
+    cta,
+    narration,
+    social,
+    audience,
+    customerLanguage,
+    objections,
+    switchingForces,
+    proofPoints,
+  };
 }
 
 const brief = validateBrief(briefRaw);
@@ -248,6 +294,73 @@ const socialSection = `
   }
 </section>`;
 
+// Grounding panel: the audience facts the copy above must trace to. Only
+// sub-blocks with content render; an entirely empty panel says so out loud
+// (an ungrounded brief is reviewable information, not a crash).
+const groundingBits = [];
+if (brief.audience) {
+  groundingBits.push(`
+  <div class="grounding-item">
+    <p class="label">Audience</p>
+    <p>${esc(brief.audience.who)}</p>
+    ${
+      brief.audience.painPoints.length
+        ? `<ul class="benefit-lines">${brief.audience.painPoints.map((p) => `<li>${esc(p)}</li>`).join('')}</ul>`
+        : ''
+    }
+  </div>`);
+}
+if (brief.customerLanguage.use.length || brief.customerLanguage.avoid.length) {
+  const chips = (words) => words.map((w) => `<code class="chip">${esc(w)}</code>`).join(' ');
+  groundingBits.push(`
+  <div class="grounding-item">
+    <p class="label">Customer language</p>
+    ${brief.customerLanguage.use.length ? `<p class="lang-row">use: ${chips(brief.customerLanguage.use)}</p>` : ''}
+    ${brief.customerLanguage.avoid.length ? `<p class="lang-row">avoid: ${chips(brief.customerLanguage.avoid)}</p>` : ''}
+  </div>`);
+}
+if (brief.switchingForces) {
+  const forceRows = [
+    ['Push', brief.switchingForces.push],
+    ['Pull', brief.switchingForces.pull],
+    ['Habit', brief.switchingForces.habit],
+    ['Anxiety', brief.switchingForces.anxiety],
+  ]
+    .map(([label, text]) => `<tr><td class="act-cell"><code>${esc(label)}</code></td><td>${esc(text)}</td></tr>`)
+    .join('');
+  groundingBits.push(`
+  <div class="grounding-item">
+    <p class="label">Switching forces (JTBD)</p>
+    <table><tbody>${forceRows}</tbody></table>
+  </div>`);
+}
+if (brief.objections.length) {
+  groundingBits.push(`
+  <div class="grounding-item">
+    <p class="label">Objections</p>
+    <table>
+      <thead><tr><th>Objection</th><th>Response the copy carries</th></tr></thead>
+      <tbody>${brief.objections.map((o) => `<tr><td>${esc(o.objection)}</td><td>${esc(o.response)}</td></tr>`).join('')}</tbody>
+    </table>
+  </div>`);
+}
+if (brief.proofPoints.length) {
+  groundingBits.push(`
+  <div class="grounding-item">
+    <p class="label">Proof points (every claim needs its source)</p>
+    <table>
+      <thead><tr><th>Claim</th><th>Source</th></tr></thead>
+      <tbody>${brief.proofPoints.map((p) => `<tr><td>${esc(p.claim)}</td><td><code class="chip">${esc(p.source)}</code></td></tr>`).join('')}</tbody>
+    </table>
+  </div>`);
+}
+
+const groundingSection = `
+<section class="block">
+  <h2 class="block-title">Grounding</h2>
+  ${groundingBits.length ? groundingBits.join('') : '<p class="muted">No grounding sections recorded — the copy above traces only to the provenance line below.</p>'}
+</section>`;
+
 const ctaSection = `
 <section class="block">
   <h2 class="block-title">CTA &amp; positioning</h2>
@@ -353,6 +466,9 @@ const html = `<!doctype html>
     color: var(--ink3);
   }
   .muted { color: var(--ink3); font-style: italic; }
+  .grounding-item { margin-bottom: 20px; font-size: 14px; color: var(--ink2); }
+  .grounding-item p { margin: 0 0 8px; }
+  .lang-row { line-height: 2; }
   @media (max-width: 640px) {
     .card-grid { grid-template-columns: 1fr; }
   }
@@ -375,6 +491,7 @@ const html = `<!doctype html>
   ${narrationSection}
   ${socialSection}
   ${ctaSection}
+  ${groundingSection}
 
   <footer class="provenance">${provenanceLine()}</footer>
 </div>
