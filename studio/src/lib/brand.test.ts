@@ -21,6 +21,8 @@ describe('getBrand', () => {
   it('loads the synthacon brand with validated tokens', () => {
     const b = getBrand('synthacon');
     expect(b.name).toBe('Synthacon');
+    // canonical lockup: synthacon-marketing/content/synthacon-messaging.md
+    expect(b.tagline).toBe('Gear near you, from people who play');
     // dark "Synthacon Lexicon" palette: violet primary, rich but never neon
     expect(b.colors.brand).toBe('#a090dc');
     expect(b.colors.bg).toBe('#0c0c0d');
