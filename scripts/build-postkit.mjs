@@ -14,14 +14,22 @@
 //   - launch.srt/launch.vtt — copied in for youtube + linkedin only
 //   - POST.md — human checklist: what to upload, which file, caption, notes
 //
+// WrapClip segment kits: for every out/<brand>/matrix/wrap-<segmentId>/ dir
+// (render-matrix.mjs --comp WrapClip --props), an additional
+// out/<brand>/postkit/wrap-<segmentId>/<platform>/ kit is assembled per platform
+// with the segment's aspect-matched video (wrap-<aspect>.mp4), the same
+// lint-gated brief-sourced caption.txt/alt.txt, and POST.md — no thumbnail or
+// srt/vtt sidecars (those are launch-video artifacts). Brands without wrap dirs
+// are completely unaffected.
+//
 // Also writes manifest.json at the kit root — machine-readable kit index
-// consumed by launch-engine.
+// consumed by launch-engine (plus a `segments` key when segment kits exist).
 //
 // caption.txt is gated by scripts/lint-copy.mjs (imported directly, not spawned):
 // any ERROR-level violation FAILS the whole build. Exits non-zero only if NOTHING
 // could be assembled across every platform; partial kits are the expected outcome
 // before render-matrix.mjs has produced full videos.
-import {copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
+import {copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
 import {lintJson, formatReport} from './lint-copy.mjs';
@@ -138,8 +146,38 @@ export function manifestEntry(platformKey, cfg, {hasVideo, thumbFile, srtCopied,
 }
 
 // The machine-readable interface consumed by launch-engine (PostKitManifestSchema).
-export function buildManifest(brand, generatedAt, platforms) {
-  return {version: 1, brand, generatedAt, platforms};
+// `segments` (WrapClip segment kits, keyed by segmentId) is only present when at
+// least one segment kit was assembled — brands without wrap matrix dirs produce a
+// manifest identical in shape to before segments existed.
+export function buildManifest(brand, generatedAt, platforms, segments = null) {
+  const manifest = {version: 1, brand, generatedAt, platforms};
+  if (segments && Object.keys(segments).length > 0) manifest.segments = segments;
+  return manifest;
+}
+
+// WrapClip segment discovery: render-matrix.mjs --props nests each segment's
+// exports under out/<brand>/matrix/wrap-<segmentId>/. Given the matrix dir's
+// directory names, return the segment ids (empty for brands with no wrap dirs).
+export function wrapSegmentIds(dirNames) {
+  return dirNames.filter((n) => n.startsWith('wrap-')).map((n) => n.slice('wrap-'.length));
+}
+
+// Manifest entry for one platform folder inside a wrap segment kit. Same field set
+// as manifestEntry so launch-engine consumes both shapes uniformly; thumb/srt/vtt
+// are always null — those artifacts trace to the brand's launch video
+// (extract-thumbs.mjs / build-captions.mjs), not to the wrap segment, so segment
+// kits deliberately omit them rather than ship mislabeled launch assets.
+export function wrapKitEntry(segmentId, platformKey, cfg, hasVideo) {
+  const kitPath = `wrap-${segmentId}/${platformKey}`;
+  return {
+    video: hasVideo ? `${kitPath}/wrap-${cfg.aspect}.mp4` : null,
+    caption: `${kitPath}/caption.txt`,
+    alt: `${kitPath}/alt.txt`,
+    thumb: null,
+    srt: null,
+    vtt: null,
+    note: cfg.note,
+  };
 }
 
 function postMd(brandLabel, platformKey, cfg, videoStatus, thumbStatus, captionFilesLine) {
@@ -209,6 +247,20 @@ function main() {
   let assembledCount = 0;
   const manifestPlatforms = {};
 
+  // Caption, gated by lint-copy before it is trusted (shared by the brand kit and
+  // the wrap segment kits below — identical gate, different label/target dir).
+  const writeGatedCaption = (dir, platformKey, label) => {
+    const captionText = buildCaption(platformKey, brief, brandData);
+    const violations = lintJson({caption: captionText});
+    const errorCount = violations.filter((v) => v.level === 'ERROR').length;
+    if (errorCount > 0) {
+      console.error(formatReport(`${label}/caption.txt`, violations));
+      console.error(`build-postkit: FAILED — lint-copy found ${errorCount} violation(s) in ${label}'s caption`);
+      process.exit(1);
+    }
+    writeFileSync(join(dir, 'caption.txt'), captionText + '\n');
+  };
+
   for (const [platformKey, cfg] of Object.entries(PLATFORM_MAP)) {
     const dir = join(postkitDir, platformKey);
     mkdirSync(dir, {recursive: true});
@@ -243,16 +295,7 @@ function main() {
     }
     const thumbFile = thumbStatus.startsWith('NOT') ? null : thumbStatus;
 
-    // Caption, gated by lint-copy before it is trusted.
-    const captionText = buildCaption(platformKey, brief, brandData);
-    const violations = lintJson({caption: captionText});
-    const errorCount = violations.filter((v) => v.level === 'ERROR').length;
-    if (errorCount > 0) {
-      console.error(formatReport(`${platformKey}/caption.txt`, violations));
-      console.error(`build-postkit: FAILED — lint-copy found ${errorCount} violation(s) in ${platformKey}'s caption`);
-      process.exit(1);
-    }
-    writeFileSync(join(dir, 'caption.txt'), captionText + '\n');
+    writeGatedCaption(dir, platformKey, platformKey);
     assembledCount += 1;
 
     // Alt text.
@@ -299,6 +342,55 @@ function main() {
     console.log(`postkit: wrote out/${brand}/postkit/${platformKey}/ (video: ${existsSync(videoSrc) ? 'yes' : 'skipped'}, thumb: ${thumbStatus.startsWith('NOT') ? 'skipped' : 'yes'})`);
   }
 
+  // WrapClip segment kits: one kit per out/<brand>/matrix/wrap-<segmentId>/ dir
+  // (render-matrix.mjs --comp WrapClip --props). Reuses the platform table and the
+  // same lint-gated, brief-sourced caption path as the brand kit; thumbs and
+  // srt/vtt sidecars are omitted — launch-video artifacts, not segment artifacts
+  // (see wrapKitEntry). Brands with no wrap dirs skip this loop entirely.
+  const manifestSegments = {};
+  const matrixDirNames = existsSync(matrixDir)
+    ? readdirSync(matrixDir, {withFileTypes: true}).filter((e) => e.isDirectory()).map((e) => e.name)
+    : [];
+  for (const segmentId of wrapSegmentIds(matrixDirNames)) {
+    const segMatrixDir = join(matrixDir, `wrap-${segmentId}`);
+    const segEntries = {};
+    for (const [platformKey, cfg] of Object.entries(PLATFORM_MAP)) {
+      const kitLabel = `wrap-${segmentId}/${platformKey}`;
+      const dir = join(postkitDir, `wrap-${segmentId}`, platformKey);
+      mkdirSync(dir, {recursive: true});
+
+      // Video: the segment's own aspect-matched export.
+      const videoName = `wrap-${cfg.aspect}.mp4`;
+      const videoSrc = join(segMatrixDir, videoName);
+      const hasVideo = existsSync(videoSrc);
+      let videoStatus;
+      if (hasVideo) {
+        copyFileSync(videoSrc, join(dir, videoName));
+        videoStatus = videoName;
+        assembledCount += 1;
+      } else {
+        videoStatus = `NOT INCLUDED (missing out/${brand}/matrix/wrap-${segmentId}/${videoName} — run render-matrix.mjs --comp WrapClip --props props/${brand}-wrap-${segmentId}.json)`;
+        console.log(`postkit: ${kitLabel}: skipped video, ${videoName} not found in out/${brand}/matrix/wrap-${segmentId}/`);
+      }
+
+      writeGatedCaption(dir, platformKey, kitLabel);
+      assembledCount += 1;
+
+      writeFileSync(join(dir, 'alt.txt'), buildAlt(brief, brandData) + '\n');
+      assembledCount += 1;
+
+      writeFileSync(
+        join(dir, 'POST.md'),
+        postMd(brandData.name ?? brand, platformKey, cfg, videoStatus, 'NOT INCLUDED (segment kits omit the brand launch thumbnail)', ''),
+      );
+      assembledCount += 1;
+
+      segEntries[platformKey] = wrapKitEntry(segmentId, platformKey, cfg, hasVideo);
+    }
+    manifestSegments[segmentId] = segEntries;
+    console.log(`postkit: wrote out/${brand}/postkit/wrap-${segmentId}/ (${Object.keys(PLATFORM_MAP).length} platform folders)`);
+  }
+
   if (assembledCount === 0) {
     console.error(`build-postkit: FAILED — nothing could be assembled for ${brand}`);
     process.exit(1);
@@ -306,7 +398,7 @@ function main() {
 
   writeFileSync(
     join(postkitDir, 'manifest.json'),
-    JSON.stringify(buildManifest(brand, new Date().toISOString(), manifestPlatforms), null, 2) + '\n',
+    JSON.stringify(buildManifest(brand, new Date().toISOString(), manifestPlatforms, manifestSegments), null, 2) + '\n',
   );
   console.log(`postkit: wrote out/${brand}/postkit/manifest.json`);
 

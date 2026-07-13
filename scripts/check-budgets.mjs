@@ -9,8 +9,9 @@
 // Budget table (BUDGETS below): readme gif 5MB; web hero/og mp4 8MB (LaunchVideo
 // matrix rows, id-prefixed `launch-`, plus og.mp4 — the picture-locked hero video
 // meant to be embedded/autoplay on a web page); social mp4 50MB (SocialClip matrix
-// rows, id-prefixed `social-` — uploaded natively to platforms that transcode on
-// ingest, so the budget is looser); webm 6MB; thumbs jpg 400KB. Files that don't
+// rows, id-prefixed `social-`, and WrapClip segment rows, id-prefixed `wrap-` —
+// both uploaded natively to platforms that transcode on ingest, so the budget is
+// looser); webm 6MB; thumbs jpg 400KB. Files that don't
 // match any of the five budgets (og.gif, og-image.png, .props json, caption/alt.txt,
 // POST.md, srt/vtt, a .png thumb fallback) are not part of this contract and are
 // skipped, not flagged — og.gif in particular is known-heavy by design (see
@@ -41,9 +42,13 @@ export function matchBudget(filePath) {
   if (base.endsWith('.mp4')) {
     // scripts/platforms.json ids: launch-* = LaunchVideo (web hero), social-* =
     // SocialClip. build-postkit.mjs copies matrix files into postkit/<platform>/
-    // under the same name, so this rule holds in both locations.
+    // under the same name, so this rule holds in both locations. wrap-* = WrapClip
+    // segment exports (out/<brand>/matrix/wrap-<segmentId>/wrap-<aspect>.mp4 and
+    // their postkit copies) — uploaded natively like SocialClip, and no per-aspect
+    // budget classes exist, so they reuse the social-mp4 budget.
     if (base.startsWith('launch-')) return BUDGETS['web-hero-og-mp4'];
     if (base.startsWith('social-')) return BUDGETS['social-mp4'];
+    if (base.startsWith('wrap-')) return BUDGETS['social-mp4'];
   }
   return null;
 }
@@ -67,10 +72,12 @@ export function checkFiles(files) {
   return results;
 }
 
-// Lists files (not directories) directly inside dir, plus one level deep when
-// {recursive:true} — used for postkit/<platform>/<file>. Missing dir -> null so the
-// caller can log a skip note instead of an error. Dotdirs (matrix/.props/) are
-// ignored at every level.
+// Lists files (not directories) inside dir, descending into subdirectories at any
+// depth when {recursive:true} — used for postkit/<platform>/<file>, matrix segment
+// dirs (matrix/wrap-<segmentId>/<file>), and postkit segment kits
+// (postkit/wrap-<segmentId>/<platform>/<file>). Missing dir -> null so the caller
+// can log a skip note instead of an error. Dotdirs (matrix/.props/) are ignored at
+// every level.
 function listFiles(dir, {recursive = false} = {}) {
   if (!existsSync(dir)) return null;
   const entries = readdirSync(dir, {withFileTypes: true});
@@ -79,7 +86,7 @@ function listFiles(dir, {recursive = false} = {}) {
     if (entry.name.startsWith('.')) continue;
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (recursive) files.push(...(listFiles(full) ?? []));
+      if (recursive) files.push(...(listFiles(full, {recursive}) ?? []));
       continue;
     }
     files.push(full);
@@ -112,7 +119,7 @@ function main() {
   const allFiles = [];
 
   const locations = [
-    {dir: join(brandOut, 'matrix'), recursive: false, label: `out/${brand}/matrix/`},
+    {dir: join(brandOut, 'matrix'), recursive: true, label: `out/${brand}/matrix/`},
     {dir: join(brandOut, 'thumbs'), recursive: false, label: `out/${brand}/thumbs/`},
     {dir: join(brandOut, 'postkit'), recursive: true, label: `out/${brand}/postkit/`},
   ];

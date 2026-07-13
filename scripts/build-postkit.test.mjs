@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {trimToBudget, buildCaption, buildAlt, manifestEntry, buildManifest, PLATFORM_MAP} from './build-postkit.mjs';
+import {trimToBudget, buildCaption, buildAlt, manifestEntry, buildManifest, wrapSegmentIds, wrapKitEntry, PLATFORM_MAP} from './build-postkit.mjs';
 
 // --- trimToBudget ---
 
@@ -120,4 +120,50 @@ test('buildManifest wraps platforms with version and brand', () => {
   assert.equal(m.brand, 'noban');
   assert.equal(m.generatedAt, '2026-07-11T00:00:00.000Z');
   assert.ok(m.platforms.x);
+});
+
+// --- wrap segment kits ---
+
+test('wrapSegmentIds discovers wrap-<segmentId> dirs and strips the prefix', () => {
+  assert.deepEqual(wrapSegmentIds(['wrap-clip-c-hook', 'wrap-intro']), ['clip-c-hook', 'intro']);
+});
+
+test('wrapSegmentIds ignores non-wrap directory names', () => {
+  assert.deepEqual(wrapSegmentIds(['thumbs', 'somefolder', 'wrapped-up']), []);
+});
+
+test('wrapSegmentIds is empty for brands with no wrap dirs (no-wrap unchanged)', () => {
+  assert.deepEqual(wrapSegmentIds([]), []);
+});
+
+test('buildManifest without segments has no segments key (backward-compatible shape)', () => {
+  const m = buildManifest('noban', '2026-07-11T00:00:00.000Z', {});
+  assert.equal('segments' in m, false);
+  const mEmpty = buildManifest('noban', '2026-07-11T00:00:00.000Z', {}, {});
+  assert.equal('segments' in mEmpty, false);
+});
+
+test('buildManifest includes segments when segment kits exist', () => {
+  const seg = {'clip-c-hook': {x: wrapKitEntry('clip-c-hook', 'x', PLATFORM_MAP.x, true)}};
+  const m = buildManifest('dashclaw', '2026-07-11T00:00:00.000Z', {}, seg);
+  assert.deepEqual(m.segments, seg);
+});
+
+test('wrapKitEntry maps the segment kit artifacts to kit-relative paths', () => {
+  const entry = wrapKitEntry('clip-c-hook', 'tiktok', PLATFORM_MAP.tiktok, true);
+  assert.deepEqual(entry, {
+    video: 'wrap-clip-c-hook/tiktok/wrap-9x16.mp4',
+    caption: 'wrap-clip-c-hook/tiktok/caption.txt',
+    alt: 'wrap-clip-c-hook/tiktok/alt.txt',
+    thumb: null,
+    srt: null,
+    vtt: null,
+    note: PLATFORM_MAP.tiktok.note,
+  });
+});
+
+test('wrapKitEntry uses null video when the aspect export is missing', () => {
+  const entry = wrapKitEntry('clip-c-hook', 'x', PLATFORM_MAP.x, false);
+  assert.equal(entry.video, null);
+  assert.equal(entry.caption, 'wrap-clip-c-hook/x/caption.txt');
 });

@@ -29,6 +29,17 @@ test('the launch-/social- rule also applies inside postkit/<platform>/', () => {
   assert.equal(matchBudget('out/noban/postkit/x/social-16x9.mp4'), BUDGETS['social-mp4']);
 });
 
+test('wrap-*.mp4 segment exports match the social-mp4 budget (nested matrix + postkit paths)', () => {
+  assert.equal(matchBudget('out/dashclaw/matrix/wrap-clip-c-hook/wrap-9x16.mp4'), BUDGETS['social-mp4']);
+  assert.equal(matchBudget('out/dashclaw/matrix/wrap-clip-c-hook/wrap-16x9.mp4'), BUDGETS['social-mp4']);
+  assert.equal(matchBudget('out/dashclaw/postkit/wrap-clip-c-hook/tiktok/wrap-9x16.mp4'), BUDGETS['social-mp4']);
+});
+
+test('non-mp4 files inside a wrap segment dir have no matching budget', () => {
+  assert.equal(matchBudget('out/dashclaw/matrix/wrap-clip-c-hook/frame-9x16.png'), null);
+  assert.equal(matchBudget('out/dashclaw/postkit/wrap-clip-c-hook/x/caption.txt'), null);
+});
+
 test('.webm files match the webm budget regardless of launch-/social- prefix', () => {
   assert.equal(matchBudget('out/noban/matrix/launch-16x9.webm'), BUDGETS.webm);
   assert.equal(matchBudget('out/noban/matrix/social-1x1.webm'), BUDGETS.webm);
