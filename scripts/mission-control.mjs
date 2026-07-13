@@ -29,29 +29,41 @@ process.on('unhandledRejection', (reason) => {
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
+// Import-safe (scripts/mission-control.test.mjs imports the pure functions
+// below): only parse argv, bind the port, and start the server when executed
+// directly — matching review-in-magnetic.mjs's / pull-magnetic-verdicts.mjs's
+// isMain convention. Everything else in this file is a function declaration
+// (hoisted, not executed at import time), so importing this module for its
+// pure helpers never binds a port or touches argv.
+const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
 // ---- args ------------------------------------------------------------------
-const argv = process.argv.slice(2);
 let brand = null;
 let port = 4600;
-for (let i = 0; i < argv.length; i++) {
-  const a = argv[i];
-  if (a === '--port') port = parseInt(argv[++i], 10);
-  else if (a.startsWith('--port=')) port = parseInt(a.split('=')[1], 10);
-  else if (!a.startsWith('-') && !brand) brand = a;
-}
-if (!brand) {
-  console.error('usage: node scripts/mission-control.mjs <brandId> [--port 4600]');
-  process.exit(1);
-}
-if (!Number.isFinite(port)) {
-  console.error(`mission-control: invalid --port value`);
-  process.exit(1);
-}
+let brandOut, marketingDir, runPath, reviewPath; // bound below once brand is known
 
-const brandOut = join(root, 'out', brand); // media root — nothing is served from outside this dir
-const marketingDir = join(brandOut, 'marketing');
-const runPath = join(marketingDir, 'run.json');
-const reviewPath = join(marketingDir, 'review.json');
+if (isMain) {
+  const argv = process.argv.slice(2);
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '--port') port = parseInt(argv[++i], 10);
+    else if (a.startsWith('--port=')) port = parseInt(a.split('=')[1], 10);
+    else if (!a.startsWith('-') && !brand) brand = a;
+  }
+  if (!brand) {
+    console.error('usage: node scripts/mission-control.mjs <brandId> [--port 4600]');
+    process.exit(1);
+  }
+  if (!Number.isFinite(port)) {
+    console.error(`mission-control: invalid --port value`);
+    process.exit(1);
+  }
+
+  brandOut = join(root, 'out', brand); // media root — nothing is served from outside this dir
+  marketingDir = join(brandOut, 'marketing');
+  runPath = join(marketingDir, 'run.json');
+  reviewPath = join(marketingDir, 'review.json');
+}
 
 // ---- manifest i/o ----------------------------------------------------------
 function readRun() {
@@ -124,7 +136,7 @@ function mediaKind(rel) {
 // Resolve the on-disk artifact for an asset and, if it exists, attach a
 // computed _artifact {url, kind, sizeBytes}. Returns the entry enriched (never
 // mutates the manifest on disk).
-function enrichAsset(entry) {
+function enrichAsset(entry, verdictsByAsset = {}) {
   const rel = artifactRel(primaryRaw(entry));
   let _artifact = null;
   if (rel) {
@@ -143,7 +155,7 @@ function enrichAsset(entry) {
       }
     }
   }
-  return {...entry, _artifact, _stills: enrichStills(entry)};
+  return {...entry, _artifact, _stills: enrichStills(entry), _verdict: verdictsByAsset[entry.id] ?? null};
 }
 
 // ---- contact-sheet stills (scripts/contact-sheet.mjs) ----------------------
@@ -339,6 +351,42 @@ async function handleAssetPost(req, res, id) {
   res.end(JSON.stringify({ok: true, id, status: entry.status}));
 }
 
+// ---- POST /review-in-magnetic, POST /pull-verdicts -------------------------
+// Both spawn a CLI driver (Tasks 5/6) as a CHILD process rather than
+// importing it in-process: each driver's own main() calls process.exit() on
+// failure, which would kill this long-running server if imported directly.
+// execFileSync isolates that in a child process and hands back its
+// stdout/stderr verbatim, so the operator sees the sidecar's exact hint (e.g.
+// "enable Agent Access in the sidebar") inline instead of a generic 500.
+export function runCliScript(scriptPath, args) {
+  try {
+    const stdout = execFileSync(process.execPath, [scriptPath, ...args], {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    return {ok: true, stdout};
+  } catch (err) {
+    // execFileSync populates err.stdout/err.stderr as strings when encoding
+    // is set. The driver's own main().catch prints err.message to stderr and
+    // exits 1 — that text is exactly what must reach the operator's eyes.
+    const stderr = typeof err.stderr === 'string' ? err.stderr.trim() : '';
+    return {ok: false, error: stderr || err.message || String(err)};
+  }
+}
+
+function handleReviewInMagnetic(res) {
+  const result = runCliScript(join(root, 'scripts', 'review-in-magnetic.mjs'), [brand]);
+  res.writeHead(result.ok ? 200 : 502, {'content-type': 'application/json'});
+  res.end(JSON.stringify(result));
+}
+
+function handlePullVerdicts(res) {
+  const result = runCliScript(join(root, 'scripts', 'pull-magnetic-verdicts.mjs'), [brand]);
+  res.writeHead(result.ok ? 200 : 502, {'content-type': 'application/json'});
+  res.end(JSON.stringify(result));
+}
+
 // ---- read-only advisories (judges / results / staleness) --------------------
 // All three are computed from files other tools write; Mission Control never
 // mutates them. They ride on /state so the operator approves with the machine
@@ -429,6 +477,30 @@ function readStaleness() {
   return value;
 }
 
+// ---- magnetic review verdicts (pull-magnetic-verdicts.mjs writes review.json) ----
+// review.json is APPEND-ONLY (mission-control's own log semantics, shared
+// with the verdict puller): the same assetId can appear more than once — a
+// redo note today, a Magnetic approve/reject verdict tomorrow. Displaying it
+// means reading the LATEST entry per assetId, never counting entries or
+// trusting anything but "last write wins" in append order.
+export function latestVerdictsByAsset(review) {
+  const byAsset = {};
+  for (const entry of Array.isArray(review) ? review : []) {
+    if (entry && typeof entry.assetId === 'string') byAsset[entry.assetId] = entry;
+  }
+  return byAsset;
+}
+
+function readReview() {
+  if (!existsSync(reviewPath)) return [];
+  try {
+    const parsed = JSON.parse(readFileSync(reviewPath, 'utf8'));
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 // ---- state -----------------------------------------------------------------
 // Serves the run manifest, each asset enriched with a computed _artifact
 // (url/kind/sizeBytes) resolved against the disk at read time. The file is
@@ -440,9 +512,10 @@ function serveState(res) {
     res.end(JSON.stringify({error: 'no run found'}));
     return;
   }
+  const verdictsByAsset = latestVerdictsByAsset(readReview());
   const enriched = {
     ...run,
-    assets: Array.isArray(run.assets) ? run.assets.map(enrichAsset) : [],
+    assets: Array.isArray(run.assets) ? run.assets.map((a) => enrichAsset(a, verdictsByAsset)) : [],
     _judges: readJudges(),
     _results: readResults(),
     _staleness: readStaleness(),
@@ -482,6 +555,11 @@ header .started{color:#8a929b;font-size:13px;}
 .dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
 .advisories{padding:10px 22px;background:#101317;border-bottom:1px solid #21262c;display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;font-size:12px;}
 .advisories:empty{display:none;}
+.mcbar{padding:10px 22px;background:#101317;border-bottom:1px solid #21262c;display:flex;flex-wrap:wrap;align-items:center;gap:10px;}
+.mcbar .btn{padding:7px 14px;flex:none;}
+.mcstatus{font-size:12px;color:#8ce6a5;}
+.mcerror{margin:0;padding:10px 22px;background:#2a1414;border-bottom:1px solid #5a2323;color:#ff8a8a;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;white-space:pre-wrap;word-break:break-word;}
+.mcerror[hidden]{display:none;}
 .judge{position:relative;}
 .judge summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-variant-numeric:tabular-nums;padding:3px 10px;border-radius:999px;border:1px solid #2b3138;background:#181c21;}
 .judge summary::-webkit-details-marker{display:none;}
@@ -511,6 +589,10 @@ header .started{color:#8a929b;font-size:13px;}
 .media .placeholder{color:#5a636d;font-size:13px;padding:38px 12px;text-align:center;}
 .meta{padding:9px 14px;font-size:12px;color:#8a929b;font-variant-numeric:tabular-nums;display:flex;gap:14px;flex-wrap:wrap;border-bottom:1px solid #21262c;}
 .redonote{padding:9px 14px;font-size:12px;color:#e6b45a;background:#1c1509;border-bottom:1px solid #21262c;}
+.verdict-badge{padding:9px 14px;font-size:12px;border-bottom:1px solid #21262c;}
+.verdict-badge.v-approved{color:#8ce6a5;background:#0f2318;}
+.verdict-badge.v-rejected{color:#ff8a8a;background:#2a1414;}
+.verdict-badge.v-unreviewed{color:#8a929b;background:#15181c;}
 .variants{padding:10px 14px;border-bottom:1px solid #21262c;}
 .variants .vtitle{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#8a929b;margin-bottom:6px;}
 .variants label{display:flex;align-items:center;gap:7px;font-size:13px;padding:3px 0;cursor:pointer;}
@@ -546,6 +628,12 @@ function consolePage() {
   <div class="counts" id="hCounts"></div>
 </header>
 <div class="advisories" id="advisories"></div>
+<div class="mcbar">
+  <button class="btn approve" id="btnReviewMagnetic">Review in Magnetic</button>
+  <button class="btn redo" id="btnPullVerdicts">Pull verdicts</button>
+  <span class="mcstatus" id="mcStatus"></span>
+</div>
+<pre class="mcerror" id="mcError" hidden></pre>
 <main class="wrap" id="cards"></main>
 <script>
 const STATUSES = ['planned','rendered','approved','delivered'];
@@ -580,6 +668,16 @@ function stillsHtml(e){
   const thumbs=st.thumbs.map(t=>'<a class="still-thumb" href="'+esc(t.url)+'" target="_blank" title="'+esc(t.label)+'"><img loading="lazy" src="'+esc(t.url)+'" alt="'+esc(t.label)+'"></a>').join('');
   return '<div class="stills"><div class="stills-head"><span class="vtitle">Stills</span><a class="sheet-link" href="'+esc(st.sheetUrl)+'" target="_blank">contact sheet &#8599;</a></div><div class="stills-strip">'+thumbs+'</div></div>';
 }
+// Latest-per-assetId verdict from review.json (pull-magnetic-verdicts.mjs or
+// mission-control's own redo writer). action carries approved/rejected/
+// unreviewed/redo — anything other than approved/rejected renders neutral.
+function verdictHtml(e){
+  const v=e._verdict;
+  if(!v)return'';
+  const action=v.action||'unreviewed';
+  const cls=action==='approved'?'v-approved':action==='rejected'?'v-rejected':'v-unreviewed';
+  return '<div class="verdict-badge '+cls+'">magnetic: '+esc(action)+(v.note?' — '+esc(v.note):'')+'</div>';
+}
 
 function cardHtml(e){
   const status=STATUSES.indexOf(e.status)>=0?e.status:'unknown';
@@ -612,7 +710,7 @@ function cardHtml(e){
       +(e.skill?'<span class="skill">'+esc(e.skill)+'</span>':'')
     +'</div>'
     +'<div class="media">'+media+'</div>'
-    +meta+redo+stillsHtml(e)+variants
+    +meta+redo+verdictHtml(e)+stillsHtml(e)+variants
     +'<div class="controls">'
       +'<div class="row"><button class="btn approve" data-act="approve">Approve</button></div>'
       +'<textarea placeholder="Redo note: what should change"></textarea>'
@@ -645,6 +743,32 @@ cardsEl.addEventListener('click',ev=>{
   const card=btn.closest('.card');if(!card)return;
   act(card.dataset.id,btn.dataset.act,card);
 });
+
+// ---- run-level actions: Review in Magnetic / Pull verdicts ----------------
+const btnReviewMagnetic=document.getElementById('btnReviewMagnetic');
+const btnPullVerdicts=document.getElementById('btnPullVerdicts');
+const mcStatusEl=document.getElementById('mcStatus');
+const mcErrorEl=document.getElementById('mcError');
+
+function showMcError(text){mcErrorEl.textContent=text;mcErrorEl.hidden=false;}
+function clearMcError(){mcErrorEl.hidden=true;mcErrorEl.textContent='';}
+
+async function runMcAction(path,btn,otherBtn,successText){
+  clearMcError();
+  mcStatusEl.textContent='';
+  btn.disabled=true;otherBtn.disabled=true;
+  try{
+    const r=await fetch(path,{method:'POST'});
+    const body=await r.json().catch(()=>({}));
+    if(!r.ok||body.ok===false){showMcError(body.error||('request failed: HTTP '+r.status));return;}
+    mcStatusEl.textContent=successText;
+    refresh();
+  }catch(err){showMcError(err.message);}
+  finally{btn.disabled=false;otherBtn.disabled=false;}
+}
+
+btnReviewMagnetic.addEventListener('click',()=>runMcAction('/review-in-magnetic',btnReviewMagnetic,btnPullVerdicts,'Proposal sent to Magnetic.'));
+btnPullVerdicts.addEventListener('click',()=>runMcAction('/pull-verdicts',btnPullVerdicts,btnReviewMagnetic,'Verdicts pulled.'));
 
 function renderHeader(run){
   document.getElementById('hBrand').textContent=run.brand||run.brandId||'';
@@ -719,64 +843,78 @@ setInterval(refresh,2000);
 }
 
 // ---- server ----------------------------------------------------------------
-const server = http.createServer((req, res) => {
-  const url = new URL(req.url, 'http://localhost');
-  const path = url.pathname;
+// Only bound when run directly (see the isMain guard at the top of the
+// file) — importing this module for its pure helpers must never open a port.
+if (isMain) {
+  const server = http.createServer((req, res) => {
+    const url = new URL(req.url, 'http://localhost');
+    const path = url.pathname;
 
-  if (req.method === 'POST' && path.startsWith('/asset/')) {
-    const id = decodeURIComponent(path.slice('/asset/'.length));
-    handleAssetPost(req, res, id).catch((err) => {
-      console.error('mission-control: POST error', err);
-      if (!res.headersSent) {
-        res.writeHead(500, {'content-type': 'application/json'});
-        res.end(JSON.stringify({error: 'internal error'}));
-      }
-    });
-    return;
-  }
-
-  if (req.method !== 'GET' && req.method !== 'HEAD') {
-    res.writeHead(405, {'content-type': 'text/plain'});
-    res.end('method not allowed');
-    return;
-  }
-
-  if (path === '/state') {
-    serveState(res);
-    return;
-  }
-
-  if (path.startsWith('/media/')) {
-    serveMedia(req, res, path.slice('/media/'.length));
-    return;
-  }
-
-  if (path === '/' || path === '/index.html') {
-    const run = readRun();
-    if (!run) {
-      console.error(`mission-control: no run manifest at ${runPath}`);
-      res.writeHead(200, {'content-type': 'text/html; charset=utf-8'});
-      res.end(noRunPage());
+    if (req.method === 'POST' && path.startsWith('/asset/')) {
+      const id = decodeURIComponent(path.slice('/asset/'.length));
+      handleAssetPost(req, res, id).catch((err) => {
+        console.error('mission-control: POST error', err);
+        if (!res.headersSent) {
+          res.writeHead(500, {'content-type': 'application/json'});
+          res.end(JSON.stringify({error: 'internal error'}));
+        }
+      });
       return;
     }
-    res.writeHead(200, {'content-type': 'text/html; charset=utf-8'});
-    res.end(consolePage());
-    return;
-  }
 
-  res.writeHead(404, {'content-type': 'text/plain'});
-  res.end('not found');
-});
+    if (req.method === 'POST' && path === '/review-in-magnetic') {
+      handleReviewInMagnetic(res);
+      return;
+    }
 
-server.on('error', (err) => {
-  console.error(`mission-control: failed to bind port ${port}:`, err.message);
-  process.exit(1);
-});
+    if (req.method === 'POST' && path === '/pull-verdicts') {
+      handlePullVerdicts(res);
+      return;
+    }
 
-server.listen(port, () => {
-  const url = `http://localhost:${port}/`;
-  if (!existsSync(runPath)) {
-    console.error(`mission-control: WARNING no manifest at ${runPath} yet — serving a "no run found" page until it appears.`);
-  }
-  console.log(`mission-control: ${brand} console at ${url}  (manifest: out/${brand}/marketing/run.json)`);
-});
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      res.writeHead(405, {'content-type': 'text/plain'});
+      res.end('method not allowed');
+      return;
+    }
+
+    if (path === '/state') {
+      serveState(res);
+      return;
+    }
+
+    if (path.startsWith('/media/')) {
+      serveMedia(req, res, path.slice('/media/'.length));
+      return;
+    }
+
+    if (path === '/' || path === '/index.html') {
+      const run = readRun();
+      if (!run) {
+        console.error(`mission-control: no run manifest at ${runPath}`);
+        res.writeHead(200, {'content-type': 'text/html; charset=utf-8'});
+        res.end(noRunPage());
+        return;
+      }
+      res.writeHead(200, {'content-type': 'text/html; charset=utf-8'});
+      res.end(consolePage());
+      return;
+    }
+
+    res.writeHead(404, {'content-type': 'text/plain'});
+    res.end('not found');
+  });
+
+  server.on('error', (err) => {
+    console.error(`mission-control: failed to bind port ${port}:`, err.message);
+    process.exit(1);
+  });
+
+  server.listen(port, () => {
+    const url = `http://localhost:${port}/`;
+    if (!existsSync(runPath)) {
+      console.error(`mission-control: WARNING no manifest at ${runPath} yet — serving a "no run found" page until it appears.`);
+    }
+    console.log(`mission-control: ${brand} console at ${url}  (manifest: out/${brand}/marketing/run.json)`);
+  });
+}
