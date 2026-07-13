@@ -84,6 +84,14 @@ if (compFilter === 'WrapClip' && !propsOverrideArg) {
   process.exit(1);
 }
 
+// The converse guard: --props is wrap-only. Without --comp WrapClip it would feed
+// wrap props to launch/social rows (zod strips the unknown keys, so they render
+// wrong-basis junk into the segment dir and register bogus run.json rows).
+if (propsOverrideArg && compFilter !== 'WrapClip') {
+  console.error('--props is only valid with --comp WrapClip — launch/social rows read their canonical props files');
+  process.exit(1);
+}
+
 const platforms = JSON.parse(readFileSync(join(root, 'scripts', 'platforms.json'), 'utf8'));
 
 // Audio manifest gates the captioned variants; absent -> caption rows are skipped.
