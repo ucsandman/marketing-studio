@@ -10,6 +10,7 @@ import {
   videoAssets,
   withCumulativeStarts,
   buildOps,
+  duplicateDurationWarnings,
   runDriver,
 } from './review-in-magnetic.mjs';
 
@@ -78,6 +79,43 @@ test('buildOps: append_clip then a green add_marker (named by key) per asset', (
     {name: 'append_clip', input: {asset_id: 'asset-2'}},
     {name: 'add_marker', input: {at_sec: 5.06, text: 'demo', color: 'green'}},
   ]);
+});
+
+// --- duplicateDurationWarnings ------------------------------------------------
+
+test('duplicateDurationWarnings: fires on an identical-duration pair (±0.05s), naming both keys and --skip', () => {
+  const assets = [
+    {key: 'launch-video', durationSec: 55.33},
+    {key: 'audio-track', durationSec: 55.33},
+    {key: 'demo', durationSec: 28.39},
+  ];
+  const warnings = duplicateDurationWarnings(assets);
+  assert.equal(warnings.length, 1);
+  assert.equal(
+    warnings[0],
+    "warning: 'launch-video' and 'audio-track' have identical durations — possible duplicate content; consider --skip <key>",
+  );
+});
+
+test('duplicateDurationWarnings: fires within the ±0.05s tolerance, not beyond it', () => {
+  // Not tested at exactly 0.05: IEEE754 makes 10.05-10.0 land a hair above it.
+  assert.equal(
+    duplicateDurationWarnings([{key: 'a', durationSec: 10.0}, {key: 'b', durationSec: 10.04}]).length,
+    1,
+  );
+  assert.equal(
+    duplicateDurationWarnings([{key: 'a', durationSec: 10.0}, {key: 'b', durationSec: 10.06}]).length,
+    0,
+  );
+});
+
+test('duplicateDurationWarnings: does not fire when all durations are distinct', () => {
+  const assets = [
+    {key: 'logo-reveal', durationSec: 5.06},
+    {key: 'demo', durationSec: 28.39},
+    {key: 'social-x', durationSec: 10.0},
+  ];
+  assert.deepEqual(duplicateDurationWarnings(assets), []);
 });
 
 // --- runDriver (fixture run.json + stub HTTP sidecar) -----------------------
@@ -225,6 +263,120 @@ test('runDriver: unreachable sidecar rejects with the enable-Agent-Access hint',
   } finally {
     rmSync(root, {recursive: true, force: true});
     rmSync(appDataDir, {recursive: true, force: true});
+  }
+});
+
+// Fixture with the real dashclaw duplicate pair: launch-video (launch.mp4)
+// and audio-track (launch-final.mp4) are the same 55s content remixed.
+const FIXTURE_RUN_DUP = {
+  assets: [
+    {id: 'launch-video', artifact: 'out/dashclaw/launch.mp4', duration: '55.33s'},
+    {id: 'audio-track', artifact: 'out/dashclaw/launch-final.mp4', duration: '55.33s'},
+    {id: 'demo', artifact: 'out/dashclaw/demo.webm', duration: '28.39s'},
+  ],
+};
+
+// Captures console.error lines emitted while fn runs (runDriver's warning
+// channel), restoring the original afterward.
+async function captureStderr(fn) {
+  const lines = [];
+  const original = console.error;
+  console.error = (...args) => lines.push(args.join(' '));
+  try {
+    await fn();
+  } finally {
+    console.error = original;
+  }
+  return lines;
+}
+
+const happyStub = {
+  import_media: (input) => ({
+    status: 200,
+    payload: {
+      result: {
+        assets: input.paths.map((p) => ({
+          assetId: `asset-${p.split(/[\\/]/).pop()}`,
+          fileName: p.split(/[\\/]/).pop(),
+        })),
+      },
+    },
+  }),
+  propose_edits: () => ({status: 200, payload: {result: {ghostDiff: true}}}),
+};
+
+test('runDriver: --skip excludes the asset from import + ops, and the manifest records {key, skipped: true}', async () => {
+  const root = tmpRoot();
+  writeRunJson(root, 'dashclaw', FIXTURE_RUN_DUP);
+  const {server, calls} = await startStub(happyStub);
+  try {
+    const {port} = server.address();
+    let manifest;
+    const stderr = await captureStderr(async () => {
+      manifest = await withEnv({MAGNETIC_AGENT_PORT: String(port), MAGNETIC_AGENT_TOKEN: 'x'}, () =>
+        runDriver({root, brand: 'dashclaw', skip: ['audio-track']}),
+      );
+    });
+
+    const importCall = calls.find((c) => c.tool === 'import_media');
+    assert.equal(importCall.input.paths.length, 2, 'skipped asset is not imported');
+    assert.ok(importCall.input.paths.every((p) => !p.endsWith('launch-final.mp4')));
+
+    const ops = calls.find((c) => c.tool === 'propose_edits').input.ops;
+    assert.ok(ops.every((op) => op.input.text !== 'audio-track'), 'no marker for the skipped asset');
+    assert.deepEqual(ops.map((op) => op.name), ['append_clip', 'add_marker', 'append_clip', 'add_marker']);
+    // demo's marker sits right after launch-video: the skipped 55.33s never enters the cumulative math
+    assert.deepEqual(ops[3].input, {at_sec: 55.33, text: 'demo', color: 'green'});
+
+    assert.deepEqual(manifest.assets, [
+      {key: 'launch-video', file: 'out/dashclaw/launch.mp4', fileName: 'launch.mp4', assetId: 'asset-launch.mp4'},
+      {key: 'demo', file: 'out/dashclaw/demo.webm', fileName: 'demo.webm', assetId: 'asset-demo.webm'},
+      {key: 'audio-track', skipped: true},
+    ]);
+    const written = JSON.parse(readFileSync(join(root, 'out', 'dashclaw', 'marketing', 'magnetic-review.json'), 'utf8'));
+    assert.deepEqual(written, manifest);
+
+    assert.equal(stderr.filter((l) => l.startsWith('warning:')).length, 0, 'no duplicate warning once the duplicate is skipped');
+  } finally {
+    server.close();
+    rmSync(root, {recursive: true, force: true});
+  }
+});
+
+test('runDriver: warns on stderr about identical-duration pairs when nothing is skipped (non-fatal)', async () => {
+  const root = tmpRoot();
+  writeRunJson(root, 'dashclaw', FIXTURE_RUN_DUP);
+  const {server, calls} = await startStub(happyStub);
+  try {
+    const {port} = server.address();
+    const stderr = await captureStderr(() =>
+      withEnv({MAGNETIC_AGENT_PORT: String(port), MAGNETIC_AGENT_TOKEN: 'x'}, () =>
+        runDriver({root, brand: 'dashclaw'}),
+      ),
+    );
+    assert.deepEqual(
+      stderr.filter((l) => l.startsWith('warning:')),
+      ["warning: 'launch-video' and 'audio-track' have identical durations — possible duplicate content; consider --skip <key>"],
+    );
+    // Non-fatal: the run still completed — all 3 imported, one proposal batch.
+    assert.equal(calls.find((c) => c.tool === 'import_media').input.paths.length, 3);
+    assert.equal(calls.filter((c) => c.tool === 'propose_edits').length, 1);
+  } finally {
+    server.close();
+    rmSync(root, {recursive: true, force: true});
+  }
+});
+
+test('runDriver: an unknown --skip key fails loud naming it, never calls the sidecar', async () => {
+  const root = tmpRoot();
+  writeRunJson(root, 'dashclaw', FIXTURE_RUN);
+  try {
+    await assert.rejects(
+      () => runDriver({root, brand: 'dashclaw', skip: ['not-an-asset']}),
+      /--skip key "not-an-asset" matches no VIDEO asset/,
+    );
+  } finally {
+    rmSync(root, {recursive: true, force: true});
   }
 });
 

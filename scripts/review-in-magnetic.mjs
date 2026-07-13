@@ -10,7 +10,14 @@
 // the human clicks Accept in the editor (propose_edits semantics) — this
 // script only proposes.
 //
-// Usage: node scripts/review-in-magnetic.mjs <brand>
+// Usage: node scripts/review-in-magnetic.mjs <brand> [--skip <key[,key]>]
+//   --skip  run.json asset ids to leave out of the reel. Skipped assets are
+//           still recorded in the manifest as {key, skipped: true} so the
+//           verdict puller marks them unreviewed — never silently approved.
+//           Curation is the human's call: the driver WARNS when two included
+//           assets share an identical duration (e.g. dashclaw's launch-video
+//           launch.mp4 vs audio-track launch-final.mp4 — the same 55s content
+//           remixed) but never auto-skips.
 //
 // Duration source (probed against the live out/dashclaw/marketing/run.json):
 // every asset whose "artifact" is a single video file already carries a
@@ -90,10 +97,30 @@ export function buildOps(assetsWithAssetIds) {
   return ops;
 }
 
+// Duplicate-content heuristic: two included video assets with identical
+// durations (±0.05s) are probably the same content twice (a remix/supersede
+// pair like launch.mp4 vs launch-final.mp4). Returns warning strings — the
+// caller prints them to stderr; nothing is ever auto-skipped.
+export function duplicateDurationWarnings(assets) {
+  const warnings = [];
+  for (let i = 0; i < assets.length; i++) {
+    for (let j = i + 1; j < assets.length; j++) {
+      if (Math.abs(assets[i].durationSec - assets[j].durationSec) <= 0.05) {
+        warnings.push(
+          `warning: '${assets[i].key}' and '${assets[j].key}' have identical durations — possible duplicate content; consider --skip <key>`
+        );
+      }
+    }
+  }
+  return warnings;
+}
+
 // Orchestrates the whole driver against a given repo root (overridable in
 // tests so a fixture run.json + stub sidecar never touch the real out/ tree).
-// Returns the written manifest.
-export async function runDriver({root, brand}) {
+// `skip` names run.json asset ids to exclude from import/proposal; they are
+// recorded in the manifest as {key, skipped: true}. Returns the written
+// manifest.
+export async function runDriver({root, brand, skip = []}) {
   const marketingDir = join(root, 'out', brand, 'marketing');
   const runPath = join(marketingDir, 'run.json');
   let run;
@@ -103,10 +130,24 @@ export async function runDriver({root, brand}) {
     throw new Error(`review-in-magnetic: failed to read run manifest at ${runPath}: ${err.message}`);
   }
 
-  const assets = withCumulativeStarts(videoAssets(run));
+  const allVideo = videoAssets(run);
+
+  // Unknown --skip keys fail loud: a typo silently skipping nothing would let
+  // the duplicate ride into the reel anyway.
+  const videoKeys = new Set(allVideo.map((a) => a.key));
+  for (const key of skip) {
+    if (!videoKeys.has(key)) {
+      throw new Error(`review-in-magnetic: --skip key "${key}" matches no VIDEO asset in ${runPath}`);
+    }
+  }
+
+  const skipped = allVideo.filter((a) => skip.includes(a.key));
+  const assets = withCumulativeStarts(allVideo.filter((a) => !skip.includes(a.key)));
   if (assets.length === 0) {
     throw new Error(`review-in-magnetic: no VIDEO assets (.mp4/.webm) found in ${runPath}`);
   }
+
+  for (const w of duplicateDurationWarnings(assets)) console.error(w);
 
   const paths = assets.map((a) => resolve(root, a.file));
   console.log(`review-in-magnetic: importing ${paths.length} video asset(s)...`);
@@ -128,7 +169,10 @@ export async function runDriver({root, brand}) {
 
   const manifest = {
     proposedAt: new Date().toISOString(),
-    assets: assetsWithIds.map(({key, file, fileName, assetId}) => ({key, file, fileName, assetId})),
+    assets: [
+      ...assetsWithIds.map(({key, file, fileName, assetId}) => ({key, file, fileName, assetId})),
+      ...skipped.map(({key}) => ({key, skipped: true})),
+    ],
   };
   mkdirSync(marketingDir, {recursive: true});
   const outPath = join(marketingDir, 'magnetic-review.json');
@@ -142,13 +186,33 @@ export async function runDriver({root, brand}) {
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 async function main() {
-  const brand = process.argv[2];
+  const argv = process.argv.slice(2);
+  let brand = null;
+  const skip = [];
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '--skip') {
+      const value = argv[++i];
+      if (!value) {
+        console.error('review-in-magnetic: --skip requires a comma-separated list of asset keys');
+        process.exit(1);
+        return;
+      }
+      skip.push(...value.split(',').map((s) => s.trim()).filter(Boolean));
+    } else if (!a.startsWith('-') && !brand) {
+      brand = a;
+    } else {
+      console.error(`review-in-magnetic: unknown argument "${a}"`);
+      process.exit(1);
+      return;
+    }
+  }
   if (!brand) {
-    console.error('Usage: node scripts/review-in-magnetic.mjs <brand>');
+    console.error('Usage: node scripts/review-in-magnetic.mjs <brand> [--skip <key[,key]>]');
     process.exit(1);
     return;
   }
-  await runDriver({root, brand});
+  await runDriver({root, brand, skip});
 }
 
 // Import-safe (the test file imports the pure/orchestration helpers above):
