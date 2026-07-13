@@ -154,8 +154,8 @@ const SourceWindow: React.FC<{
         {video && segment ? (
           <OffthreadVideo
             src={staticFile(video)}
-            startFrom={Math.round(segment.startSec * fps)}
-            endAt={Math.round(segment.endSec * fps)}
+            trimBefore={Math.round(segment.startSec * fps)}
+            trimAfter={Math.round(segment.endSec * fps)}
             style={{
               width: '100%',
               height: '100%',
