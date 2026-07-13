@@ -1,0 +1,180 @@
+{
+  "brandId": "magnetic",
+  "video": "magnetic/demo.webm",
+  "cta": "Get Magnetic free on GitHub",
+  "telemetry": {
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "durationMs": 31985,
+    "events": [
+      {
+        "type": "step",
+        "t": 501,
+        "label": "A magnetic timeline, built for Windows"
+      },
+      {
+        "type": "focus",
+        "t": 512,
+        "x": 210,
+        "y": 418,
+        "w": 420,
+        "h": 802
+      },
+      {
+        "type": "click",
+        "t": 2467,
+        "x": 322,
+        "y": 149
+      },
+      {
+        "type": "click",
+        "t": 4704,
+        "x": 322,
+        "y": 246
+      },
+      {
+        "type": "step",
+        "t": 5015,
+        "label": "Spine and connected clips, lanes, gap clips, snapping, zoom, skimming"
+      },
+      {
+        "type": "click",
+        "t": 5973,
+        "x": 230,
+        "y": 149
+      },
+      {
+        "type": "click",
+        "t": 7449,
+        "x": 230,
+        "y": 246
+      },
+      {
+        "type": "click",
+        "t": 8930,
+        "x": 230,
+        "y": 343
+      },
+      {
+        "type": "focus",
+        "t": 9872,
+        "x": 948,
+        "y": 865,
+        "w": 1651,
+        "h": 430
+      },
+      {
+        "type": "step",
+        "t": 13035,
+        "label": "Clips never overlap; edits ripple automatically"
+      },
+      {
+        "type": "click",
+        "t": 14245,
+        "x": 948,
+        "y": 948
+      },
+      {
+        "type": "click",
+        "t": 15643,
+        "x": 1011,
+        "y": 948
+      },
+      {
+        "type": "focus",
+        "t": 15953,
+        "x": 948,
+        "y": 900,
+        "w": 760,
+        "h": 360
+      },
+      {
+        "type": "step",
+        "t": 17167,
+        "label": "The Final Cut Pro-style workflow, natively on Windows 10/11"
+      },
+      {
+        "type": "click",
+        "t": 17899,
+        "x": 1201,
+        "y": 868
+      },
+      {
+        "type": "focus",
+        "t": 19984,
+        "x": 1201,
+        "y": 910,
+        "w": 620,
+        "h": 340
+      },
+      {
+        "type": "step",
+        "t": 20792,
+        "label": "One pass merges silence and filler-word detection"
+      },
+      {
+        "type": "click",
+        "t": 21738,
+        "x": 230,
+        "y": 440
+      },
+      {
+        "type": "click",
+        "t": 23403,
+        "x": 257,
+        "y": 51
+      },
+      {
+        "type": "step",
+        "t": 23428,
+        "label": "Red strikethrough over the cuts, a green preview strip of the result"
+      },
+      {
+        "type": "focus",
+        "t": 23428,
+        "x": 1152,
+        "y": 880,
+        "w": 1536,
+        "h": 400
+      },
+      {
+        "type": "click",
+        "t": 24389,
+        "x": 45,
+        "y": 781
+      },
+      {
+        "type": "step",
+        "t": 26030,
+        "label": "Accept lands it in one undo step; Discard leaves zero history"
+      },
+      {
+        "type": "click",
+        "t": 27045,
+        "x": 35,
+        "y": 781
+      },
+      {
+        "type": "step",
+        "t": 28467,
+        "label": "Export at disk speed when nothing changed"
+      },
+      {
+        "type": "focus",
+        "t": 28478,
+        "x": 960,
+        "y": 540,
+        "w": 1920,
+        "h": 1080
+      },
+      {
+        "type": "click",
+        "t": 31481,
+        "x": 1130,
+        "y": 615
+      }
+    ]
+  }
+}
