@@ -33,14 +33,22 @@ export function discoverSidecar() {
 // Response is {result} on success or {error} on rejection (whole-call reject,
 // e.g. import_media naming an out-of-allowlist path). Error text mirrors the
 // MCP bridge verbatim.
-export async function callTool(tool, input) {
+//
+// timeoutMs bounds the WHOLE call (connect + response + body read): a stale
+// discovery file pointing at a port something unresponsive holds, or a hung
+// editor, must fail loud instead of wedging the caller forever —
+// mission-control runs this chain synchronously on its event loop, so an
+// unbounded hang here would freeze its entire console. Injectable so tests
+// keep a small timeout instead of waiting 30s.
+export async function callTool(tool, input, {timeoutMs = 30_000} = {}) {
   const config = discoverSidecar();
   if (config === null) {
     throw new Error(
       'Magnetic is not reachable — open the editor and enable Agent Access in the sidebar (or set MAGNETIC_AGENT_PORT / MAGNETIC_AGENT_TOKEN).'
     );
   }
-  let response;
+  const signal = AbortSignal.timeout(timeoutMs);
+  let response, payload;
   try {
     response = await fetch(`http://127.0.0.1:${config.port}/tool`, {
       method: 'POST',
@@ -49,11 +57,18 @@ export async function callTool(tool, input) {
         'content-type': 'application/json',
       },
       body: JSON.stringify({tool, input}),
+      signal,
     });
-  } catch {
+    payload = await response.json();
+  } catch (err) {
+    if (err?.name === 'TimeoutError' || err?.name === 'AbortError' || signal.aborted) {
+      throw new Error(
+        `Magnetic did not respond within ${Math.round(timeoutMs / 1000)}s — the editor may be busy or hung.`
+      );
+    }
+    if (response !== undefined) throw err; // headers arrived but the body wasn't JSON — not a connection problem
     throw new Error('Magnetic refused the connection — Agent Access is switched off.');
   }
-  const payload = await response.json();
   if (!response.ok || payload.error !== undefined) {
     throw new Error(payload.error ?? `sidecar answered HTTP ${response.status}`);
   }

@@ -101,6 +101,21 @@ test('runCliScript: forwards args to the child process', () => {
   assert.deepEqual(JSON.parse(result.stdout), ['dashclaw']);
 });
 
+test('runCliScript: a hung child is killed at the timeout and reported loud, not waited on forever', () => {
+  // Stands in for a sidecar that accepted the connection but never answers:
+  // the child sleeps far past the injected timeout. execFileSync must kill it
+  // and runCliScript must surface the timeout message (which the inline
+  // error box renders) — never block mission-control's event loop unbounded.
+  const script = join(tmp, 'hang.mjs');
+  writeFileSync(script, 'setTimeout(() => {}, 60_000);\n'); // keeps the child alive 60s if not killed
+  const started = Date.now();
+  const result = runCliScript(script, [], {timeoutMs: 500});
+  const elapsed = Date.now() - started;
+  assert.equal(result.ok, false);
+  assert.match(result.error, /review CLI timed out after \ds — is Magnetic responding\?/);
+  assert.ok(elapsed < 10_000, `child should be killed near the 500ms timeout, took ${elapsed}ms`);
+});
+
 test.after(() => {
   rmSync(tmp, {recursive: true, force: true});
 });

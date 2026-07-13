@@ -358,15 +358,31 @@ async function handleAssetPost(req, res, id) {
 // execFileSync isolates that in a child process and hands back its
 // stdout/stderr verbatim, so the operator sees the sidecar's exact hint (e.g.
 // "enable Agent Access in the sidebar") inline instead of a generic 500.
-export function runCliScript(scriptPath, args) {
+//
+// timeoutMs is a hard ceiling: execFileSync BLOCKS this server's event loop
+// (/state polling, media serving, approve/redo all wait), so a hung child —
+// e.g. a stale discovery file pointing at a port something unresponsive
+// holds — must be killed rather than wedging the console forever. The
+// sidecar client's own 30s fetch timeout (scripts/lib/magnetic-sidecar.mjs)
+// normally fires first; this is the backstop. Injectable so tests use a
+// small timeout, not 60s.
+export function runCliScript(scriptPath, args, {timeoutMs = 60_000} = {}) {
   try {
     const stdout = execFileSync(process.execPath, [scriptPath, ...args], {
       cwd: root,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: timeoutMs,
+      killSignal: 'SIGTERM',
     });
     return {ok: true, stdout};
   } catch (err) {
+    // Timed out: execFileSync killed the child (err.code ETIMEDOUT and/or
+    // err.signal = killSignal, platform-dependent). Say so explicitly — the
+    // child's stderr is empty or truncated here, not the real story.
+    if (err.code === 'ETIMEDOUT' || err.signal === 'SIGTERM') {
+      return {ok: false, error: `review CLI timed out after ${Math.round(timeoutMs / 1000)}s — is Magnetic responding?`};
+    }
     // execFileSync populates err.stdout/err.stderr as strings when encoding
     // is set. The driver's own main().catch prints err.message to stderr and
     // exits 1 — that text is exactly what must reach the operator's eyes.

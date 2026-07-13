@@ -174,3 +174,47 @@ test('callTool: non-ok HTTP status with no error field -> generic sidecar-answer
     server.close();
   }
 });
+
+test('callTool: sidecar accepts the connection but never answers -> loud timeout, not an unbounded hang', async () => {
+  // The stale-discovery-file failure mode: something unresponsive holds the
+  // port. The server below accepts the TCP connection and reads the request
+  // but never writes a response; only the AbortSignal timeout gets us out.
+  const server = http.createServer(() => {
+    /* never respond */
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  try {
+    const {port} = server.address();
+    await withEnv({MAGNETIC_AGENT_PORT: String(port), MAGNETIC_AGENT_TOKEN: 'x'}, () =>
+      assert.rejects(
+        () => callTool('read_timeline', {}, {timeoutMs: 250}),
+        /Magnetic did not respond within \ds — the editor may be busy or hung\./,
+      ),
+    );
+  } finally {
+    server.closeAllConnections();
+    server.close();
+  }
+});
+
+test('callTool: headers arrive but the body stalls forever -> same loud timeout', async () => {
+  // Worse variant: the hang happens mid-body, after fetch() resolved. The
+  // signal must cover the body read too, or response.json() hangs unbounded.
+  const server = http.createServer((req, res) => {
+    res.writeHead(200, {'content-type': 'application/json'});
+    res.write('{"result":'); // start a body, never finish it
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  try {
+    const {port} = server.address();
+    await withEnv({MAGNETIC_AGENT_PORT: String(port), MAGNETIC_AGENT_TOKEN: 'x'}, () =>
+      assert.rejects(
+        () => callTool('read_timeline', {}, {timeoutMs: 250}),
+        /Magnetic did not respond within \ds — the editor may be busy or hung\./,
+      ),
+    );
+  } finally {
+    server.closeAllConnections();
+    server.close();
+  }
+});
