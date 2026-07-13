@@ -131,6 +131,14 @@ export function buildAlt(brief, brand) {
   return `${brand.name} launch video: ${headline}.`;
 }
 
+// alt.txt for wrap segment kits: same brief-sourced fields as buildAlt, neutral
+// wording — segment kits carry editorial wrap footage, not the launch video, so
+// "launch video" would misdescribe the content.
+export function buildWrapAlt(brief, brand) {
+  const headline = brief?.hook || brand.tagline;
+  return `${brand.name} video: ${headline}.`;
+}
+
 // Manifest entry for one platform folder. Paths are relative to the postkit
 // root; null means that artifact was not assembled (partial kits are normal).
 export function manifestEntry(platformKey, cfg, {hasVideo, thumbFile, srtCopied, vttCopied}) {
@@ -157,9 +165,21 @@ export function buildManifest(brand, generatedAt, platforms, segments = null) {
 
 // WrapClip segment discovery: render-matrix.mjs --props nests each segment's
 // exports under out/<brand>/matrix/wrap-<segmentId>/. Given the matrix dir's
-// directory names, return the segment ids (empty for brands with no wrap dirs).
-export function wrapSegmentIds(dirNames) {
-  return dirNames.filter((n) => n.startsWith('wrap-')).map((n) => n.slice('wrap-'.length));
+// directory names and a lister for each dir's file names, return {ids, skipped}:
+// only dirs containing at least one wrap-*.mp4 count as segments; stray wrap-
+// prefixed dirs (empty, or holding only stills/frames) land in `skipped` so the
+// caller can log them instead of assembling an all-missing kit. Both lists are
+// empty for brands with no wrap dirs.
+export function wrapSegmentIds(dirNames, filesIn) {
+  const ids = [];
+  const skipped = [];
+  for (const name of dirNames) {
+    if (!name.startsWith('wrap-')) continue;
+    const id = name.slice('wrap-'.length);
+    const hasVideo = filesIn(name).some((f) => f.startsWith('wrap-') && f.endsWith('.mp4'));
+    (hasVideo ? ids : skipped).push(id);
+  }
+  return {ids, skipped};
 }
 
 // Manifest entry for one platform folder inside a wrap segment kit. Same field set
@@ -351,7 +371,14 @@ function main() {
   const matrixDirNames = existsSync(matrixDir)
     ? readdirSync(matrixDir, {withFileTypes: true}).filter((e) => e.isDirectory()).map((e) => e.name)
     : [];
-  for (const segmentId of wrapSegmentIds(matrixDirNames)) {
+  const {ids: segmentIds, skipped: strayWrapDirs} = wrapSegmentIds(
+    matrixDirNames,
+    (name) => readdirSync(join(matrixDir, name)),
+  );
+  for (const strayId of strayWrapDirs) {
+    console.log(`postkit: skipped matrix/wrap-${strayId}/ (no wrap-*.mp4 inside — not a segment export dir)`);
+  }
+  for (const segmentId of segmentIds) {
     const segMatrixDir = join(matrixDir, `wrap-${segmentId}`);
     const segEntries = {};
     for (const [platformKey, cfg] of Object.entries(PLATFORM_MAP)) {
@@ -376,7 +403,7 @@ function main() {
       writeGatedCaption(dir, platformKey, kitLabel);
       assembledCount += 1;
 
-      writeFileSync(join(dir, 'alt.txt'), buildAlt(brief, brandData) + '\n');
+      writeFileSync(join(dir, 'alt.txt'), buildWrapAlt(brief, brandData) + '\n');
       assembledCount += 1;
 
       writeFileSync(

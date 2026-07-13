@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {trimToBudget, buildCaption, buildAlt, manifestEntry, buildManifest, wrapSegmentIds, wrapKitEntry, PLATFORM_MAP} from './build-postkit.mjs';
+import {trimToBudget, buildCaption, buildAlt, buildWrapAlt, manifestEntry, buildManifest, wrapSegmentIds, wrapKitEntry, PLATFORM_MAP} from './build-postkit.mjs';
 
 // --- trimToBudget ---
 
@@ -124,16 +124,38 @@ test('buildManifest wraps platforms with version and brand', () => {
 
 // --- wrap segment kits ---
 
-test('wrapSegmentIds discovers wrap-<segmentId> dirs and strips the prefix', () => {
-  assert.deepEqual(wrapSegmentIds(['wrap-clip-c-hook', 'wrap-intro']), ['clip-c-hook', 'intro']);
+// filesIn stub: maps dir name -> its file listing (what readdirSync provides in main).
+const filesInStub = (listing) => (name) => listing[name] ?? [];
+
+test('wrapSegmentIds discovers wrap-<segmentId> dirs holding wrap-*.mp4 and strips the prefix', () => {
+  const listing = {
+    'wrap-clip-c-hook': ['wrap-16x9.mp4', 'wrap-9x16.mp4'],
+    'wrap-intro': ['wrap-1x1.mp4'],
+  };
+  assert.deepEqual(wrapSegmentIds(['wrap-clip-c-hook', 'wrap-intro'], filesInStub(listing)), {
+    ids: ['clip-c-hook', 'intro'],
+    skipped: [],
+  });
 });
 
-test('wrapSegmentIds ignores non-wrap directory names', () => {
-  assert.deepEqual(wrapSegmentIds(['thumbs', 'somefolder', 'wrapped-up']), []);
+test('wrapSegmentIds skips stray wrap- dirs with no wrap-*.mp4 inside (empty or stills-only)', () => {
+  const listing = {
+    'wrap-clip-c-hook': ['wrap-16x9.mp4'],
+    'wrap-empty': [],
+    'wrap-stills': ['frame-9x16.png', 'notes.txt'],
+  };
+  assert.deepEqual(wrapSegmentIds(['wrap-clip-c-hook', 'wrap-empty', 'wrap-stills'], filesInStub(listing)), {
+    ids: ['clip-c-hook'],
+    skipped: ['empty', 'stills'],
+  });
+});
+
+test('wrapSegmentIds ignores non-wrap directory names entirely', () => {
+  assert.deepEqual(wrapSegmentIds(['thumbs', 'somefolder', 'wrapped-up'], filesInStub({})), {ids: [], skipped: []});
 });
 
 test('wrapSegmentIds is empty for brands with no wrap dirs (no-wrap unchanged)', () => {
-  assert.deepEqual(wrapSegmentIds([]), []);
+  assert.deepEqual(wrapSegmentIds([], filesInStub({})), {ids: [], skipped: []});
 });
 
 test('buildManifest without segments has no segments key (backward-compatible shape)', () => {
@@ -166,4 +188,17 @@ test('wrapKitEntry uses null video when the aspect export is missing', () => {
   const entry = wrapKitEntry('clip-c-hook', 'x', PLATFORM_MAP.x, false);
   assert.equal(entry.video, null);
   assert.equal(entry.caption, 'wrap-clip-c-hook/x/caption.txt');
+});
+
+test('buildWrapAlt uses the brief hook with neutral wording (no "launch video")', () => {
+  const alt = buildWrapAlt({hook: 'CS2 skin arbitrage with guardrails'}, brand);
+  assert.match(alt, /noban\.gg/);
+  assert.match(alt, /CS2 skin arbitrage with guardrails/);
+  assert.doesNotMatch(alt, /launch video/);
+});
+
+test('buildWrapAlt falls back to brand tagline when brief is null', () => {
+  const alt = buildWrapAlt(null, brand);
+  assert.match(alt, new RegExp(brand.tagline));
+  assert.doesNotMatch(alt, /launch video/);
 });

@@ -42,7 +42,10 @@
 // out/<brand>/matrix/wrap-<segmentId>/ (segmentId parsed off the props filename) instead
 // of the flat matrix dir, and the segment id is folded into each rendered id — and the
 // run.json manifest key — so re-running the matrix for a different segment of the same
-// brand doesn't clobber the previous segment's manifest rows.
+// brand doesn't clobber the previous segment's manifest rows. Wrap rows are gated on
+// it: a plain brand-wide run skips them with a log line (they'd otherwise render
+// placeholder slates off the social-props fallback), and --comp WrapClip without
+// --props is a usage error.
 import {execSync} from 'node:child_process';
 import {existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
@@ -70,6 +73,14 @@ const propsOverrideArg = propsIdx >= 0 ? args[propsIdx + 1] : null;
 
 if (!brand) {
   console.error('usage: node scripts/render-matrix.mjs <brand> [--comp LaunchVideo|SocialClip|WrapClip] [--only <id>] [--props <path>] [--stills-only] [--webm]');
+  process.exit(1);
+}
+
+// WrapClip has no canonical base props file for resolveBaseProps to fall back on
+// (each segment gets its own from build-wrap-props.mjs), so asking for it without
+// --props could only render a meaningless placeholder slate — fail loudly instead.
+if (compFilter === 'WrapClip' && !propsOverrideArg) {
+  console.error('--comp WrapClip requires --props props/<brand>-wrap-<segmentId>.json (emitted by scripts/build-wrap-props.mjs) — WrapClip has no canonical base props file');
   process.exit(1);
 }
 
@@ -192,6 +203,13 @@ const rendered = [];
 for (const p of platforms) {
   if (compFilter && p.comp !== compFilter) continue;
   if (onlyFilter && p.id !== onlyFilter) continue;
+  // WrapClip rows only render off an explicit per-segment --props file — a plain
+  // brand-wide run must not fall through to resolveBaseProps' social fallback and
+  // render placeholder slates (same skip pattern as the audio-manifest gate above).
+  if (p.comp === 'WrapClip' && !propsOverrideData) {
+    console.log(`matrix: skipped ${p.id} (WrapClip rows need --props props/${brand}-wrap-<segmentId>.json)`);
+    continue;
+  }
   const base = withFormat(propsOverrideData ?? loadBase(p.comp), p.width, p.height);
   rendered.push(renderVariant(p.id, p.comp, p.width, p.height, base));
 
