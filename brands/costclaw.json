@@ -1,0 +1,48 @@
+{
+  "id": "costclaw",
+  "name": "CostClaw",
+  "tagline": "Find the leak in your Claude Code spend",
+  "url": "costclaw.io",
+  "colors": {
+    "bg": "#ffffff",
+    "surface": "#fefaf7",
+    "surface2": "#fff0ea",
+    "line": "#e6ded9",
+    "ink": "#251d1a",
+    "ink2": "#50453f",
+    "ink3": "#6b5d55",
+    "brand": "#e07a5f",
+    "profit": "#792a1a",
+    "safe": "#33854a",
+    "loss": "#c9593d",
+    "info": "#50453f",
+    "rare": "#822d1d"
+  },
+  "fonts": {
+    "display": "Archivo",
+    "body": "Source Sans 3",
+    "mono": "JetBrains Mono"
+  },
+  "effects": {
+    "wash": 0.07,
+    "glow": 0
+  },
+  "grade": {
+    "grain": 0.08,
+    "vignette": 0.08,
+    "bloom": 0,
+    "aberration": 0,
+    "letterbox": 0
+  },
+  "motion": {
+    "tempo": 1,
+    "exuberance": 0.1,
+    "stagger": 0.45,
+    "overshoot": 0.05,
+    "parallax": 0.15,
+    "settle": 0.25,
+    "textReveal": "maskWipe"
+  },
+  "textAccent": "rare",
+  "voice": "An honest receipt under warm shop light: terracotta ink on clean white paper, precise and unfussy. Terse, technical, dry; leads with real numbers; all data and commands render in mono. Clay #e07a5f is a graphic color only (bars, the mark, rules, washes) and NEVER carries text; colored text uses umber. Background is white paper, never dark-terminal, never fintech navy. Green appears only as the score-strong accent. Waste and emphasis read as deep clay and umber, not red. No glow, no hype, no em dashes."
+}

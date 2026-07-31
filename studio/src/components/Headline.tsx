@@ -8,7 +8,12 @@ import {useFormat} from '../lib/layout';
 
 const easeOutExpo = Easing.out(Easing.exp);
 
-export const Headline: React.FC<{kicker: string; headline: string; brand: Brand}> = ({kicker, headline, brand}) => {
+export const Headline: React.FC<{kicker: string; headline: string; brand: Brand; hideKicker?: boolean}> = ({
+  kicker,
+  headline,
+  brand,
+  hideKicker,
+}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   const {scale, width, safe} = useFormat();
@@ -35,17 +40,22 @@ export const Headline: React.FC<{kicker: string; headline: string; brand: Brand}
   const kickerIn = entrance(frame, fps, brand.motion, {durFrames: 12, easing: easeOutExpo});
   return (
     <AbsoluteFill style={{justifyContent: 'center', alignItems: 'center', gap: Math.round(36 * scale)}}>
-      <div
-        style={{
-          fontFamily: fonts.mono,
-          fontSize: Math.round(30 * scale),
-          letterSpacing: '0.35em',
-          color: brand.colors.brand,
-          opacity: kickerIn,
-        }}
-      >
-        {kicker.toUpperCase()}
-      </div>
+      {hideKicker ? null : (
+        <div
+          style={{
+            fontFamily: fonts.mono,
+            fontSize: Math.round(30 * scale),
+            letterSpacing: '0.35em',
+            // textAccent token, not the raw brand color: a brand whose clay/accent is
+            // graphic-only must not carry text in it. Defaults to 'brand', so every
+            // other brand renders byte-identically.
+            color: brand.colors[brand.textAccent],
+            opacity: kickerIn,
+          }}
+        >
+          {kicker.toUpperCase()}
+        </div>
+      )}
       <div
         style={{
           display: 'flex',

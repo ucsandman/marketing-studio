@@ -56,7 +56,11 @@ export const DemoStage: React.FC<{
             <Mark size={120} color={brand.colors.line} />
           </AbsoluteFill>
         )}
-        {telemetry ? <DemoCursor clickList={clickList} timeMs={timeMs} brand={brand} /> : null}
+        {/* No clicks means nothing to point at (a CLI capture): rendering the
+            cursor anyway parks it at the origin, in frame, forever. */}
+        {clickList.length > 0 ? (
+          <DemoCursor clickList={clickList} timeMs={timeMs} brand={brand} />
+        ) : null}
       </div>
     </div>
   );

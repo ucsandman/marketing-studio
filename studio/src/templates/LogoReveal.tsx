@@ -74,7 +74,7 @@ export const LogoReveal: React.FC<Props> = ({brandId, sequence, frameCount, cta,
             fontFamily: fonts.mono,
             fontSize: 32,
             letterSpacing: '0.22em',
-            color: brand.colors.brand,
+            color: brand.colors[brand.textAccent],
             opacity: ctaIn,
           }}
         >

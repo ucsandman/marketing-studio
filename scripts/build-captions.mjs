@@ -39,9 +39,12 @@ const FEATURE_LEN = 180;
 const END_LEN = 150;
 const VO_LEAD = 12; // audioMix.ts
 
-const buildTiming = (telemetryDurationMs, featureCount) => {
+// `lengths` mirrors launchTiming's ActLengths override (read from the launch props);
+// an absent override reproduces the shared constants exactly.
+const buildTiming = (telemetryDurationMs, featureCount, lengths) => {
+  const l = lengths ?? {};
   const demoLen = telemetryDurationMs
-    ? Math.ceil((telemetryDurationMs / 1000) * FPS) + DEMO_TAIL
+    ? Math.ceil((telemetryDurationMs / 1000) * FPS) + (l.demoTail ?? DEMO_TAIL)
     : DEMO_FALLBACK_LEN;
   let cursor = 0;
   const next = (len) => {
@@ -49,11 +52,11 @@ const buildTiming = (telemetryDurationMs, featureCount) => {
     cursor += len;
     return act;
   };
-  const logo = next(LOGO_LEN);
-  const hook = next(HOOK_LEN);
+  const logo = next(l.logo ?? LOGO_LEN);
+  const hook = next(l.hook ?? HOOK_LEN);
   const demo = next(demoLen);
-  const features = Array.from({length: featureCount}, () => next(FEATURE_LEN));
-  const end = next(END_LEN);
+  const features = Array.from({length: featureCount}, (_, i) => next(l.features?.[i] ?? FEATURE_LEN));
+  const end = next(l.end ?? END_LEN);
   return {logo, hook, demo, features, end};
 };
 
@@ -95,7 +98,7 @@ const launch = JSON.parse(readFileSync(launchPath, 'utf8'));
 const telemetryDurationMs = launch.demo?.telemetry?.durationMs ?? null;
 const featureCount = Array.isArray(launch.features) ? launch.features.length : 0;
 
-const timing = buildTiming(telemetryDurationMs, featureCount);
+const timing = buildTiming(telemetryDurationMs, featureCount, launch.actLengths ?? null);
 const cues = captionCues(audio.lines, timing);
 
 // --- timecode formatting ---

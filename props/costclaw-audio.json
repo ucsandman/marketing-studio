@@ -1,0 +1,53 @@
+{
+  "music": {
+    "src": "costclaw/audio/music.mp3",
+    "durationMs": 73720
+  },
+  "lines": [
+    {
+      "act": "logo",
+      "src": "costclaw/audio/logo.mp3",
+      "durationMs": 2870,
+      "text": "CostClaw. A local audit for Claude Code."
+    },
+    {
+      "act": "hook",
+      "src": "costclaw/audio/hook.mp3",
+      "durationMs": 6160,
+      "text": "Your Anthropic invoice is one number. The waste hides in the session logs already on your disk."
+    },
+    {
+      "act": "demo",
+      "src": "costclaw/audio/demo.mp3",
+      "durationMs": 7370,
+      "text": "One free command reads those logs on your machine, prices the recoverable spend, and ranks the fixes by the dollars they return."
+    },
+    {
+      "act": "feature-0",
+      "src": "costclaw/audio/feature-0.mp3",
+      "durationMs": 6400,
+      "text": "Cache misses, model misrouting, sessions that outgrow the cache. Each priced, with evidence."
+    },
+    {
+      "act": "feature-1",
+      "src": "costclaw/audio/feature-1.mp3",
+      "durationMs": 5150,
+      "text": "Then your setup gets a six pillar score, from evidence only. No evidence, no score."
+    },
+    {
+      "act": "feature-2",
+      "src": "costclaw/audio/feature-2.mp3",
+      "durationMs": 7000,
+      "text": "And through all of it, your prompts and your code never leave your machine. A tripwire test keeps it that way."
+    },
+    {
+      "act": "end",
+      "src": "costclaw/audio/end.mp3",
+      "durationMs": 5040,
+      "text": "Run the free audit: n p x costclaw audit. Free, no account, nothing uploaded."
+    }
+  ],
+  "sfx": {
+    "enabled": true
+  }
+}

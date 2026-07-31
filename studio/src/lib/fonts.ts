@@ -4,6 +4,8 @@ import {loadFont as loadGeistMono} from '@remotion/google-fonts/GeistMono';
 import {loadFont as loadInter} from '@remotion/google-fonts/Inter';
 import {loadFont as loadJetBrainsMono} from '@remotion/google-fonts/JetBrainsMono';
 import {loadFont as loadLibreFranklin} from '@remotion/google-fonts/LibreFranklin';
+import {loadFont as loadArchivo} from '@remotion/google-fonts/Archivo';
+import {loadFont as loadSourceSans3} from '@remotion/google-fonts/SourceSans3';
 import type {Brand} from './brand';
 
 // Load once at module scope; Remotion delays render until fonts resolve.
@@ -21,6 +23,10 @@ const families: Record<string, string> = {
     weights: ['400', '600', '800'],
     subsets: ['latin'],
   }).fontFamily,
+  Archivo: loadArchivo('normal', {weights: ['500', '600', '700'], subsets: ['latin']})
+    .fontFamily,
+  'Source Sans 3': loadSourceSans3('normal', {weights: ['400', '600'], subsets: ['latin']})
+    .fontFamily,
 };
 
 const resolve = (name: string): string => {

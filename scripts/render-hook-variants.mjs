@@ -118,7 +118,11 @@ h1{font-size:18px;font-weight:650;margin:0 0 22px;}
 
 async function main() {
   const timingMod = await import(new URL('../studio/src/lib/launchTiming.ts', import.meta.url));
-  const timing = timingMod.launchTiming(launch.demo?.telemetry?.durationMs ?? null, (launch.features ?? []).length);
+  const timing = timingMod.launchTiming(
+    launch.demo?.telemetry?.durationMs ?? null,
+    (launch.features ?? []).length,
+    launch.actLengths ?? null,
+  );
   const frames = `${timing.hook.from}-${timing.hook.from + timing.hook.len - 1}`;
 
   const outDir = join(root, 'out', brand, 'marketing', 'hooks');

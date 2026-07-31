@@ -12,6 +12,11 @@ export const animatedOgSchema = z.object({
   brandId: z.string(),
   tagline: z.string(),
   cta: z.string(),
+  // Optional runnable command shown under the CTA (mono, verbatim, never
+  // uppercased — a shell command is case sensitive, so uppercasing it would
+  // print something that does not run). Absent for brands with no command,
+  // which keeps their OG frame byte-identical. Mirrors EndCard's `command` prop.
+  command: z.string().nullable().default(null),
   heroImage: z.string().nullable(),
   loopSequence: z.string().nullable(),
   loopFrames: z.number().int().positive(),
@@ -24,6 +29,7 @@ export const AnimatedOG: React.FC<Props> = ({
   brandId,
   tagline,
   cta,
+  command,
   heroImage,
   loopSequence,
   loopFrames,
@@ -80,6 +86,22 @@ export const AnimatedOG: React.FC<Props> = ({
         >
           {cta.toUpperCase()}
         </div>
+        {command ? (
+          <div
+            style={{
+              fontFamily: fonts.mono,
+              fontSize: 22,
+              color: brand.colors.ink2,
+              background: brand.colors.surface2,
+              border: `1px solid ${brand.colors.line}`,
+              borderRadius: 10,
+              padding: '10px 20px',
+              marginTop: 4,
+            }}
+          >
+            {command}
+          </div>
+        ) : null}
       </AbsoluteFill>
       {showFloatBar !== false ? (
         <div style={{position: 'absolute', bottom: 36, left: 0, right: 0, display: 'flex', justifyContent: 'center'}}>

@@ -13,6 +13,9 @@ import {fileURLToPath} from 'node:url';
 const ACRONYM_ALLOWLIST = new Set([
   'API', 'JSON', 'HTML', 'CSS', 'GPU', 'CPU', 'README', 'OG', 'CTA', 'VO', 'URL', 'SDK', 'UI', 'UX',
   'FIFO', 'MP4', 'GIF', 'PNG', 'SVG', 'SRT', 'VTT',
+  // The CLAUDE.md filename (Claude Code project memory) reads as an all-caps
+  // word to the hype rule but is a literal artifact name.
+  'CLAUDE',
 ]);
 
 // name: label used for grouping/reporting. re: word-boundary regex, matched case-insensitively.
@@ -82,6 +85,9 @@ function isSkippableKey(key) {
   if (!key) return false;
   const lower = key.toLowerCase();
   if (['id', 'key', 'act', 'comp'].includes(lower)) return true;
+  // customerLanguage.avoid exists to NAME the banned words; flagging them
+  // there inverts the field's meaning.
+  if (lower === 'avoid') return true;
   if (/Path$|Src$|File$/.test(key)) return true;
   if (/^fonts?$/i.test(key)) return true;
   return false;

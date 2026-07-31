@@ -31,6 +31,17 @@ import {FilmGrade} from '../components/FilmGrade';
 import {captionCues} from '../lib/captionTiming';
 import {getMark} from '../brands/marks';
 
+// Zod mirror of lib/launchTiming's ActLengths. It lives here, not in launchTiming.ts,
+// because that lib is imported by plain .mjs scripts via Node type-stripping and must
+// stay dependency-free.
+export const actLengthsSchema = z.object({
+  logo: z.number().int().positive().optional(),
+  hook: z.number().int().positive().optional(),
+  features: z.array(z.number().int().positive()).optional(),
+  end: z.number().int().positive().optional(),
+  demoTail: z.number().int().nonnegative().optional(),
+});
+
 export const launchVideoSchema = z.object({
   brandId: z.string(),
   kicker: z.string(),
@@ -45,6 +56,9 @@ export const launchVideoSchema = z.object({
     }),
   ).max(3),
   cta: z.string(),
+  // Optional runnable command shown on the end card under the CTA (mono, verbatim).
+  // Nullable, defaults null, so brands without one render byte-identically.
+  command: z.string().nullable().default(null),
   assets: z.object({
     logoSequence: z.string().nullable(),
     logoFrames: z.number().int().positive(),
@@ -65,6 +79,11 @@ export const launchVideoSchema = z.object({
   // a normal render/smoke merges nothing and stays byte-identical to brand.motion
   // — same nullable-override pattern as formatWidth/formatHeight above.
   motionOverride: motionOverrideSchema.nullable().default(null),
+  // Optional per-render act-length overrides (lib/launchTiming's ActLengths), for a
+  // brand whose approved narration needs more room than the shared constants give.
+  // Nullable, defaults null, so a normal render/smoke overrides nothing and stays
+  // byte-identical — same nullable-override pattern as motionOverride above.
+  actLengths: actLengthsSchema.nullable().default(null),
 });
 
 type Props = z.infer<typeof launchVideoSchema>;
@@ -201,13 +220,13 @@ const FeatureAct: React.FC<{feature: Props['features'][number]; len: number; bra
   );
 };
 
-export const LaunchVideo: React.FC<Props> = ({brandId, kicker, headline, demo, features, cta, assets, audio, burnCaptions, motionOverride}) => {
+export const LaunchVideo: React.FC<Props> = ({brandId, kicker, headline, demo, features, cta, command, assets, audio, burnCaptions, motionOverride, actLengths}) => {
   const frame = useCurrentFrame();
   const {durationInFrames, fps} = useVideoConfig();
   const {orientation, scale, safe} = useFormat();
   const brand = getBrand(brandId);
   const m = motionOverride ? {...brand.motion, ...motionOverride} : brand.motion;
-  const t = launchTiming(demo.telemetry?.durationMs ?? null, features.length);
+  const t = launchTiming(demo.telemetry?.durationMs ?? null, features.length, actLengths);
   const cues = burnCaptions && audio ? captionCues(audio.lines, t, fps) : [];
   // Three depth planes for the flat comp: the loop backdrop drifts most (far), the
   // wash sits mid, act content drifts least (near). Per-layer seeds keep the planes
@@ -266,7 +285,7 @@ export const LaunchVideo: React.FC<Props> = ({brandId, kicker, headline, demo, f
         ))}
         <Sequence from={t.end.from} durationInFrames={t.end.len}>
           <ActContainer motion={m}>
-            <EndCard cta={cta} brand={brand} />
+            <EndCard cta={cta} command={command} brand={brand} />
           </ActContainer>
         </Sequence>
       </Depth>

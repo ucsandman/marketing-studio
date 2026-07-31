@@ -204,7 +204,7 @@ async function main() {
 
   const telemetryDurationMs = launch.demo?.telemetry?.durationMs ?? null;
   const mod = await import(new URL('../studio/src/lib/launchTiming.ts', import.meta.url));
-  const timing = mod.launchTiming(telemetryDurationMs, features.length);
+  const timing = mod.launchTiming(telemetryDurationMs, features.length, launch.actLengths ?? null);
 
   const {findings, verdict} = runAvSync({timing, lines, features, telemetryEvents});
 

@@ -40,6 +40,8 @@ export const RemotionRoot: React.FC = () => {
           ],
           screenshot: "noban/cockpit.webp",
           cta: "Free in simulation",
+          command: null,
+          video: null,
           burnCaptions: false,
           voLines: null,
         }}
@@ -99,15 +101,18 @@ export const RemotionRoot: React.FC = () => {
           demo: {video: null, telemetry: null},
           features: [],
           cta: "Simulate free at noban.gg",
+          command: null,
           assets: {logoSequence: null, logoFrames: 90, loopSequence: null, loopFrames: 240},
           audio: null,
           burnCaptions: false,
           motionOverride: null,
+          actLengths: null,
         }}
         calculateMetadata={({props}) => ({
           durationInFrames: launchTiming(
             props.demo.telemetry?.durationMs ?? null,
             props.features.length,
+            props.actLengths ?? null,
           ).total,
           width: props.formatWidth ?? 1920,
           height: props.formatHeight ?? 1080,
@@ -125,6 +130,7 @@ export const RemotionRoot: React.FC = () => {
           brandId: "noban",
           tagline: "CS2 skin arbitrage with guardrails",
           cta: "Simulate free at noban.gg",
+          command: null,
           heroImage: null,
           loopSequence: null,
           loopFrames: 240,

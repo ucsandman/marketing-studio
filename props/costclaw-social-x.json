@@ -1,0 +1,15 @@
+{
+  "brandId": "costclaw",
+  "kicker": "costclaw.io",
+  "headline": "See where your Claude Code spend leaks",
+  "lines": [
+    "Your Claude Code invoice is one number. The waste is in the logs.",
+    "Real spend read from the logs on your disk",
+    "Cache-miss exposure priced in dollars",
+    "Fixes ranked by what each one recovers"
+  ],
+  "screenshot": "costclaw/feature-leak.png",
+  "cta": "Run the free audit on your own logs",
+  "command": "npx costclaw audit",
+  "video": "costclaw/demo.webm"
+}

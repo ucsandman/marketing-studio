@@ -108,7 +108,7 @@ async function framePlan() {
     const mod = await import(new URL('../studio/src/lib/launchTiming.ts', import.meta.url));
     const telemetryMs = props.demo?.telemetry?.durationMs ?? null;
     const featureCount = Array.isArray(props.features) ? props.features.length : 0;
-    const timing = mod.launchTiming(telemetryMs, featureCount);
+    const timing = mod.launchTiming(telemetryMs, featureCount, props.actLengths ?? null);
     const IN = 20; // boundary + ~20 frames in, per PLAYBOOK's act-boundary-stills rule
     const sample = (label, act) => ({label, frame: Math.min(act.from + IN, act.from + act.len - 1)});
     return [

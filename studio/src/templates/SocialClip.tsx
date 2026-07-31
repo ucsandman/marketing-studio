@@ -1,5 +1,5 @@
 import React from 'react';
-import {AbsoluteFill, Sequence, interpolate, useCurrentFrame, useVideoConfig} from 'remotion';
+import {AbsoluteFill, OffthreadVideo, Sequence, interpolate, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
 import {z} from 'zod';
 import {alphaHex, getBrand} from '../lib/brand';
 import {FloatBar} from '../components/FloatBar';
@@ -19,6 +19,14 @@ export const socialClipSchema = z.object({
   screenshot: z.string().nullable(),
   portraitScreenshot: z.string().optional(),
   cta: z.string(),
+  // Optional runnable command shown on the end card under the CTA (mono, verbatim,
+  // never uppercased) -- same slot LaunchVideo's EndCard already renders. Nullable
+  // so brands/clips with no command stay byte-identical.
+  command: z.string().nullable().default(null),
+  // Optional raw demo footage played muted, full-bleed, behind the opening headline
+  // act so the clip opens on the product moving rather than static text. Nullable
+  // so every existing social clip prop file (no video) renders byte-identical.
+  video: z.string().nullable().default(null),
   // Burn VO lines into on-screen captions for muted autoplay. SocialClip has no
   // audio track, so caption text arrives via the optional `voLines` prop (the
   // props builder is the sole writer, only when audio props exist). Default
@@ -44,6 +52,8 @@ export const SocialClip: React.FC<Props> = ({
   screenshot,
   portraitScreenshot,
   cta,
+  command,
+  video,
   burnCaptions,
   voLines,
 }) => {
@@ -65,6 +75,25 @@ export const SocialClip: React.FC<Props> = ({
         : '60% 50% at 50% 35%';
   return (
     <AbsoluteFill style={{backgroundColor: brand.colors.bg}}>
+      {video ? (
+        <Sequence durationInFrames={90}>
+          <AbsoluteFill style={{opacity: fadeAt(0, 90)}}>
+            <OffthreadVideo
+              src={staticFile(video)}
+              muted
+              // 4s into the raw capture: past the blank prompt, into the scrolling
+              // report body (the recoverable-spend line itself passes through),
+              // so the opening motion is legible content, not empty terminal.
+              startFrom={120}
+              style={{width: '100%', height: '100%', objectFit: 'cover', display: 'block'}}
+            />
+            {/* Paper-toned scrim: keeps the opening headline legible over moving
+                footage without going to a dark-terminal look (brand voice is white
+                paper, never dark). */}
+            <AbsoluteFill style={{background: `${brand.colors.bg}${alphaHex(0.52)}`}} />
+          </AbsoluteFill>
+        </Sequence>
+      ) : null}
       <AbsoluteFill
         style={{
           background: `radial-gradient(${washGeom}, ${brand.colors.brand}${alphaHex(brand.effects.wash)}, transparent 70%)`,
@@ -72,7 +101,7 @@ export const SocialClip: React.FC<Props> = ({
       />
       <Sequence durationInFrames={90}>
         <AbsoluteFill style={{opacity: fadeAt(0, 90)}}>
-          <Headline kicker={kicker} headline={headline} brand={brand} />
+          <Headline kicker={kicker} headline={headline} brand={brand} hideKicker={Boolean(video)} />
         </AbsoluteFill>
       </Sequence>
       <Sequence from={78} durationInFrames={162}>
@@ -87,7 +116,7 @@ export const SocialClip: React.FC<Props> = ({
         </AbsoluteFill>
       </Sequence>
       <Sequence from={228}>
-        <EndCard cta={cta} brand={brand} />
+        <EndCard cta={cta} command={command} brand={brand} />
       </Sequence>
       {/* progress float bar, pinned bottom */}
       <div style={{position: 'absolute', bottom: Math.max(Math.round(48 * scale), safe.bottom), left: 0, right: 0, display: 'flex', justifyContent: 'center'}}>

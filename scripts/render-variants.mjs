@@ -97,7 +97,11 @@ async function main() {
   } else {
     comp = 'LaunchVideo';
     const timingMod = await import(new URL('../studio/src/lib/launchTiming.ts', import.meta.url));
-    const timing = timingMod.launchTiming(launch.demo?.telemetry?.durationMs ?? null, (launch.features ?? []).length);
+    const timing = timingMod.launchTiming(
+      launch.demo?.telemetry?.durationMs ?? null,
+      (launch.features ?? []).length,
+      launch.actLengths ?? null,
+    );
     frames = `${timing.hook.from}-${timing.hook.from + timing.hook.len - 1}`;
     baseProps = {...launch, formatWidth: 1920, formatHeight: 1080};
   }

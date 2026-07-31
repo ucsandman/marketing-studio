@@ -3,6 +3,7 @@ import noban from '../../../brands/noban.json';
 import dashclaw from '../../../brands/dashclaw.json';
 import paperroute from '../../../brands/paperroute.json';
 import magnetic from '../../../brands/magnetic.json';
+import costclaw from '../../../brands/costclaw.json';
 
 const hex = z.string().regex(/^#[0-9a-f]{6}$/i, 'expected #rrggbb hex color');
 
@@ -97,6 +98,12 @@ export const brandSchema = z.object({
     settle: 0,
     textReveal: 'spring',
   }),
+  // Which colors.* key templates use for small colored text (e.g. LogoReveal's
+  // CTA line). Defaults to 'brand' — the legacy hardcoded behavior, so a brand
+  // that omits this renders byte-identically. costclaw sets 'rare': its voice
+  // forbids clay (colors.brand) from ever carrying text (graphic-only, and it
+  // fails contrast on white), so colored text uses its umber tone instead.
+  textAccent: z.enum(['brand', 'profit', 'safe', 'loss', 'info', 'rare']).default('brand'),
   voice: z.string().min(1),
 });
 
@@ -108,7 +115,7 @@ export const alphaHex = (a: number): string =>
 
 export type Brand = z.infer<typeof brandSchema>;
 
-const registry: Record<string, unknown> = {noban, dashclaw, paperroute, magnetic};
+const registry: Record<string, unknown> = {noban, dashclaw, paperroute, magnetic, costclaw};
 
 export const getBrand = (id: string): Brand => {
   const raw = registry[id];
