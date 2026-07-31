@@ -1,7 +1,7 @@
 {
   "brandId": "costclaw",
   "kicker": "costclaw.io",
-  "headline": "Your invoice is one number. The waste is in the logs.",
+  "headline": "See where your Claude Code spend leaks",
   "demo": {
     "video": "costclaw/demo.webm",
     "telemetry": {

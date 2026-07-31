@@ -13,8 +13,8 @@
     {
       "act": "hook",
       "src": "costclaw/audio/hook.mp3",
-      "durationMs": 6160,
-      "text": "Your Anthropic invoice is one number. The waste hides in the session logs already on your disk."
+      "durationMs": 6030,
+      "text": "See where your Claude Code spend leaks. The waste hides in the session logs already on your disk."
     },
     {
       "act": "demo",

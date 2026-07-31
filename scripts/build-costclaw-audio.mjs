@@ -34,7 +34,7 @@ const LINES = [
   {id: 'logo', text: 'CostClaw. A local audit for Claude Code.'},
   {
     id: 'hook',
-    text: 'Your Anthropic invoice is one number. The waste hides in the session logs already on your disk.',
+    text: 'See where your Claude Code spend leaks. The waste hides in the session logs already on your disk.',
   },
   {
     id: 'demo',
