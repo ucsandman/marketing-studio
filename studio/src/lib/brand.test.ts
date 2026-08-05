@@ -46,6 +46,26 @@ describe('getBrand', () => {
     // calm, confident motion for a peer-to-peer gear community
     expect(b.motion.exuberance).toBeLessThanOrEqual(0.3);
     expect(b.motion.textReveal).toBe('maskWipe');
+    expect(b.light).toEqual({
+      bg: '#f8f7f6',
+      ink: '#181818',
+      brand: '#3d17a0',
+      outlineVariant: '#cdc5d5',
+    });
+  });
+
+  it('does not inject Synthacon light tokens into unrelated brands', () => {
+    expect(getBrand('noban').light).toBeUndefined();
+  });
+
+  it('rejects an incomplete explicit light palette', () => {
+    const source = getBrand('noban');
+    expect(
+      brandSchema.safeParse({
+        ...source,
+        light: {bg: '#f8f7f6', ink: '#181818', brand: '#3d17a0'},
+      }).success,
+    ).toBe(false);
   });
 
   it('resolves markColorOf per brand.markColor (ink for synthacon, brand accent for brands that omit it)', () => {

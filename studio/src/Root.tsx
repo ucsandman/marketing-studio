@@ -11,6 +11,7 @@ import { launchTiming } from "./lib/launchTiming";
 import { getBrand } from "./lib/brand";
 import { getReveal } from "./brands/reveals";
 import { loopCycleFrames } from "./lib/revealTiming";
+import { MotionVariant, type MotionVariantProps } from "./templates/MotionVariant";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -114,6 +115,16 @@ export const RemotionRoot: React.FC = () => {
           width: props.formatWidth ?? 1920,
           height: props.formatHeight ?? 1080,
         })}
+      />
+      <Composition
+        id="MotionVariant"
+        component={MotionVariant}
+        durationInFrames={270}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={{brandId: "synthacon", direction: "A", headline: "Gear near you", caption: "From people who play"} satisfies MotionVariantProps}
+        calculateMetadata={({props}) => ({width: props.formatWidth ?? 1080, height: props.formatHeight ?? 1920})}
       />
       <Composition
         id="AnimatedOG"

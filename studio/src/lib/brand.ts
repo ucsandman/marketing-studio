@@ -49,6 +49,9 @@ export const brandSchema = z.object({
   // brand's output byte-identically) or 'ink' for a brand whose voice forbids a
   // colored mark (synthacon: the S renders in ink/white, never violet). Resolve
   // with markColorOf() below rather than reading brand.colors.brand directly.
+  light: z
+    .object({bg: hex, ink: hex, brand: hex, outlineVariant: hex})
+    .optional(),
   markColor: z.enum(['brand', 'ink']).default('brand'),
   fonts: z.object({
     display: z.string().min(1),

@@ -3,6 +3,7 @@
   "name": "Synthacon",
   "tagline": "Gear near you, from people who play",
   "url": "synthacon.com",
+  "light": {"bg": "#f8f7f6", "ink": "#181818", "brand": "#3d17a0", "outlineVariant": "#cdc5d5"},
   "colors": {
     "bg": "#0c0c0d",
     "surface": "#171719",

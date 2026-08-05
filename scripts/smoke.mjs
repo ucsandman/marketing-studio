@@ -1,7 +1,8 @@
-import {execSync} from 'node:child_process';
+import {execFileSync, execSync} from 'node:child_process';
 import {existsSync, mkdirSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {motionVariants, writeMotionProps} from './build-synthacon-motion-props.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = join(root, 'out', 'smoke');
@@ -21,4 +22,13 @@ for (const id of compositions) {
     process.exit(1);
   }
 }
-console.log(`smoke OK: ${compositions.length} compositions rendered to out/smoke/`);
+const motionProps = writeMotionProps(join(outDir, 'props'));
+for (const path of motionProps.filter((_, index) => motionVariants[index].direction === 'C')) {
+  const variant = motionVariants[motionProps.indexOf(path)];
+  const id = `MotionVariant-${variant.formatWidth}x${variant.formatHeight}`;
+  const out = join(outDir, `${id}.png`);
+  console.log(`smoke: rendering frame 120 of ${id}`);
+  execFileSync('npx', ['remotion', 'still', 'MotionVariant', out, '--frame=120', `--props=${path}`], {cwd: join(root, 'studio'), stdio: 'inherit'});
+  if (!existsSync(out)) throw new Error(`smoke FAILED: ${out} was not produced`);
+}
+console.log(`smoke OK: ${compositions.length + 2} compositions rendered to out/smoke/`);
