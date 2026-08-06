@@ -1,5 +1,6 @@
 // Paste-ready post kit: assembles out/<brand>/postkit/{x,linkedin,tiktok,shorts,
-// youtube,instagram}/ from artifacts already produced by render-matrix.mjs
+// youtube,instagram,facebook,instagram-story,facebook-story}/ from artifacts already
+// produced by render-matrix.mjs
 // (video), extract-thumbs.mjs (thumbnail), build-captions.mjs (SRT/VTT), and
 // out/<brand>/marketing/brief.json (platform copy, when the agent synthesized it).
 //
@@ -22,6 +23,7 @@ import {copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync} from '
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
 import {lintJson, formatReport} from './lint-copy.mjs';
+import {readPostsManifest} from './lib/posts-manifest.mjs';
 
 // --- platform table ---------------------------------------------------------
 // aspect matches extract-thumbs.mjs's thumb-<aspect>.jpg naming. videoSource is a
@@ -32,16 +34,16 @@ import {lintJson, formatReport} from './lint-copy.mjs';
 // fallback. charBudget is each platform's public caption/description character limit.
 export const PLATFORM_MAP = {
   x: {
-    aspect: '16x9',
-    videoSource: 'social-16x9',
+    aspect: '1x1',
+    videoSource: 'motion-1x1',
     captionFile: false,
     charBudget: 280,
     sourceKey: 'x',
     note: 'Upload the video file directly to X. Do not link out to YouTube; X suppresses off-platform links in the feed.',
   },
   linkedin: {
-    aspect: '16x9',
-    videoSource: 'launch-16x9',
+    aspect: '1x1',
+    videoSource: 'motion-1x1',
     captionFile: true,
     charBudget: 3000,
     sourceKey: 'linkedin',
@@ -49,37 +51,65 @@ export const PLATFORM_MAP = {
   },
   tiktok: {
     aspect: '9x16',
-    videoSource: 'social-9x16-captioned',
+    videoSource: 'motion-9x16',
     captionFile: false,
     charBudget: 2200,
     sourceKey: 'vertical',
-    note: 'Upload as a TikTok video post. The video already has burned-in captions; paste caption.txt as the on-app caption/hashtag line.',
+    note: 'Upload as a TikTok video post. Paste caption.txt as the on-app caption/hashtag line.',
   },
   shorts: {
     aspect: '9x16',
-    videoSource: 'social-9x16-captioned',
+    videoSource: 'motion-9x16',
     captionFile: false,
     charBudget: 5000,
     sourceKey: 'vertical',
     note: 'Upload via YouTube Studio > Create > Upload video. Keep it vertical and under 60s so YouTube routes it to the Shorts shelf; paste caption.txt as the description.',
   },
   youtube: {
-    aspect: '16x9',
-    videoSource: 'launch-16x9',
+    aspect: '9x16',
+    videoSource: 'motion-9x16',
     captionFile: true,
     charBudget: 5000,
     sourceKey: null,
-    note: 'Upload as a standard YouTube video. Paste caption.txt as the description, then upload launch.srt or launch.vtt as captions in YouTube Studio.',
+    note: 'Upload via YouTube Studio > Create > Upload video, vertical Shorts-style. Paste caption.txt as the description, then upload launch.srt or launch.vtt as captions in YouTube Studio.',
   },
   instagram: {
     aspect: '1x1',
-    videoSource: 'social-1x1-captioned',
+    videoSource: 'motion-1x1',
     captionFile: false,
     charBudget: 2200,
     sourceKey: 'vertical',
     note: 'Upload as an Instagram feed post or Reel. Paste caption.txt as the caption and alt.txt into Advanced settings > Accessibility > Alt text.',
   },
+  facebook: {
+    aspect: '1x1',
+    videoSource: 'motion-1x1',
+    captionFile: false,
+    charBudget: 63206,
+    sourceKey: null,
+    note: 'Upload as a Facebook feed post. Paste caption.txt as the post copy.',
+  },
+  'instagram-story': {
+    aspect: '9x16',
+    videoSource: 'motion-9x16',
+    captionFile: false,
+    charBudget: 2200,
+    sourceKey: 'vertical',
+    note: 'Upload as an Instagram Story. Paste caption.txt as the on-screen sticker/caption text.',
+  },
+  'facebook-story': {
+    aspect: '9x16',
+    videoSource: 'motion-9x16',
+    captionFile: false,
+    charBudget: 63206,
+    sourceKey: null,
+    note: 'Upload as a Facebook Story. Paste caption.txt as the on-screen sticker/caption text.',
+  },
 };
+
+export function resolvePostkitOutputDirectory(root, brand, postId) {
+  return postId ? join(root, 'out', brand, 'posts', postId, 'postkit') : join(root, 'out', brand, 'postkit');
+}
 
 const PLATFORM_LABELS = {
   x: 'X',
@@ -88,6 +118,9 @@ const PLATFORM_LABELS = {
   shorts: 'YouTube Shorts',
   youtube: 'YouTube',
   instagram: 'Instagram',
+  facebook: 'Facebook',
+  'instagram-story': 'Instagram Stories',
+  'facebook-story': 'Facebook Stories',
 };
 
 // --- pure helpers (unit-testable, no I/O) -----------------------------------
@@ -112,6 +145,10 @@ export function buildCaption(platformKey, brief, brand) {
   const entry = cfg.sourceKey && brief?.social ? brief.social[cfg.sourceKey] : null;
   const raw = entry ? [entry.hook, entry.headline].filter(Boolean).join('\n\n') : brand.tagline;
   return trimToBudget(raw, cfg.charBudget);
+}
+
+export function buildPostCaption(platformKey, post) {
+  return trimToBudget([post.headline, post.caption].filter(Boolean).join('\n\n'), PLATFORM_MAP[platformKey].charBudget);
 }
 
 // One-sentence literal description of the video content, for alt.txt.
@@ -146,8 +183,15 @@ function main() {
 
   const root = join(dirname(fileURLToPath(import.meta.url)), '..');
   const brand = process.argv[2];
+  const args = process.argv.slice(3);
+  const postIdx = args.indexOf('--post');
+  const postId = postIdx >= 0 ? args[postIdx + 1] : null;
   if (!brand) {
-    console.error('usage: node scripts/build-postkit.mjs <brand>');
+    console.error('usage: node scripts/build-postkit.mjs <brand> [--post <id>]');
+    process.exit(1);
+  }
+  if (postIdx >= 0 && !postId) {
+    console.error('build-postkit: --post requires an id');
     process.exit(1);
   }
 
@@ -157,6 +201,21 @@ function main() {
     process.exit(1);
   }
   const brandData = JSON.parse(readFileSync(brandPath, 'utf8'));
+
+  let post = null;
+  if (postId) {
+    const postsPath = join(root, 'out', brand, 'marketing', 'posts.json');
+    try {
+      post = readPostsManifest(postsPath, Object.keys(PLATFORM_MAP)).find((entry) => entry.id === postId) ?? null;
+    } catch (error) {
+      console.error(`build-postkit: ${error.message}`);
+      process.exit(1);
+    }
+    if (!post) {
+      console.error(`build-postkit: post "${postId}" was not found in out/${brand}/marketing/posts.json`);
+      process.exit(1);
+    }
+  }
 
   const briefPath = join(root, 'out', brand, 'marketing', 'brief.json');
   let brief = null;
@@ -179,14 +238,15 @@ function main() {
     console.log(`build-postkit: no out/${brand}/marketing/brief.json — all captions use the brand tagline fallback`);
   }
 
-  const matrixDir = join(root, 'out', brand, 'matrix');
+  const matrixDir = postId ? join(root, 'out', brand, 'posts', postId) : join(root, 'out', brand, 'matrix');
   const thumbsDir = join(root, 'out', brand, 'thumbs');
   const captionsDir = join(root, 'out', brand, 'captions');
-  const postkitDir = join(root, 'out', brand, 'postkit');
+  const postkitDir = resolvePostkitOutputDirectory(root, brand, postId);
 
   let assembledCount = 0;
 
   for (const [platformKey, cfg] of Object.entries(PLATFORM_MAP)) {
+    if (post && !post.platforms.includes(platformKey)) continue;
     const dir = join(postkitDir, platformKey);
     mkdirSync(dir, {recursive: true});
 
@@ -198,8 +258,9 @@ function main() {
       videoStatus = `${cfg.videoSource}.mp4`;
       assembledCount += 1;
     } else {
-      videoStatus = `NOT INCLUDED (missing out/${brand}/matrix/${cfg.videoSource}.mp4 — run render-matrix.mjs)`;
-      console.log(`postkit: ${platformKey}: skipped video, ${cfg.videoSource}.mp4 not found in out/${brand}/matrix/`);
+      const renderDirectory = postId ? `out/${brand}/posts/${postId}` : `out/${brand}/matrix`;
+      videoStatus = `NOT INCLUDED (missing ${renderDirectory}/${cfg.videoSource}.mp4 — run render-matrix.mjs)`;
+      console.log(`postkit: ${platformKey}: skipped video, ${cfg.videoSource}.mp4 not found in ${renderDirectory}/`);
     }
 
     // Thumbnail (jpg preferred, png fallback per extract-thumbs.mjs).
@@ -220,7 +281,7 @@ function main() {
     }
 
     // Caption, gated by lint-copy before it is trusted.
-    const captionText = buildCaption(platformKey, brief, brandData);
+    const captionText = post ? buildPostCaption(platformKey, post) : buildCaption(platformKey, brief, brandData);
     const violations = lintJson({caption: captionText});
     const errorCount = violations.filter((v) => v.level === 'ERROR').length;
     if (errorCount > 0) {
@@ -232,7 +293,7 @@ function main() {
     assembledCount += 1;
 
     // Alt text.
-    writeFileSync(join(dir, 'alt.txt'), buildAlt(brief, brandData) + '\n');
+    writeFileSync(join(dir, 'alt.txt'), buildAlt(post ? {hook: post.headline} : brief, brandData) + '\n');
     assembledCount += 1;
 
     // Caption sidecars (youtube + linkedin only).
@@ -261,7 +322,7 @@ function main() {
     writeFileSync(join(dir, 'POST.md'), postMd(brandData.name ?? brand, platformKey, cfg, videoStatus, thumbStatus, captionFilesLine));
     assembledCount += 1;
 
-    console.log(`postkit: wrote out/${brand}/postkit/${platformKey}/ (video: ${existsSync(videoSrc) ? 'yes' : 'skipped'}, thumb: ${thumbStatus.startsWith('NOT') ? 'skipped' : 'yes'})`);
+    console.log(`postkit: wrote ${postId ? `out/${brand}/posts/${postId}/postkit` : `out/${brand}/postkit`}/${platformKey}/ (video: ${existsSync(videoSrc) ? 'yes' : 'skipped'}, thumb: ${thumbStatus.startsWith('NOT') ? 'skipped' : 'yes'})`);
   }
 
   if (assembledCount === 0) {
@@ -269,7 +330,7 @@ function main() {
     process.exit(1);
   }
 
-  console.log(`postkit OK: ${Object.keys(PLATFORM_MAP).length} platform folders in out/${brand}/postkit/`);
+  console.log(`postkit OK: ${post ? post.platforms.length : Object.keys(PLATFORM_MAP).length} platform folders in ${postId ? `out/${brand}/posts/${postId}/postkit/` : `out/${brand}/postkit/`}`);
 }
 
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];

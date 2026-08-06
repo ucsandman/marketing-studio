@@ -14,7 +14,7 @@ describe('audioSchema', () => {
   it('accepts a manifest and null music', () => {
     const m = audioSchema.parse({
       music: null,
-      lines: [{act: 'hook', src: 'noban/audio/hook.mp3', durationMs: 3900, text: 'x'}],
+      lines: [{act: 'hook', src: 'synthacon/audio/hook.mp3', durationMs: 3900, text: 'x'}],
     });
     expect(m.lines).toHaveLength(1);
   });

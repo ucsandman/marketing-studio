@@ -127,12 +127,12 @@ test('feature-speak violation does not affect exit code (WARN only)', () => {
 // --- Skip rules: should NOT fire ---
 
 test('path-like values (forward slash) are skipped', () => {
-  const violations = lintJson({screenshot: 'noban/governance.webp'});
+  const violations = lintJson({screenshot: 'synthacon/market-grid.png'});
   assert.equal(violations.length, 0);
 });
 
 test('path-like values (backslash) are skipped', () => {
-  const violations = lintJson({screenshot: 'noban\\governance.webp'});
+  const violations = lintJson({screenshot: 'synthacon\\market-grid.png'});
   assert.equal(violations.length, 0);
 });
 
@@ -142,7 +142,7 @@ test('hex colors are skipped', () => {
 });
 
 test('URLs are skipped', () => {
-  const violations = lintJson({link: 'https://noban.gg/robust-page'});
+  const violations = lintJson({link: 'https://synthacon.com/robust-page'});
   assert.equal(violations.length, 0);
 });
 

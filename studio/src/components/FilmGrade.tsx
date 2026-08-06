@@ -7,7 +7,7 @@ import {alphaHex} from '../lib/brand';
 // grain, radial vignette, accent bloom, chromatic aberration, optional letterbox.
 // Every layer is intensity 0..1 and is skipped entirely at 0, so a zeroed grade
 // costs nothing. Intensities are meant to stay RESTRAINED — see the grade defaults
-// in lib/brand.ts and each brand's stated rules (paperroute: no green bloom).
+// in lib/brand.ts and the brand's stated rules (synthacon: no glow, no bloom).
 export const FilmGrade: React.FC<{
   grade: Brand['grade'];
   accent: string; // bloom color: the brand's primary/accent token

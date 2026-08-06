@@ -41,7 +41,8 @@ expensive to discover; do not re-derive or second-guess them.
 ## Non-negotiables
 
 - Brand values only from `brands/<id>.json` via `getBrand(brandId)`; never literal hex
-  in templates. Honor the brand's stated color rules (noban: profit gold, never green).
+  in templates. Honor the brand's stated color rules (synthacon: violet/white/black
+  only, no gold or yellow).
 - Nullable asset props + placeholder fallbacks (clean-clone smoke stays green).
 - Copy: no em dashes, no hype words.
 - Fail loudly; generated props files are edited via their builder scripts only.

@@ -1,5 +1,9 @@
 # Animation Studio Phase 4 — LaunchVideo (compose demo + 3D assets + copy)
 
+> **Historical note:** this plan predates the later slim of the studio to
+> synthacon-only. References to noban, dashclaw, or paperroute below are
+> historical and describe brands that have since been removed from the repo.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build the LaunchVideo template that composes the Blender logo reveal, the background loop, the captured dashboard demo, and feature copy into a ~45s noban.gg launch video draft approved by the user.

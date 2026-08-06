@@ -1,5 +1,5 @@
 // Stages rendered Blender PNG sequences into the studio's public dir.
-// Usage: node scripts/stage-blender-assets.mjs [brandId] [--force]   (default brand: noban)
+// Usage: node scripts/stage-blender-assets.mjs [brandId] [--force]   (default brand: synthacon)
 //
 // Content-hash cache: when the source assets and this script are byte-identical to
 // the last run AND the staged files are all still present, staging is a no-op.
@@ -12,7 +12,7 @@ import {cacheKey, checkCache, storeCache} from './lib/cache.mjs';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
 const force = args.includes('--force');
-const brandId = args.find((a) => !a.startsWith('--')) ?? 'noban';
+const brandId = args.find((a) => !a.startsWith('--')) ?? 'synthacon';
 const src = join(root, 'assets', brandId);
 const dest = join(root, 'studio', 'public', brandId);
 

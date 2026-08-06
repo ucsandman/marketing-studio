@@ -16,15 +16,15 @@ repo. Assets are copied out to the calling repo at the end.
 | Health checks + Studio | `launch.py` | `python launch.py --check` |
 | Smoke (frame 0 of every comp) | `scripts/smoke.mjs` | run before claiming any studio change done |
 | Brand tokens | `brands/<id>.json` + `studio/src/lib/brand.ts` (zod) + `studio/src/brands/marks.ts` (mark registry) | |
-| Playwright capture feeder | `feeders/capture/record-noban-demo.mjs` | needs the product's app running |
+| Playwright capture feeder | `feeders/capture/record-synthacon-demo.mjs` | needs the product's app running |
 | Blender feeder | `feeders/blender/render.py <scene> --out <dir> --frame N \| --animation` | Blender via `BLENDER_PATH` in `.env` |
-| ComfyUI feeder | `feeders/comfy/client.mjs hero [--seed N]` | non-load-bearing; exit 2 = fallback |
+| ComfyUI feeder | `feeders/comfy/client.mjs hero [--workflow NAME] [--seed N]` | non-load-bearing; exit 2 = fallback (ComfyUI unreachable) — see ComfyUI gotchas below for the missing-workflow case |
 | Stage Blender output | `scripts/stage-blender-assets.mjs [brandId]` | assets/<brand>/ -> studio/public/<brand>/ |
-| Launch props builder | `scripts/build-launch-props.mjs` | copy source of truth (JSON is generated) |
-| Static presets | `scripts/render-statics.mjs` (noban), `scripts/render-<brand>-statics.mjs` per brand | og.png / og.mp4 / og.gif / readme.gif |
+| Launch props builder | none yet for synthacon — `build-launch-props.mjs` was removed in the brand slim; author `scripts/build-synthacon-launch-props.mjs` following the brief-overlay convention (see `build-synthacon-demo-props.mjs`) before rendering LaunchVideo | copy source of truth (JSON is generated) |
+| Static presets | `scripts/render-synthacon-statics.mjs` | og.png / og.mp4 / og.gif / readme.gif |
 | Audio feeder (ElevenLabs) | `feeders/audio/client.mjs vo\|music\|probe` | needs ELEVENLABS_API_KEY in .env; exit 2 = silent fallback |
-| Audio build + merge | `scripts/build-<brand>-audio.mjs`, `scripts/merge-launch-audio.mjs <brand>` | VO/music copy source of truth -> props/<brand>-audio.json; merge takes brand argv, defaults noban |
-| Content brief gatherer | `scripts/derive-brief.mjs <brand> <productRepo> [--url]` | grounding -> out/<brand>/marketing/brief-inputs.json; agent synthesizes brief.json (zod: `studio/src/lib/brief.ts`); build-launch-props overlays brief copy when brief.json exists |
+| Audio build + merge | none yet for synthacon — the per-brand `build-<brand>-audio.mjs` scripts and `merge-launch-audio.mjs` were removed in the brand slim; author `scripts/build-synthacon-audio.mjs` against the `audioSchema` manifest contract (below) when needed | VO/music copy source of truth -> props/<brand>-audio.json |
+| Content brief gatherer | `scripts/derive-brief.mjs <brand> <productRepo> [--url]` | grounding -> out/<brand>/marketing/brief-inputs.json; agent synthesizes brief.json (zod: `studio/src/lib/brief.ts`); builder scripts (e.g. `build-synthacon-demo-props.mjs`) overlay brief copy when brief.json exists |
 | Copy voice-linter | `scripts/lint-copy.mjs <file.json> [--json]` | gates any props/brief JSON: em dashes, slop lexicon, hype; exit 1 on violations |
 | Storyboard board | `scripts/build-storyboard.mjs <brand>` | brief.json -> out/<brand>/marketing/storyboard.html (content approval before any render) |
 | Mission Control | `scripts/mission-control.mjs <brand> [--port 4600]` | live run console over run.json; Approve/Redo buttons write manifest + review.json atomically |
@@ -45,12 +45,13 @@ ComponentGallery (test bench). All schemas carry `brandId`; templates resolve
 `getBrand(brandId)` and pass `brand` down. Every asset prop is nullable with a
 placeholder so smoke stays green on a clean clone.
 
-## Onboarding a new brand (first step for any non-noban product)
+## Onboarding a new brand (first step for any product beyond synthacon)
 
-1. `brands/<id>.json` — copy `brands/noban.json` shape exactly (zod-enforced: 13 color
+1. `brands/<id>.json` — copy `brands/synthacon.json` shape exactly (zod-enforced: 13 color
    tokens, 3 fonts, tagline, voice). Derive values from the product repo's DESIGN.md,
    tailwind config, or CSS variables; ask the user for anything ambiguous. Encode the
-   brand's color RULES in `voice` (e.g. noban: profit gold NEVER green). Optional
+   brand's color RULES in `voice` (e.g. synthacon: violet/white/black only, no gold or
+   yellow anywhere). Optional
    zod-defaulted blocks: `grade` (FilmGrade grain/vignette/bloom/aberration/letterbox —
    zero bloom for brands whose voice forbids glow) and `motion` (tempo/exuberance/
    stagger/overshoot plus `parallax`/`settle` depth-and-cut kickers defaulting to 0 and
@@ -61,11 +62,13 @@ placeholder so smoke stays green on a clean clone.
 3. Mark component: `studio/src/brands/<Brand>Mark.tsx` recreating the product's logo
    SVG (viewBox-normalized, `{size, color}` props, `currentColor` strokes), then
    register in `studio/src/brands/marks.ts`.
-4. Fonts: `studio/src/lib/fonts.ts` currently loads one global font set
-   (Saira/HankenGrotesk/GeistMono). If the new brand needs different fonts, extend
-   fonts.ts to a per-brand loader keyed like the mark registry.
+4. Fonts: `studio/src/lib/fonts.ts` is a keyed per-brand registry (family name ->
+   `@remotion/google-fonts` loader — see the Fonts gotcha below); if the new brand
+   names a family not yet registered, add its loader.
 5. Screenshots/footage: copy into `studio/public/<id>/` (gitignored) via a
-   `scripts/fetch-<id>-assets.mjs` following the noban one.
+   `scripts/fetch-<id>-assets.mjs` — no example ships in a synthacon-only tree
+   (`fetch-noban-assets.mjs` was removed in the brand slim); `stage-synthacon-launch-assets.mjs`
+   shows the copy-from-product-repo pattern to follow.
 6. Blender logo reveal for the new brand: copy `feeders/blender/scenes/logo_reveal.py`
    to `logo_reveal_<id>.py` and replace ONLY the geometry builders (rounded rect /
    circle / ticks / dot) with the new mark's shapes sampled from its SVG. Everything
@@ -110,11 +113,13 @@ placeholder so smoke stays green on a clean clone.
   the camera out during cursor approach windows.
 - NEVER print dashboard tokens; scripts read the product's .env at runtime and redact
   tokens from every error path.
-- Next.js dev-tools indicator (the dark "N" button) lives INSIDE A SHADOW ROOT
-  (`#devtools-indicator`), not light DOM — `nextjs-portal` removal/CSS misses it and it
-  ends up baked into footage. Capture scripts need a shadow-root-piercing interval sweep;
-  verify it's gone in the first extracted frame before recording the full take
-  (see record-paperroute-demo.mjs).
+- Dev-server overlays (Vite error overlay, TanStack Query devtools button/panel) render
+  INSIDE SHADOW ROOTS, not light DOM — plain removal/CSS misses them and they end up
+  baked into footage. Capture scripts need a shadow-root-piercing interval sweep (see
+  `HIDE_OVERLAYS` in `record-synthacon-demo.mjs`); the same shadow-root fact applies to
+  Next.js's dev-tools indicator (`#devtools-indicator` / `nextjs-portal`) for a future
+  non-Vite product. Verify the overlay is gone in the first extracted frame before
+  recording the full take.
 
 ### Blender 5.1.2 (headless bpy) — each of these was a silent wrong-output bug
 - Scene cleanup: `for obj in list(bpy.data.objects): bpy.data.objects.remove(obj, do_unlink=True)`.
@@ -125,7 +130,7 @@ placeholder so smoke stays green on a clean clone.
   non-cyclic POLY splines with the first point repeated at the end. AND: the open
   spline's two flat end-caps butt together at the join and can carve a visible notch
   at pointed features — run the spline several points PAST its own start so the
-  closing tube swallows both caps (discovered on the DashClaw shield tip).
+  closing tube swallows both caps (seen on pointed-tip mark geometry).
 - Curve tubes have flat end-caps only (no stroke-linecap round equivalent). Reads as
   a chisel at display sizes; if a brand needs round caps, add small spheres at the
   endpoints.
@@ -147,23 +152,29 @@ placeholder so smoke stays green on a clean clone.
 - Workflow graphs are stored JSON with `{{TOKEN}}` placeholders;
   `CheckpointLoaderSimple` outputs: model=0, clip=1, vae=2. Deterministic seeds
   (default 47) make heroes reproducible; `--seed N` re-rolls.
-- The fallback is part of the contract: exit 2 + message; `render-statics.mjs` logs
-  the procedural fallback. Never make an asset depend on ComfyUI being up.
-- `feeders/comfy/client.mjs` is noban-hardwired (violet prompt, `assets/noban/comfy`
-  output, negative prompt excludes "green"). Other brands take the procedural fallback
-  until someone parameterizes it — do not point it at a new brand as-is.
+- The fallback is part of the contract: exit 2 + message; `render-synthacon-statics.mjs`
+  logs the procedural fallback. Never make an asset depend on ComfyUI being up.
+- `feeders/comfy/client.mjs` takes `--workflow NAME` (default `synthacon`) but NO
+  workflow JSON ships in the repo (`feeders/comfy/workflows/` doesn't exist —
+  `noban-hero.json` was removed in the brand slim and never replaced). Even with
+  ComfyUI reachable, the hero call now fails loudly (exit 1: "author it or pass
+  --workflow") until someone authors `feeders/comfy/workflows/<name>-hero.json`
+  against the client's `fillTemplate` tokens (`{{CHECKPOINT}}`/`{{POSITIVE}}`/
+  `{{NEGATIVE}}`/`{{SEED}}`). ComfyUI-unreachable still exits 2, the documented
+  graceful fallback to the procedural background.
 
-### Brand-driven effects and fonts (post-DashClaw-onboarding facts)
+### Brand-driven effects and fonts
 - Backdrop wash/glow intensities are brand-driven via the optional `effects` block in
   brands/<id>.json (brand.ts has the schema + `alphaHex` helper; defaults reproduce
-  the original hardcoded values). As of the paperroute run (2026-07-10) ALL five
-  templates consume it — LogoReveal, ProductDemo, LaunchVideo, SocialClip, AnimatedOG;
-  no hardcoded `${brand.colors.brand}<alpha>` washes remain. A saturated brand color
-  as a big radial hero-wash is a known failure mode — check the brand's stated rules
-  before leaning on the default (paperroute: wash MUST be 0, One Green Rule).
-- FloatBar's progress fill runs brand → profit tokens (changed from safe→profit→loss
-  during the paperroute run: a red-tipped scrubber reads as decoration-red and violates
-  brands whose red is error-only; noban's end color became its profit gold, on-identity).
+  the original hardcoded values). As of 2026-07-10 ALL five templates consume it —
+  LogoReveal, ProductDemo, LaunchVideo, SocialClip, AnimatedOG; no hardcoded
+  `${brand.colors.brand}<alpha>` washes remain. A saturated brand color as a big
+  radial hero-wash is a known failure mode — check the brand's stated rules before
+  leaning on the default (synthacon: `effects.wash` 0.1, `effects.glow` 0, and
+  `grade.bloom` 0 — deliberately restrained, no glow/bloom per voice).
+- FloatBar's progress fill runs brand → profit tokens (not safe→profit→loss: a
+  red-tipped scrubber reads as decoration-red and violates brands whose red is
+  error-only; synthacon's end color is its profit token `#b8a8f0`, on-identity).
 - FeaturePanel is orientation-aware (`height > width` switches row→column), so vertical
   9:16 social clips render from the SAME SocialClip comp via
   `npx remotion render SocialClip ... --width=1080 --height=1920`; no separate template.
@@ -187,8 +198,8 @@ placeholder so smoke stays green on a clean clone.
   `act` keys match `launchTiming.ts`'s acts (`logo|hook|demo|feature-N|end`). The
   feeder's `probe --file <mp3>` mode measures an existing file's duration with no API
   call, used when a build script skips regenerating a line that's already on disk.
-- VO text is written for the ear ("noban dot gg", never "noban.gg") — spell out
-  anything a TTS model would otherwise mispronounce.
+- VO text is written for the ear ("synthacon dot com", never "synthacon.com") — spell
+  out anything a TTS model would otherwise mispronounce.
 - If a line overruns its act's time budget, trim the COPY rather than squeeze the
   timing — shortening `launchTiming.ts`'s act lengths to fit audio inverts the
   source of truth.
@@ -204,7 +215,7 @@ placeholder so smoke stays green on a clean clone.
 
 ### Process
 - Every generated props file has a builder script as its source of truth
-  (`build-launch-props.mjs` pattern) — never hand-edit generated JSON.
+  (`build-synthacon-demo-props.mjs` pattern) — never hand-edit generated JSON.
 - Verify behavior-preserving refactors with SHA-256-compared stills, not eyeballs.
 - Exit criterion for any asset is the USER seeing the rendered artifact, not code
   compiling.

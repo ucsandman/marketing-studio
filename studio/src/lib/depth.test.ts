@@ -17,7 +17,7 @@ describe('parallaxOffset', () => {
     const flat = withParallax(0);
     for (const frame of [0, 1, 37, 220, 999]) {
       for (const depth of [0, 0.25, 0.6, 1]) {
-        for (const seed of ['a', 'b', 'noban:bg']) {
+        for (const seed of ['a', 'b', 'synthacon:bg']) {
           const o = parallaxOffset(frame, FPS, depth, flat, seed);
           expect(o.x).toBe(0);
           expect(o.y).toBe(0);
@@ -28,22 +28,22 @@ describe('parallaxOffset', () => {
 
   it('is deterministic: same inputs -> same output', () => {
     const m = withParallax(0.3);
-    const a = parallaxOffset(123, FPS, 1, m, 'noban:bg');
-    const b = parallaxOffset(123, FPS, 1, m, 'noban:bg');
+    const a = parallaxOffset(123, FPS, 1, m, 'synthacon:bg');
+    const b = parallaxOffset(123, FPS, 1, m, 'synthacon:bg');
     expect(a).toEqual(b);
   });
 
   it('different seeds decorrelate layers (not identical drift)', () => {
     const m = withParallax(0.3);
-    const a = parallaxOffset(200, FPS, 1, m, 'noban:bg');
-    const b = parallaxOffset(200, FPS, 1, m, 'noban:content');
+    const a = parallaxOffset(200, FPS, 1, m, 'synthacon:bg');
+    const b = parallaxOffset(200, FPS, 1, m, 'synthacon:content');
     expect(a).not.toEqual(b);
   });
 
   it('amplitude scales with parallax and layer depth (background drifts more)', () => {
     // At a fixed frame the |offset| grows with both parallax and layerDepth. Use a
     // frame where the seeded sine is safely away from a zero crossing.
-    const seed = 'noban:bg';
+    const seed = 'synthacon:bg';
     const frame = 200;
     const strong = parallaxOffset(frame, FPS, 1, withParallax(0.5), seed);
     const weak = parallaxOffset(frame, FPS, 1, withParallax(0.25), seed);
@@ -55,7 +55,7 @@ describe('parallaxOffset', () => {
 
   it('drift is slow and smooth: tiny change frame-to-frame, bounded amplitude', () => {
     const m = withParallax(1); // worst case amplitude
-    const seed = 'noban:bg';
+    const seed = 'synthacon:bg';
     let prev = parallaxOffset(0, FPS, 1, m, seed);
     for (let f = 1; f <= 300; f++) {
       const cur = parallaxOffset(f, FPS, 1, m, seed);

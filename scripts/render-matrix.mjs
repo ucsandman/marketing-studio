@@ -32,8 +32,14 @@ import {execSync} from 'node:child_process';
 import {existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
-import {makeBaseLoader, withFormat} from './lib/matrix-props.mjs';
+import {makeBaseLoader, stillFrameForComposition, withFormat} from './lib/matrix-props.mjs';
 
+export function resolveMatrixOutputDirectory(root, brand, postId) {
+  return postId ? join(root, 'out', brand, 'posts', postId) : join(root, 'out', brand, 'matrix');
+}
+
+const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
+if (isMain) {
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
   process.exit(1);
@@ -50,9 +56,19 @@ const compIdx = args.indexOf('--comp');
 const compFilter = compIdx >= 0 ? args[compIdx + 1] : null;
 const onlyIdx = args.indexOf('--only');
 const onlyFilter = onlyIdx >= 0 ? args[onlyIdx + 1] : null;
+const postIdx = args.indexOf('--post');
+const postId = postIdx >= 0 ? args[postIdx + 1] : null;
 
 if (!brand) {
-  console.error('usage: node scripts/render-matrix.mjs <brand> [--comp LaunchVideo|SocialClip] [--only <id>] [--stills-only] [--webm]');
+  console.error('usage: node scripts/render-matrix.mjs <brand> [--comp LaunchVideo|SocialClip] [--post <id>] [--only <id>] [--stills-only] [--webm]');
+  process.exit(1);
+}
+if (postIdx >= 0 && !postId) {
+  console.error('render-matrix: --post requires an id');
+  process.exit(1);
+}
+if (postId && compFilter && compFilter !== 'MotionVariant') {
+  console.error('render-matrix: --post only supports MotionVariant');
   process.exit(1);
 }
 
@@ -64,14 +80,11 @@ const audioManifest = existsSync(audioPropsPath)
   ? JSON.parse(readFileSync(audioPropsPath, 'utf8'))
   : null;
 
-// A text-bearing frame per composition (headline act) — the layout proof frame.
-const stillFrame = (comp) => (comp === 'LaunchVideo' ? 240 : 40);
-
-const outDir = join(root, 'out', brand, 'matrix');
+const outDir = resolveMatrixOutputDirectory(root, brand, postId);
 const propsDir = join(outDir, '.props');
 mkdirSync(propsDir, {recursive: true});
 
-const loadBase = makeBaseLoader(root, brand);
+const loadBase = makeBaseLoader(root, brand, postId);
 
 // Probe the bundled ffmpeg for VP9/Opus once, only when --webm was requested. Never
 // fails the run: unsupported means webm transcoding is skipped per-file, logged once.
@@ -122,9 +135,10 @@ const renderVariant = (id, comp, width, height, props) => {
   const ext = stillsOnly ? 'png' : 'mp4';
   const outFile = join(outDir, `${id}.${ext}`);
   const cmd = stillsOnly
-    ? `npx remotion still ${comp} "${outFile}" --props="${propsPath}" --frame=${stillFrame(comp)}`
+    ? `npx remotion still ${comp} "${outFile}" --props="${propsPath}" --frame=${stillFrameForComposition(comp, 240)}`
     : `npx remotion render ${comp} "${outFile}" --props="${propsPath}"`;
-  console.log(`matrix: ${id} (${width}x${height}) -> out/${brand}/matrix/${id}.${ext}`);
+  const outputBase = postId ? `out/${brand}/posts/${postId}` : `out/${brand}/matrix`;
+  console.log(`matrix: ${id} (${width}x${height}) -> ${outputBase}/${id}.${ext}`);
   execSync(cmd, {cwd: studio, stdio: 'inherit'});
   if (!existsSync(outFile)) {
     console.error(`FAILED: ${outFile} was not produced`);
@@ -140,7 +154,7 @@ const renderVariant = (id, comp, width, height, props) => {
     }
   }
 
-  return {id, path: `out/${brand}/matrix/${id}.${ext}`, width, height, bytes: statSync(outFile).size};
+  return {id, path: `${postId ? `out/${brand}/posts/${postId}` : `out/${brand}/matrix`}/${id}.${ext}`, width, height, bytes: statSync(outFile).size};
 };
 
 // Merge caption data into a base props object per composition.
@@ -155,6 +169,7 @@ const withCaptions = (comp, base) =>
 
 const rendered = [];
 for (const p of platforms) {
+  if (postId && p.comp !== 'MotionVariant') continue;
   if (compFilter && p.comp !== compFilter) continue;
   if (onlyFilter && p.id !== onlyFilter) continue;
   const base = withFormat(loadBase(p.comp), p.width, p.height);
@@ -189,4 +204,5 @@ if (existsSync(runJson)) {
   console.log(`manifest: registered ${rendered.length} exports in out/${brand}/marketing/run.json`);
 }
 
-console.log(`matrix OK: ${rendered.length} ${stillsOnly ? 'stills' : 'videos'} in out/${brand}/matrix/`);
+console.log(`matrix OK: ${rendered.length} ${stillsOnly ? 'stills' : 'videos'} in ${postId ? `out/${brand}/posts/${postId}/` : `out/${brand}/matrix/`}`);
+}

@@ -1,23 +1,19 @@
 import {describe, expect, it} from 'vitest';
 import {brandSchema, getBrand, markColorOf} from './brand';
 
+// A synthetic brand that omits every optional block, used to assert the schema's
+// defaults independently of the one real brand in the registry.
+const bare = {
+  id: 'x',
+  name: 'x',
+  tagline: 'x',
+  url: 'x',
+  colors: getBrand('synthacon').colors,
+  fonts: getBrand('synthacon').fonts,
+  voice: 'x',
+};
+
 describe('getBrand', () => {
-  it('loads the noban brand with validated tokens', () => {
-    const b = getBrand('noban');
-    expect(b.name).toBe('noban.gg');
-    expect(b.colors.brand).toBe('#8847ff');
-    expect(b.colors.profit).toBe('#d6c23c');
-    expect(b.fonts.display).toBe('Saira');
-  });
-
-  it('loads the dashclaw brand with validated tokens', () => {
-    const b = getBrand('dashclaw');
-    expect(b.name).toBe('DashClaw');
-    expect(b.colors.brand).toBe('#f97316');
-    expect(b.fonts.display).toBe('Inter');
-    expect(b.fonts.mono).toBe('JetBrains Mono');
-  });
-
   it('loads the synthacon brand with validated tokens', () => {
     const b = getBrand('synthacon');
     expect(b.name).toBe('Synthacon');
@@ -54,54 +50,43 @@ describe('getBrand', () => {
     });
   });
 
-  it('does not inject Synthacon light tokens into unrelated brands', () => {
-    expect(getBrand('noban').light).toBeUndefined();
+  it('leaves the light palette undefined for a brand that omits it', () => {
+    expect(brandSchema.parse(bare).light).toBeUndefined();
   });
 
   it('rejects an incomplete explicit light palette', () => {
-    const source = getBrand('noban');
     expect(
       brandSchema.safeParse({
-        ...source,
+        ...bare,
         light: {bg: '#f8f7f6', ink: '#181818', brand: '#3d17a0'},
       }).success,
     ).toBe(false);
   });
 
-  it('resolves markColorOf per brand.markColor (ink for synthacon, brand accent for brands that omit it)', () => {
-    expect(markColorOf(getBrand('synthacon'))).toBe(getBrand('synthacon').colors.ink);
-    expect(markColorOf(getBrand('noban'))).toBe(getBrand('noban').colors.brand);
+  it('resolves markColorOf per brand.markColor (ink for synthacon, brand accent by default)', () => {
+    const s = getBrand('synthacon');
+    expect(markColorOf(s)).toBe(s.colors.ink);
+    const parsed = brandSchema.parse(bare);
+    expect(markColorOf(parsed)).toBe(parsed.colors.brand);
   });
 
   it('defaults markColor to "brand" when a brand omits the field (byte-identical mark color)', () => {
-    const parsed = brandSchema.parse({
-      id: 'x',
-      name: 'x',
-      tagline: 'x',
-      url: 'x',
-      colors: getBrand('noban').colors,
-      fonts: getBrand('noban').fonts,
-      voice: 'x',
-    });
-    expect(parsed.markColor).toBe('brand');
-    expect(markColorOf(parsed)).toBe(parsed.colors.brand);
+    expect(brandSchema.parse(bare).markColor).toBe('brand');
   });
 
   it('rejects hex colors that are not #rrggbb', () => {
     // schema-level guarantee: every color token matches /^#[0-9a-f]{6}$/i
-    const b = getBrand('noban');
-    for (const v of Object.values(b.colors)) {
+    for (const v of Object.values(getBrand('synthacon').colors)) {
       expect(v).toMatch(/^#[0-9a-f]{6}$/i);
     }
   });
 
   it('throws a loud error for unknown brand ids', () => {
-    expect(() => getBrand('nope')).toThrowError(/Unknown brand "nope"/);
+    expect(() => getBrand('nope')).toThrow(/Unknown brand "nope"/);
   });
 
   it('applies restrained FilmGrade grade defaults when a brand omits the block', () => {
-    // noban carries no `grade` block, so it must receive the zod defaults unchanged.
-    expect(getBrand('noban').grade).toEqual({
+    expect(brandSchema.parse(bare).grade).toEqual({
       grain: 0.12,
       vignette: 0.18,
       bloom: 0.1,
@@ -110,32 +95,21 @@ describe('getBrand', () => {
     });
   });
 
-  it('keeps paperroute and dashclaw grade restrained with no accent bloom', () => {
-    // One Green Rule / orange-is-signal: neither brand may have an accent-colored
-    // bloom wash, and every grade layer stays at or below the defaults.
-    for (const id of ['paperroute', 'dashclaw']) {
-      const g = getBrand(id).grade;
-      expect(g.bloom).toBe(0);
-      expect(g.grain).toBeLessThanOrEqual(0.12);
-      expect(g.vignette).toBeLessThanOrEqual(0.18);
-      expect(g.aberration).toBe(0);
-      expect(g.letterbox).toBe(0);
-    }
+  it('keeps the synthacon grade restrained with no accent bloom', () => {
+    // violet/white/black only, no glow, no bloom: every grade layer stays at or
+    // below the engine defaults and the accent bloom is fully off.
+    const g = getBrand('synthacon').grade;
+    expect(g.bloom).toBe(0);
+    expect(g.grain).toBeLessThanOrEqual(0.12);
+    expect(g.vignette).toBeLessThanOrEqual(0.18);
+    expect(g.aberration).toBe(0);
+    expect(g.letterbox).toBe(0);
   });
 
   it('applies neutral motion defaults when a brand omits the block', () => {
     // A brand with no `motion` block must receive the calibrated defaults that
     // reproduce the prior smooth, no-overshoot entrance feel.
-    const parsed = brandSchema.parse({
-      id: 'x',
-      name: 'x',
-      tagline: 'x',
-      url: 'x',
-      colors: getBrand('noban').colors,
-      fonts: getBrand('noban').fonts,
-      voice: 'x',
-    });
-    expect(parsed.motion).toEqual({
+    expect(brandSchema.parse(bare).motion).toEqual({
       tempo: 1,
       exuberance: 0.35,
       stagger: 0.5,
@@ -150,35 +124,20 @@ describe('getBrand', () => {
     // A brand that provides tempo/exuberance/stagger/overshoot but no depth cues
     // must still get parallax 0 / settle 0 so its output stays a flat, hard cut.
     const parsed = brandSchema.parse({
-      id: 'x',
-      name: 'x',
-      tagline: 'x',
-      url: 'x',
-      colors: getBrand('noban').colors,
-      fonts: getBrand('noban').fonts,
+      ...bare,
       motion: {tempo: 1, exuberance: 0.4, stagger: 0.5, overshoot: 0.2},
-      voice: 'x',
     });
     expect(parsed.motion.parallax).toBe(0);
     expect(parsed.motion.settle).toBe(0);
   });
 
-  it('carries each brand a motion personality on-voice with its rules', () => {
-    // noban: terse/mechanical -> lowest exuberance, minimal overshoot, brisk tempo.
-    const noban = getBrand('noban').motion;
-    expect(noban.exuberance).toBeLessThan(0.2);
-    expect(noban.overshoot).toBeLessThanOrEqual(0.1);
-    expect(noban.tempo).toBeGreaterThan(1);
-
-    // paperroute: springy but a quiet ledger -> most exuberant, slightly slower tempo.
-    const paperroute = getBrand('paperroute').motion;
-    expect(paperroute.exuberance).toBeGreaterThan(noban.exuberance);
-    expect(paperroute.tempo).toBeLessThan(1);
-
-    // dashclaw: confident/snappy -> quick tempo, wider stagger, restrained bounce.
-    const dashclaw = getBrand('dashclaw').motion;
-    expect(dashclaw.tempo).toBeGreaterThanOrEqual(1.15);
-    expect(dashclaw.stagger).toBeGreaterThan(0.5);
-    expect(dashclaw.exuberance).toBeLessThan(paperroute.exuberance);
+  it('carries synthacon a motion personality on-voice with its rules', () => {
+    // Peer-to-peer and unhurried: calmer than the engine default on every axis
+    // that can read as hype, with real depth cues so flat comps still breathe.
+    const m = getBrand('synthacon').motion;
+    expect(m.exuberance).toBeLessThan(0.35);
+    expect(m.overshoot).toBeLessThan(0.25);
+    expect(m.parallax).toBeGreaterThan(0);
+    expect(m.settle).toBeGreaterThan(0);
   });
 });

@@ -23,6 +23,18 @@ export function writeMotionProps(outputDirectory = resolve(root, "out/synthacon-
   });
 }
 
+// The canonical base props the matrix/postkit pipeline reads for MotionVariant
+// (props/<brand>-motion.json, resolved by scripts/lib/matrix-props.mjs) — always
+// Direction A at 1080x1080, with per-platform formatWidth/formatHeight merged in
+// at render time.
+export function writeCanonicalProps(outputPath = resolve(root, "props", "synthacon-motion.json")) {
+  const canonical = motionVariants.find(({direction, formatWidth, formatHeight}) => direction === "A" && formatWidth === 1080 && formatHeight === 1080);
+  writeFileSync(outputPath, `${JSON.stringify(canonical, null, 2)}\n`);
+  return outputPath;
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  process.stdout.write(`${JSON.stringify({props: writeMotionProps().map((path) => path.slice(root.length + 1))})}\n`);
+  const props = writeMotionProps().map((path) => path.slice(root.length + 1));
+  const canonical = writeCanonicalProps().slice(root.length + 1);
+  process.stdout.write(`${JSON.stringify({props, canonical})}\n`);
 }

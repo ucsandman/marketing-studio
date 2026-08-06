@@ -4,9 +4,9 @@
 // Samples frames from a rendered still or video, quantizes to a coarse color
 // grid (shared scripts/lib/png.mjs), and flags dominant colors that are BOTH
 // (a) close to a color the brand's voice FORBIDS (parsed from the "never <color>"
-//     rules in brands/<brand>.json voice — e.g. noban: "profit is gold, never
-//     green") AND
-// (b) far from every brand token (so a legitimate on-brand green like noban's
+//     rules in brands/<brand>.json voice — e.g. synthacon: "no gold or yellow
+//     anywhere") AND
+// (b) far from every brand token (so a legitimate on-brand green like synthacon's
 //     `safe` token is NOT flagged — it sits right on a token).
 //
 // False-positive guard (PLAYBOOK Phase-4 lesson: product screenshots inside a

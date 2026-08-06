@@ -11,7 +11,7 @@ import {execSync} from 'node:child_process';
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
-import {makeBaseLoader, withFormat} from './lib/matrix-props.mjs';
+import {makeBaseLoader, stillFrameForComposition, withFormat} from './lib/matrix-props.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -39,14 +39,12 @@ if (platforms.length === 0) {
   process.exit(1);
 }
 
-// Strongest text-bearing frame per composition. LaunchVideo: the hook act begins
+// LaunchVideo's strongest text-bearing frame begins
 // right after the logo act (mirrors LOGO_LEN in studio/src/lib/launchTiming.ts,
 // which is fixed regardless of feature count/telemetry length), and hook-start +
-// ~70 frames reads best per this repo's render proofs. SocialClip: frame 40, the
-// same layout-proof frame render-matrix.mjs already uses (inside the Headline
-// sequence's fully-visible window).
+// ~70 frames reads best per this repo's render proofs. Other composition frames
+// are selected by the shared helper.
 const LOGO_LEN = 150; // must match studio/src/lib/launchTiming.ts
-const stillFrame = (c) => (c === 'LaunchVideo' ? LOGO_LEN + 70 : 40);
 
 const outDir = join(root, 'out', brand, 'thumbs');
 const propsDir = join(outDir, '.props');
@@ -67,7 +65,7 @@ for (const p of platforms) {
   const propsPath = join(propsDir, `${p.id}.json`);
   writeFileSync(propsPath, JSON.stringify(props));
   const outFile = join(outDir, `thumb-${aspect}.jpg`);
-  const cmd = `npx remotion still ${p.comp} "${outFile}" --props="${propsPath}" --frame=${stillFrame(p.comp)} --image-format=jpeg`;
+  const cmd = `npx remotion still ${p.comp} "${outFile}" --props="${propsPath}" --frame=${stillFrameForComposition(p.comp, LOGO_LEN + 70)} --image-format=jpeg`;
   console.log(`thumbs: ${aspect} (${p.width}x${p.height}) -> out/${brand}/thumbs/thumb-${aspect}.jpg`);
   try {
     execSync(cmd, {cwd: studio, stdio: 'inherit'});
@@ -77,7 +75,7 @@ for (const p of platforms) {
     console.log(`thumbs: --image-format=jpeg failed, falling back to png: ${err.message}`);
     const pngFile = join(outDir, `thumb-${aspect}.png`);
     execSync(
-      `npx remotion still ${p.comp} "${pngFile}" --props="${propsPath}" --frame=${stillFrame(p.comp)}`,
+      `npx remotion still ${p.comp} "${pngFile}" --props="${propsPath}" --frame=${stillFrameForComposition(p.comp, LOGO_LEN + 70)}`,
       {cwd: studio, stdio: 'inherit'},
     );
     if (!existsSync(pngFile)) {

@@ -22,10 +22,10 @@ test('firstCheckpoint reads the object_info enum shape', () => {
 
 test('imagesFromHistory collects images across output nodes', () => {
   const history = {
-    p1: {outputs: {'9': {images: [{filename: 'noban_hero_00001_.png', subfolder: '', type: 'output'}]}}},
+    p1: {outputs: {'9': {images: [{filename: 'synthacon_hero_00001_.png', subfolder: '', type: 'output'}]}}},
   };
   assert.deepEqual(imagesFromHistory(history, 'p1'), [
-    {filename: 'noban_hero_00001_.png', subfolder: '', type: 'output'},
+    {filename: 'synthacon_hero_00001_.png', subfolder: '', type: 'output'},
   ]);
   assert.deepEqual(imagesFromHistory({}, 'p1'), []);
 });

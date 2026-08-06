@@ -1,5 +1,9 @@
 # Animation Studio Phase 5 — ComfyUI feeder + Static-plus (AnimatedOG + README GIF)
 
+> **Historical note:** this plan predates the later slim of the studio to
+> synthacon-only. References to noban, dashclaw, or paperroute below are
+> historical and describe brands that have since been removed from the repo.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build the ComfyUI feeder (local API client + stored workflow) and the Static-plus exports: an animated OG loop and a README GIF for noban.gg, with the OG's AI hero background falling back to the procedural loop when ComfyUI is unavailable.

@@ -21,13 +21,19 @@ regenerate blindly. Free tier returns 402; Starter or above required.
 ## Recipe A: video soundtrack
 
 1. Shared-repo guard + toolchain per marketing-studio.
-2. Copy source of truth: `scripts/build-<brand>-audio.mjs` (copy the noban one for a
-   new brand). VO lines are keyed by act, written FOR THE EAR ("dot gg", not ".gg"),
-   one line per act, terse. Music prompt describes the brand's sonic character.
+2. Copy source of truth: `scripts/build-<brand>-audio.mjs`. No per-brand audio builder
+   ships in a synthacon-only tree — the noban template and `merge-launch-audio.mjs`
+   were removed in the brand slim. Author `scripts/build-synthacon-audio.mjs` fresh,
+   against the `audioSchema` manifest contract in the PLAYBOOK's Audio section
+   (`{music, lines: [{act, src, durationMs, text}]}`). VO lines are keyed by act,
+   written FOR THE EAR ("dot com", not ".com"), one line per act, terse. Music prompt
+   describes the brand's sonic character.
 3. Run it: `node scripts/build-<brand>-audio.mjs` (music takes 1-3 min). Check every
    line's duration fits its act; trim TEXT if not, re-run with --force.
-4. Merge + render: `node scripts/merge-launch-audio.mjs` then render the composition
-   with the merged props.
+4. Merge + render: no `merge-launch-audio.mjs` ships either — merge the generated
+   `props/<brand>-audio.json` into the target composition's props yourself (or author
+   a small merge script following the same builder-script convention), then render
+   the composition with the merged props.
 5. Listen-proof: verify the mp4 has an audio stream (ffprobe), then SEND the video —
    audio is approved by ear, by the user. Ducking feel (base 0.35 / duck 0.12) is
    tunable in `studio/src/lib/audioMix.ts` if redlined.

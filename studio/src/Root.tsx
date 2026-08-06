@@ -33,16 +33,16 @@ export const RemotionRoot: React.FC = () => {
         height={1080}
         schema={socialClipSchema}
         defaultProps={{
-          brandId: "noban",
-          kicker: "noban.gg",
-          headline: "Skin arbitrage with guardrails",
+          brandId: "synthacon",
+          kicker: "synthacon.com",
+          headline: "Gear near you, from people who play",
           lines: [
-            "Scans CSFloat, Steam, and 7 more venues",
-            "Float and pattern aware spreads",
-            "Hard spend caps on every trade",
+            "Synths, drum machines, studio hardware",
+            "From home studios and pro shops",
+            "Search and filter by what you need",
           ],
-          screenshot: "noban/cockpit.webp",
-          cta: "Free in simulation",
+          screenshot: "synthacon/market-grid.png",
+          cta: "Join the beta at synthacon.com",
           burnCaptions: false,
           voLines: null,
         }}
@@ -60,9 +60,9 @@ export const RemotionRoot: React.FC = () => {
         height={1080}
         schema={productDemoSchema}
         defaultProps={{
-          brandId: "noban",
+          brandId: "synthacon",
           video: null,
-          cta: "Simulate free at noban.gg",
+          cta: "Join the beta at synthacon.com",
           telemetry: null,
         }}
         calculateMetadata={({props}) => ({
@@ -80,10 +80,10 @@ export const RemotionRoot: React.FC = () => {
         height={1080}
         schema={logoRevealSchema}
         defaultProps={{
-          brandId: "noban",
+          brandId: "synthacon",
           sequence: null,
-          frameCount: 90,
-          cta: "Simulate free at noban.gg",
+          frameCount: 1,
+          cta: "Join the beta at synthacon.com",
           motionOverride: null,
         }}
       />
@@ -96,13 +96,13 @@ export const RemotionRoot: React.FC = () => {
         height={1080}
         schema={launchVideoSchema}
         defaultProps={{
-          brandId: "noban",
-          kicker: "noban.gg",
-          headline: "CS2 skin arbitrage with guardrails",
+          brandId: "synthacon",
+          kicker: "synthacon.com",
+          headline: "Gear near you, from people who play",
           demo: {video: null, telemetry: null},
           features: [],
-          cta: "Simulate free at noban.gg",
-          assets: {logoSequence: null, logoFrames: 90, loopSequence: null, loopFrames: 240},
+          cta: "Join the beta at synthacon.com",
+          assets: {logoSequence: null, logoFrames: 1, loopSequence: null, loopFrames: 240},
           audio: null,
           burnCaptions: false,
           motionOverride: null,
@@ -135,9 +135,9 @@ export const RemotionRoot: React.FC = () => {
         height={630}
         schema={animatedOgSchema}
         defaultProps={{
-          brandId: "noban",
-          tagline: "CS2 skin arbitrage with guardrails",
-          cta: "Simulate free at noban.gg",
+          brandId: "synthacon",
+          tagline: "Gear near you, from people who play",
+          cta: "Join the beta at synthacon.com",
           heroImage: null,
           loopSequence: null,
           loopFrames: 240,

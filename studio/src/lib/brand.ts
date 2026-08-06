@@ -1,7 +1,4 @@
 import {z} from 'zod';
-import noban from '../../../brands/noban.json';
-import dashclaw from '../../../brands/dashclaw.json';
-import paperroute from '../../../brands/paperroute.json';
 import synthacon from '../../../brands/synthacon.json';
 
 const hex = z.string().regex(/^#[0-9a-f]{6}$/i, 'expected #rrggbb hex color');
@@ -59,9 +56,9 @@ export const brandSchema = z.object({
     mono: z.string().min(1),
   }),
   // How loudly the brand mark is allowed to bloom. `wash` is the alpha of the
-  // radial backdrop behind the mark, `glow` the alpha of its drop-shadow. Brands
-  // whose rules forbid a hero wash (dashclaw: orange is signal, never decoration)
-  // set wash to 0. Defaults reproduce the values these were hardcoded to.
+  // radial backdrop behind the mark, `glow` the alpha of its drop-shadow. A brand
+  // whose rules forbid a hero wash or glow (synthacon: no glow on any asset) sets
+  // them low or 0. Defaults reproduce the values these were hardcoded to.
   effects: z
     .object({
       wash: z.number().min(0).max(1),
@@ -71,8 +68,8 @@ export const brandSchema = z.object({
   // FilmGrade overlay intensities — the template-to-agency production-value pass.
   // Each layer is 0..1 (letterbox capped low) and skipped at 0. Defaults are
   // deliberately RESTRAINED (grain barely-there, gentle vignette, faint accent bloom,
-  // no aberration, no letterbox); brands whose rules forbid a hero wash/glow
-  // (paperroute One Green Rule, dashclaw orange-is-signal) zero their bloom.
+  // no aberration, no letterbox); a brand whose rules forbid an accent bloom
+  // (synthacon: violet/white/black only, no glow, no bloom) zeroes it.
   grade: z
     .object({
       grain: z.number().min(0).max(1),
@@ -123,7 +120,7 @@ export type Brand = z.infer<typeof brandSchema>;
 export const markColorOf = (brand: Brand): string =>
   brand.markColor === 'ink' ? brand.colors.ink : brand.colors.brand;
 
-const registry: Record<string, unknown> = {noban, dashclaw, paperroute, synthacon};
+const registry: Record<string, unknown> = {synthacon};
 
 export const getBrand = (id: string): Brand => {
   const raw = registry[id];

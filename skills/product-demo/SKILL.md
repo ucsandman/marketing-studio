@@ -15,7 +15,7 @@ focus-driven camera zooms, and step captions, plus a brand end card.
 1. Toolchain + brand check per marketing-studio. The product's app must be RUNNING
    (ask the user to start it; never start their stack yourself).
 2. Capture script: `feeders/capture/record-<brand>-demo.mjs`. For a new product copy
-   `record-noban-demo.mjs`: viewport wide enough for the app, `deviceScaleFactor: 2`,
+   `record-synthacon-demo.mjs`: viewport wide enough for the app, `deviceScaleFactor: 2`,
    proven ready-locators per view, a step caption per view. Read the PLAYBOOK's
    capture gotchas FIRST — especially: camera focus rects are MEASURED from raw
    footage frames, never derived from click points, and must end before any app-side

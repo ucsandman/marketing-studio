@@ -3,7 +3,7 @@ import {launchTiming} from './launchTiming';
 import {DEFAULT_MOTION} from './motion';
 import {RISER_LEAD, sfxCues} from './sfxCues';
 
-// Real noban inputs: telemetry 16085ms, 2 features of 3 benefit lines each.
+// Real launch inputs: telemetry 16085ms, 2 features of 3 benefit lines each.
 const T = launchTiming(16085, 2); // demo len = ceil(16085/1000*30)+24 = 507
 // -> logo{0,150} hook{150,186} demo{336,507} feature0{843,180} feature1{1023,180} end{1203,150}
 

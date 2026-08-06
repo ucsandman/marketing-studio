@@ -1,4 +1,10 @@
-"""noban.gg logo reveal: scope mark drawn on in brand violet, 90 frames, alpha."""
+"""Logo reveal: mark drawn on in the brand accent, 90 frames, alpha.
+
+NOTE: the drawn geometry below is still the noban scope mark, retained only as a
+working reference for the Blender reveal pipeline. Synthacon ships a VECTOR
+reveal (studio/src/brands/SynthaconReveal.tsx) and does not use this scene; the
+geometry needs re-authoring before any synthacon asset renders from here.
+"""
 
 import argparse
 import json
@@ -9,7 +15,7 @@ from pathlib import Path
 import bpy
 
 ROOT = Path(__file__).resolve().parents[3]
-BRAND = json.loads((ROOT / "brands" / "noban.json").read_text())
+BRAND = json.loads((ROOT / "brands" / "synthacon.json").read_text())
 
 FPS = 30
 FRAMES = 90

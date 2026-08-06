@@ -1,5 +1,9 @@
 # Animation Studio Phase 2 — ProductDemo (Playwright capture + cursor/zoom/captions)
 
+> **Historical note:** this plan predates the later slim of the studio to
+> synthacon-only. References to noban, dashclaw, or paperroute below are
+> historical and describe brands that have since been removed from the repo.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build the Playwright capture feeder and the Remotion ProductDemo template (synthetic smooth cursor, auto-zoom to clicks, step captions), and render one polished noban.gg dashboard demo clip approved by the user.

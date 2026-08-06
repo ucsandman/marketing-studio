@@ -7,7 +7,7 @@ description: Use when finished work needs to go out — the user says "ship it",
 
 Every ship is the same ritual: verify → docs → sync surfaces → version → secrets → de-vibe spot-check → quiz → commit → push. Work through the checklist in order; report what shipped and what was skipped.
 
-**If the repo has its own ship skill (e.g. `/dashclaw-ship`), use that instead.**
+**If the repo has its own ship skill (e.g. a repo-specific `/<repo>-ship`), use that instead.**
 
 ## Checklist
 

@@ -70,7 +70,7 @@ const clamp01 = (v) => Math.min(1, Math.max(0, v));
 const LOGO_TAKES = [
   {label: 'brand default', override: null},
   // Floor at 0.65: below ~0.55 the spring stays overdamped and a +0.25 delta on a
-  // low-exuberance brand renders byte-identical to the control (verified on noban 0.15).
+  // low-exuberance brand renders byte-identical to the control (verified at exuberance 0.15).
   {label: 'exuberant', override: (m) => ({exuberance: clamp01(Math.max(0.65, m.exuberance + 0.25))})},
   {label: 'slow-luxe (tempo 0.85)', override: () => ({tempo: 0.85})},
 ];

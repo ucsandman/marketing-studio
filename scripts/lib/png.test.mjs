@@ -193,7 +193,7 @@ test('rgbToHsv: pure green hue ~120, pure red hue 0', () => {
   assert.equal(rgbToHsv(255, 0, 0).h, 0);
 });
 
-test('colorDistance + hexToRgb: pure green is far from noban safe token', () => {
+test('colorDistance + hexToRgb: pure green is far from the synthacon safe token', () => {
   const green = {r: 0, g: 255, b: 0};
   const safe = hexToRgb('#3fd08c');
   assert.ok(colorDistance(green, safe) > 100);

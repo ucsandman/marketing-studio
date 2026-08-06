@@ -1,5 +1,9 @@
 # Audio Feeder + Remotion Audio Integration — Design Spec
 
+> **Historical note:** this spec predates the later slim of the studio to
+> synthacon-only. References to noban, dashclaw, or paperroute below are
+> historical and describe brands that have since been removed from the repo.
+
 **Date:** 2026-07-09
 **Status:** Approved direction (ElevenLabs VO + Eleven Music, generic capability, LaunchVideo first)
 **Repo:** `C:\Projects\animations`

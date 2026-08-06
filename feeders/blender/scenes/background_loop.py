@@ -1,4 +1,4 @@
-"""Seamless noban background loop: violet wave drift on near-black, 240 frames."""
+"""Seamless background loop: violet wave drift on near-black, 240 frames."""
 
 import argparse
 import json
@@ -8,7 +8,7 @@ from pathlib import Path
 import bpy
 
 ROOT = Path(__file__).resolve().parents[3]
-BRAND = json.loads((ROOT / "brands" / "noban.json").read_text())
+BRAND = json.loads((ROOT / "brands" / "synthacon.json").read_text())
 
 FPS = 30
 FRAMES = 240

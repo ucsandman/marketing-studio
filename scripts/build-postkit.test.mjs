@@ -1,6 +1,12 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {trimToBudget, buildCaption, buildAlt, PLATFORM_MAP} from './build-postkit.mjs';
+import {readFileSync} from 'node:fs';
+import {dirname, join} from 'node:path';
+import {fileURLToPath} from 'node:url';
+import {trimToBudget, buildCaption, buildAlt, buildPostCaption, PLATFORM_MAP, resolvePostkitOutputDirectory} from './build-postkit.mjs';
+
+const platforms = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'platforms.json'), 'utf8'));
+const platformById = new Map(platforms.map((p) => [p.id, p]));
 
 // --- trimToBudget ---
 
@@ -14,7 +20,7 @@ test('text at exactly the budget is unchanged', () => {
 });
 
 test('text over budget is cut at the last whitespace, never mid-word', () => {
-  const text = 'CS2 skin arbitrage with guardrails and a live trading desk';
+  const text = 'Buy, sell, and rent synthesizers with people who know the difference.';
   const result = trimToBudget(text, 20);
   assert.ok(result.length <= 20, `expected <= 20 chars, got ${result.length}`);
   assert.equal(text.startsWith(result), true);
@@ -47,7 +53,7 @@ test('never exceeds the requested budget across a range of lengths', () => {
 
 // --- buildCaption ---
 
-const brand = {name: 'noban.gg', tagline: 'CS2 skin arbitrage with guardrails'};
+const brand = {name: 'Synthacon', tagline: 'Gear near you, from people who play'};
 
 test('buildCaption falls back to brand tagline when brief is null', () => {
   const caption = buildCaption('x', null, brand);
@@ -78,15 +84,48 @@ test('buildCaption trims to the platform charBudget', () => {
   assert.ok(caption.length <= PLATFORM_MAP.x.charBudget);
 });
 
+test('buildPostCaption uses the selected post headline and caption', () => {
+  const caption = buildPostCaption('x', {
+    headline: 'Every synth has a next owner.',
+    caption: 'Buy, sell, and rent synthesizers with people who know the difference.',
+  });
+  assert.match(caption, /Every synth has a next owner/);
+  assert.match(caption, /Buy, sell, and rent synthesizers/);
+});
+
+test('a selected post kit writes below out/<brand>/posts/<id>/postkit', () => {
+  assert.equal(
+    resolvePostkitOutputDirectory('/repo', 'synthacon', 'next-owner'),
+    join('/repo', 'out', 'synthacon', 'posts', 'next-owner', 'postkit'),
+  );
+});
+
 // --- buildAlt ---
 
 test('buildAlt uses the brief hook when present', () => {
-  const alt = buildAlt({hook: 'CS2 skin arbitrage with guardrails'}, brand);
-  assert.match(alt, /noban\.gg/);
-  assert.match(alt, /CS2 skin arbitrage with guardrails/);
+  const alt = buildAlt({hook: 'Every synth has a next owner.'}, brand);
+  assert.match(alt, /Synthacon/);
+  assert.match(alt, /Every synth has a next owner\./);
 });
 
 test('buildAlt falls back to brand tagline when brief is null', () => {
   const alt = buildAlt(null, brand);
   assert.match(alt, new RegExp(brand.tagline));
+});
+
+// --- PLATFORM_MAP / platforms.json consistency ---
+
+test('every PLATFORM_MAP videoSource resolves to an existing id in scripts/platforms.json', () => {
+  for (const [platformKey, cfg] of Object.entries(PLATFORM_MAP)) {
+    const baseId = cfg.videoSource.replace(/-captioned$/, '');
+    assert.ok(platformById.has(baseId), `${platformKey}: videoSource '${cfg.videoSource}' has no matching platforms.json id`);
+  }
+});
+
+test('no PLATFORM_MAP entry sources a LaunchVideo-backed row', () => {
+  for (const [platformKey, cfg] of Object.entries(PLATFORM_MAP)) {
+    const baseId = cfg.videoSource.replace(/-captioned$/, '');
+    const row = platformById.get(baseId);
+    assert.notEqual(row?.comp, 'LaunchVideo', `${platformKey}: videoSource '${cfg.videoSource}' is LaunchVideo-backed`);
+  }
 });

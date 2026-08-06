@@ -1,8 +1,8 @@
 import React from 'react';
 import {AbsoluteFill, useCurrentFrame, useVideoConfig, interpolate} from 'remotion';
-import {getBrand} from '../lib/brand';
+import {getBrand, markColorOf} from '../lib/brand';
 import {loadBrandFonts} from '../lib/fonts';
-import {NobanMark} from '../brands/NobanMark';
+import {getMark} from '../brands/marks';
 import {FloatBar} from '../components/FloatBar';
 import {DemoCursor} from '../components/DemoCursor';
 import {Caption} from '../components/Caption';
@@ -16,7 +16,8 @@ const GALLERY_CLICKS = [
 export const ComponentGallery: React.FC = () => {
   const frame = useCurrentFrame();
   const {durationInFrames, fps} = useVideoConfig();
-  const brand = getBrand('noban');
+  const brand = getBrand('synthacon');
+  const Mark = getMark(brand.id);
   const fonts = loadBrandFonts(brand);
   const progress = interpolate(frame, [0, durationInFrames - 1], [0, 1]);
   const timeMs = (frame / fps) * 1000;
@@ -30,7 +31,7 @@ export const ComponentGallery: React.FC = () => {
         gap: 40,
       }}
     >
-      <NobanMark size={96} color={brand.colors.brand} />
+      <Mark size={96} color={markColorOf(brand)} />
       <div style={{fontFamily: fonts.display, fontWeight: 800, fontSize: 72}}>
         {brand.name}
       </div>
@@ -38,7 +39,7 @@ export const ComponentGallery: React.FC = () => {
         {brand.tagline}
       </div>
       <div style={{fontFamily: fonts.mono, fontSize: 24, color: brand.colors.profit}}>
-        +$12.40 net spread
+        mono / prices and data
       </div>
       <FloatBar progress={progress} brand={brand} width={800} />
       {/* demo strip: cursor roaming a mock panel + a caption */}

@@ -1,7 +1,7 @@
 # animations: agent-driven marketing studio
 
-Remotion (studio/) renders all final video for ALL products/brands; assets are copied
-out to the product's repo at the end. brands/<id>.json holds per-product tokens
+Remotion (studio/) renders all final video for synthacon (the studio's only brand);
+assets are copied out to the product's repo at the end. brands/<id>.json holds per-product tokens
 (zod-validated via studio/src/lib/brand.ts; mark components in studio/src/brands/marks.ts);
 templates resolve getBrand(brandId) and never hardcode brand values. Feeders:
 feeders/blender (headless bpy), feeders/capture (Playwright), feeders/comfy (ComfyUI,
@@ -15,8 +15,8 @@ rules, capture lessons). Do not re-derive them. User-level skills (/logo-reveal,
 /social-clip, /product-demo, /launch-video, /og-assets) drive this repo from any repo.
 
 Rules:
-- Brand color rules live in each brand's JSON `voice` (noban: profit = gold #d6c23c
-  NEVER green; green = safe/simulation only).
+- Brand color rules live in each brand's JSON `voice` (synthacon: violet/white/black
+  only — no gold or yellow, no glow, no bloom; green = success/online only, red = error only).
 - Rendered proof: visual work is not done until a rendered frame was inspected;
   final assets are not done until the user saw them.
 - Smoke check before claiming done: node scripts/smoke.mjs (every composition listed).

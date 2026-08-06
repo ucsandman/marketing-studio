@@ -3,6 +3,14 @@ out/
 assets/
 studio/public/*/
 .env
+# Per-post props are regenerated from a posts manifest by
+# scripts/build-synthacon-post-props.mjs; the manifest is the source of truth,
+# these are build products. The canonical props/synthacon-motion.json IS tracked.
+props/synthacon-post-*.json
+# The shipped studio lockfile is studio/package-lock.json; pnpm's artifacts are
+# local-only until the toolchain question is settled (Remotion warns on two lockfiles).
+studio/pnpm-lock.yaml
+studio/pnpm-workspace.yaml
 *.log
 .superpowers/
 __pycache__/

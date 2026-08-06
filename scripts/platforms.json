@@ -6,5 +6,8 @@
   {"id": "social-16x9", "comp": "SocialClip", "width": 1920, "height": 1080, "label": "Social clip, landscape (YouTube, X, web hero)"},
   {"id": "social-9x16", "comp": "SocialClip", "width": 1080, "height": 1920, "captioned": true, "label": "Social clip, vertical (Reels, Shorts, TikTok)"},
   {"id": "social-1x1", "comp": "SocialClip", "width": 1080, "height": 1080, "captioned": true, "label": "Social clip, square (feed)"},
-  {"id": "social-4x5", "comp": "SocialClip", "width": 1080, "height": 1350, "label": "Social clip, portrait 4:5 (Instagram feed)"}
+  {"id": "social-4x5", "comp": "SocialClip", "width": 1080, "height": 1350, "label": "Social clip, portrait 4:5 (Instagram feed)"},
+  {"id": "motion-1x1", "comp": "MotionVariant", "width": 1080, "height": 1080, "label": "Animated graphic, square (Instagram/Facebook feed)"},
+  {"id": "motion-4x5", "comp": "MotionVariant", "width": 1080, "height": 1350, "label": "Animated graphic, portrait 4:5 (Instagram feed)"},
+  {"id": "motion-9x16", "comp": "MotionVariant", "width": 1080, "height": 1920, "label": "Animated graphic, vertical (Instagram/Facebook stories, Reels)"}
 ]

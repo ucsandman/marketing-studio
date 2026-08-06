@@ -1,5 +1,9 @@
 # Animation Studio Phase 3 — Blender Feeder (headless wrapper + LogoReveal + background loop)
 
+> **Historical note:** this plan predates the later slim of the studio to
+> synthacon-only. References to noban, dashclaw, or paperroute below are
+> historical and describe brands that have since been removed from the repo.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build the headless Blender feeder (bpy scene scripts + render wrapper), produce a noban.gg 3D logo reveal and a seamless brand background loop, and composite the reveal into a Remotion LogoReveal composition approved by the user.

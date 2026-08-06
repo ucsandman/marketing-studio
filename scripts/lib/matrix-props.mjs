@@ -8,34 +8,55 @@ import {existsSync, readdirSync, readFileSync} from 'node:fs';
 import {join} from 'node:path';
 
 // Base props per composition. Launch is the canonical <brand>-launch.json; social
-// prefers <brand>-social-launch.json, falling back to the first <brand>-social-*.json.
-export function resolveBaseProps(root, brand, comp) {
-  if (comp === 'LaunchVideo') {
+// prefers <brand>-social-launch.json, falling back to the first <brand>-social-*.json;
+// motion is the canonical <brand>-motion.json (written by
+// scripts/build-synthacon-motion-props.mjs, Direction A at 1080x1080).
+const BASE_PROPS_RESOLVERS = {
+  LaunchVideo: (root, brand) => {
     const p = join(root, 'props', `${brand}-launch.json`);
     if (!existsSync(p)) {
       console.error(`missing base props for LaunchVideo: ${p}`);
       process.exit(1);
     }
     return p;
-  }
-  const direct = join(root, 'props', `${brand}-social-launch.json`);
-  if (existsSync(direct)) return direct;
-  const match = readdirSync(join(root, 'props')).find(
-    (f) => f.startsWith(`${brand}-social-`) && f.endsWith('.json'),
-  );
-  if (!match) {
-    console.error(`missing base props for SocialClip (${brand}-social-*.json)`);
+  },
+  SocialClip: (root, brand) => {
+    const direct = join(root, 'props', `${brand}-social-launch.json`);
+    if (existsSync(direct)) return direct;
+    const match = readdirSync(join(root, 'props')).find(
+      (f) => f.startsWith(`${brand}-social-`) && f.endsWith('.json'),
+    );
+    if (!match) {
+      console.error(`missing base props for SocialClip (${brand}-social-*.json)`);
+      process.exit(1);
+    }
+    return join(root, 'props', match);
+  },
+  MotionVariant: (root, brand, postId) => {
+    const p = join(root, 'props', postId ? `${brand}-post-${postId}.json` : `${brand}-motion.json`);
+    if (!existsSync(p)) {
+      console.error(`missing base props for MotionVariant: ${p}`);
+      process.exit(1);
+    }
+    return p;
+  },
+};
+
+export function resolveBaseProps(root, brand, comp, postId) {
+  const resolver = BASE_PROPS_RESOLVERS[comp];
+  if (!resolver) {
+    console.error(`no base props resolver for composition: ${comp}`);
     process.exit(1);
   }
-  return join(root, 'props', match);
+  return resolver(root, brand, postId);
 }
 
 // Per-composition base props cache, keyed by comp, so repeated platform rows for
 // the same comp don't re-read the file from disk.
-export function makeBaseLoader(root, brand) {
+export function makeBaseLoader(root, brand, postId) {
   const cache = new Map();
   return (comp) => {
-    if (!cache.has(comp)) cache.set(comp, JSON.parse(readFileSync(resolveBaseProps(root, brand, comp), 'utf8')));
+    if (!cache.has(comp)) cache.set(comp, JSON.parse(readFileSync(resolveBaseProps(root, brand, comp, postId), 'utf8')));
     return cache.get(comp);
   };
 }
@@ -43,4 +64,12 @@ export function makeBaseLoader(root, brand) {
 // Merges the formatWidth/formatHeight override into a composition's base props.
 export function withFormat(base, width, height) {
   return {...base, formatWidth: width, formatHeight: height};
+}
+
+// LaunchVideo's established poster frame differs by caller; all other frames
+// are composition-wide defaults shared by the matrix and thumbnail scripts.
+export function stillFrameForComposition(comp, launchVideoFrame) {
+  if (comp === 'LaunchVideo') return launchVideoFrame;
+  if (comp === 'MotionVariant') return 140;
+  return 40;
 }

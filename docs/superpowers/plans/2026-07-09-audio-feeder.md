@@ -1,5 +1,9 @@
 # Audio Feeder + Remotion Audio Implementation Plan
 
+> **Historical note:** this plan predates the later slim of the studio to
+> synthacon-only. References to noban, dashclaw, or paperroute below are
+> historical and describe brands that have since been removed from the repo.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** ElevenLabs voiceover + music feeder, an audio manifest contract, ducking math, a SoundTrack component wired into LaunchVideo, the noban audio build, and the audio-track user skill — ending with the launch video re-rendered with sound for user approval.

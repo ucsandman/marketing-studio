@@ -3,9 +3,9 @@
  * ComfyUI feeder client. NON-LOAD-BEARING: if the server is unreachable the
  * studio falls back to procedural backgrounds (documented fallback, exit 2).
  *
- * Usage: node feeders/comfy/client.mjs hero [--out DIR] [--seed N]
+ * Usage: node feeders/comfy/client.mjs hero [--workflow NAME] [--out DIR] [--seed N]
  */
-import {mkdirSync, readFileSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {dirname, join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {randomUUID} from 'node:crypto';
@@ -53,7 +53,7 @@ const probe = async () => {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const runHero = async (outDir, seed) => {
+const runHero = async (outDir, seed, WORKFLOW = 'synthacon') => {
   const base = await probe();
   if (!base) {
     console.error(
@@ -73,7 +73,15 @@ const runHero = async (outDir, seed) => {
   }
   console.log(`checkpoint: ${checkpoint}`);
 
-  const template = readFileSync(join(HERE, 'workflows', 'noban-hero.json'), 'utf8');
+  // Workflow graphs are per-brand and live in workflows/<brand>-hero.json. None
+  // ship in-repo today (the noban graph went with the synthacon-only slim), so
+  // this fails loudly rather than silently rendering the wrong brand's hero.
+  const workflowPath = join(HERE, 'workflows', `${WORKFLOW}-hero.json`);
+  if (!existsSync(workflowPath)) {
+    console.error(`no ComfyUI workflow at ${workflowPath}; author it or pass --workflow <name>`);
+    process.exit(1);
+  }
+  const template = readFileSync(workflowPath, 'utf8');
   const graph = fillTemplate(template, {
     CHECKPOINT: checkpoint,
     POSITIVE,
@@ -125,12 +133,13 @@ const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(imp
 if (isMain) {
   const args = process.argv.slice(2);
   if (args[0] !== 'hero') {
-    console.error('usage: node feeders/comfy/client.mjs hero [--out DIR] [--seed N]');
+    console.error('usage: node feeders/comfy/client.mjs hero [--workflow NAME] [--out DIR] [--seed N]');
     process.exit(1);
   }
   const outIdx = args.indexOf('--out');
   const seedIdx = args.indexOf('--seed');
-  const outDir = outIdx >= 0 ? resolve(args[outIdx + 1]) : join(ROOT, 'assets', 'noban', 'comfy');
+  const wfIdx = args.indexOf('--workflow');
+  const outDir = outIdx >= 0 ? resolve(args[outIdx + 1]) : join(ROOT, 'assets', 'synthacon', 'comfy');
   const seed = seedIdx >= 0 ? Number(args[seedIdx + 1]) : 47;
-  await runHero(outDir, seed);
+  await runHero(outDir, seed, wfIdx >= 0 ? args[wfIdx + 1] : 'synthacon');
 }
