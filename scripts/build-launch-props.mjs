@@ -116,7 +116,7 @@ const BRANDS = {
   // em dashes.
   phoneclaude: (demo) => ({
     brandId: 'phoneclaude',
-    kicker: 'github.com/ucsandman/phone-claude',
+    kicker: 'github.com/ucsandman/sidetap',
     headline: 'Drive a real iPhone from Windows',
     demo: {video: demo.video, telemetry: demo.telemetry},
     // Feature stills are cropped from the approved demo capture by

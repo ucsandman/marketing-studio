@@ -29,7 +29,7 @@ const shouldForce = (id) => forceAll || (forceIds?.has(id) ?? false);
 // Spoken copy: terse, technical, honest narrator voice; no hype, no em dashes.
 // Text mirrors out/phoneclaude/marketing/brief.json's narration array verbatim.
 const LINES = [
-  {id: 'logo', text: 'phone claude.'},
+  {id: 'logo', text: 'sidetap.'},
   {id: 'hook', text: 'This is a real iPhone, driven from Windows. No Mac. No jailbreak.'},
   {
     id: 'demo',

@@ -1,8 +1,8 @@
 {
   "id": "phoneclaude",
-  "name": "phone-claude",
+  "name": "sidetap",
   "tagline": "Your iPhone, driven from Windows",
-  "url": "github.com/ucsandman/phone-claude",
+  "url": "github.com/ucsandman/sidetap",
   "colors": {
     "bg": "#101418",
     "surface": "#1a2129",
@@ -43,5 +43,5 @@
     "settle": 0.3,
     "textReveal": "charStagger"
   },
-  "voice": "A hacker tool that gives an agent real hands on a real iPhone. Terse, technical, honest about limits. Verbs: see, tap, type, drive. Blue #4493f8 is the action color (taps, links, the mark). Red #f85149 is the STOP kill switch ONLY, never decoration. Green #3fb950 means a passing check, nothing else. Wordmark is lowercase 'phone-claude'. Terminal aesthetic: mono type for commands, charStagger reveals read as typing. No hype, no em dashes, no consumer-gadget gloss, not crypto, not generic SaaS."
+  "voice": "A hacker tool that gives an agent real hands on a real iPhone. Terse, technical, honest about limits. Verbs: see, tap, type, drive. Blue #4493f8 is the action color (taps, links, the mark). Red #f85149 is the STOP kill switch ONLY, never decoration. Green #3fb950 means a passing check, nothing else. Wordmark is lowercase 'sidetap'. Terminal aesthetic: mono type for commands, charStagger reveals read as typing. No hype, no em dashes, no consumer-gadget gloss, not crypto, not generic SaaS."
 }

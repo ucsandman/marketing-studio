@@ -1,6 +1,6 @@
 {
   "brandId": "phoneclaude",
-  "kicker": "phone-claude",
+  "kicker": "sidetap",
   "headline": "iPhone automation without a Mac used to be a dead end.",
   "lines": [
     "Exact UI element tree, not OCR guesses",
@@ -8,7 +8,7 @@
     "Live viewer streams the phone in your browser"
   ],
   "screenshot": "phoneclaude/feature-tree.png",
-  "cta": "phone-claude drives a real iPhone from Windows over USB.",
+  "cta": "sidetap drives a real iPhone from Windows over USB.",
   "command": null,
   "video": "phoneclaude/social-linkedin-open.webm"
 }

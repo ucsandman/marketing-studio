@@ -33,7 +33,7 @@ const baseProps = {
   // Runnable text -- must stay verbatim lowercase, never run through the
   // uppercased cta line (git is case sensitive). Rendered on its own
   // non-transformed mono chip. Mirrors render-costclaw-statics.mjs.
-  command: 'git clone github.com/ucsandman/phone-claude',
+  command: 'git clone github.com/ucsandman/sidetap',
   heroImage: null,
   loopSequence: null,
   loopFrames: 1,
