@@ -51,6 +51,7 @@ import {existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, w
 import {fileURLToPath} from 'node:url';
 import {basename, dirname, join, resolve} from 'node:path';
 import {makeBaseLoader, withFormat} from './lib/matrix-props.mjs';
+import {matchBudget} from './check-budgets.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -156,6 +157,38 @@ const remuxFaststart = (mp4Path) => {
   renameSync(tmpPath, mp4Path);
 };
 
+// A rendered mp4 that lands OVER its check-budgets.mjs cap (real captured footage
+// in the source, e.g. a raw-motion demo act, encodes far heavier than the mostly
+// static/vector content the default render settings were sized for) gets a single
+// bitrate-targeted re-encode to fit, instead of blocking delivery. One-pass ABR
+// with a maxrate/bufsize cap converges close enough to its target average bitrate
+// over a multi-second clip; a 10% margin below the byte cap absorbs container
+// overhead and rate-control variance. Audio is fixed at 128kbps AAC. Never called
+// for files already under budget, so passing brands' output stays byte-identical.
+const reencodeToBudget = (mp4Path, maxBytes) => {
+  const durationOut = execSync(
+    `npx remotion ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${mp4Path}"`,
+    {cwd: studio, encoding: 'utf8'},
+  );
+  const durationS = parseFloat(durationOut.trim());
+  const audioBps = 128_000;
+  const totalTargetBps = Math.floor((maxBytes * 8 * 0.9) / durationS);
+  const videoBps = Math.max(totalTargetBps - audioBps, 200_000);
+  const tmpPath = `${mp4Path}.budget.tmp.mp4`;
+  execSync(
+    `npx remotion ffmpeg -y -i "${mp4Path}" -c:v libx264 -preset slow ` +
+      `-b:v ${videoBps} -maxrate ${Math.round(videoBps * 1.15)} -bufsize ${videoBps * 2} ` +
+      `-c:a aac -b:a 128k -movflags +faststart "${tmpPath}"`,
+    {cwd: studio, stdio: 'inherit'},
+  );
+  if (!existsSync(tmpPath)) {
+    console.error(`FAILED: budget re-encode did not produce ${tmpPath}`);
+    process.exit(1);
+  }
+  unlinkSync(mp4Path);
+  renameSync(tmpPath, mp4Path);
+};
+
 // Transcode an mp4 to VP9/Opus webm alongside it. Only called when webmSupported.
 const transcodeWebm = (mp4Path, webmPath) => {
   execSync(
@@ -187,6 +220,14 @@ const renderVariant = (id, comp, width, height, props) => {
 
   if (!stillsOnly) {
     remuxFaststart(outFile);
+    const budget = matchBudget(outFile);
+    if (budget && statSync(outFile).size > budget.maxBytes) {
+      const beforeMb = (statSync(outFile).size / (1024 * 1024)).toFixed(2);
+      console.log(`matrix: ${id} OVER budget (${beforeMb}MB > ${(budget.maxBytes / (1024 * 1024)).toFixed(2)}MB, ${budget.label}) — re-encoding to fit`);
+      reencodeToBudget(outFile, budget.maxBytes);
+      remuxFaststart(outFile);
+      console.log(`matrix: ${id} re-encoded to ${(statSync(outFile).size / (1024 * 1024)).toFixed(2)}MB`);
+    }
     if (webmFlag && webmSupported) {
       const webmFile = join(outDir, `${id}.webm`);
       const webmBytes = transcodeWebm(outFile, webmFile);

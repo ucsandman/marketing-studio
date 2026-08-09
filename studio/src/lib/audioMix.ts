@@ -99,6 +99,8 @@ export const SFX_SRC: Record<SfxKind, string> = {
   whoosh: 'sfx/whoosh.mp3',
   tick: 'sfx/tick.mp3',
   riser: 'sfx/riser.mp3',
+  'paper-tick': 'sfx/paper-tick.mp3',
+  clunk: 'sfx/clunk.mp3',
 };
 
 // Cue volumes sit under full-scale VO (VO Audios play at 1.0) and track the music
@@ -109,6 +111,11 @@ export const SFX_VOLUME: Record<SfxKind, number> = {
   whoosh: SFX_TRANSITION,
   riser: SFX_TRANSITION,
   tick: DUCKED,
+  // Fold beat + count-lock: both sit at the ducked-music floor, same as tick — quiet
+  // accents, never competing with the narration (direction.md: "soft paper tick",
+  // "single low clunk").
+  'paper-tick': DUCKED,
+  clunk: DUCKED,
 };
 
 export type SfxLayer = {src: string; frame: number; volume: number};

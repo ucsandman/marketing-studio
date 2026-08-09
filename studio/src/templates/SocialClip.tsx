@@ -27,6 +27,11 @@ export const socialClipSchema = z.object({
   // act so the clip opens on the product moving rather than static text. Nullable
   // so every existing social clip prop file (no video) renders byte-identical.
   video: z.string().nullable().default(null),
+  // Where in the source footage (in composition frames, i.e. seconds * fps) the
+  // video Sequence starts from. Nullable so existing video clips (tuned against
+  // the old hardcoded 120) render byte-identical; only a brand whose money-shot
+  // moment lands elsewhere needs to set this.
+  videoStartFrame: z.number().int().nonnegative().nullable().default(null),
   // Burn VO lines into on-screen captions for muted autoplay. SocialClip has no
   // audio track, so caption text arrives via the optional `voLines` prop (the
   // props builder is the sole writer, only when audio props exist). Default
@@ -54,6 +59,7 @@ export const SocialClip: React.FC<Props> = ({
   cta,
   command,
   video,
+  videoStartFrame,
   burnCaptions,
   voLines,
 }) => {
@@ -81,10 +87,11 @@ export const SocialClip: React.FC<Props> = ({
             <OffthreadVideo
               src={staticFile(video)}
               muted
-              // 4s into the raw capture: past the blank prompt, into the scrolling
+              // Default 120 (4s in): past the blank prompt, into the scrolling
               // report body (the recoverable-spend line itself passes through),
               // so the opening motion is legible content, not empty terminal.
-              startFrom={120}
+              // `videoStartFrame` overrides this per brand for a different money shot.
+              startFrom={videoStartFrame ?? 120}
               style={{width: '100%', height: '100%', objectFit: 'cover', display: 'block'}}
             />
             {/* Paper-toned scrim: keeps the opening headline legible over moving

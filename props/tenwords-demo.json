@@ -1,0 +1,127 @@
+{
+  "brandId": "tenwords",
+  "video": "tenwords/demo.mp4",
+  "cta": "Condense any long page at tenwords.io",
+  "telemetry": {
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "durationMs": 55177,
+    "events": [
+      {
+        "type": "step",
+        "t": 0,
+        "label": "A real article. Every paragraph runs long."
+      },
+      {
+        "type": "click",
+        "t": 15,
+        "x": 278,
+        "y": 112
+      },
+      {
+        "type": "focus",
+        "t": 2660,
+        "x": 738,
+        "y": 380,
+        "w": 1036,
+        "h": 440
+      },
+      {
+        "type": "step",
+        "t": 7663,
+        "label": "One shortcut hands the whole page to TenWords."
+      },
+      {
+        "type": "focus",
+        "t": 7663,
+        "x": 720,
+        "y": 450,
+        "w": 1440,
+        "h": 900
+      },
+      {
+        "type": "step",
+        "t": 9913,
+        "label": "It reads every paragraph before anything changes."
+      },
+      {
+        "type": "step",
+        "t": 18331,
+        "label": "Every paragraph folds to exactly ten words."
+      },
+      {
+        "type": "step",
+        "t": 22645,
+        "label": "A red pilcrow marks where each one was."
+      },
+      {
+        "type": "focus",
+        "t": 23355,
+        "x": 738,
+        "y": 339,
+        "w": 1052,
+        "h": 314
+      },
+      {
+        "type": "step",
+        "t": 27768,
+        "label": "The whole article gets one ten-word line."
+      },
+      {
+        "type": "focus",
+        "t": 27768,
+        "x": 720,
+        "y": 450,
+        "w": 1440,
+        "h": 900
+      },
+      {
+        "type": "step",
+        "t": 33385,
+        "label": "The rest of the page reads the same way."
+      },
+      {
+        "type": "focus",
+        "t": 34088,
+        "x": 738,
+        "y": 529,
+        "w": 1052,
+        "h": 555
+      },
+      {
+        "type": "step",
+        "t": 38490,
+        "label": "Skim it all at ten words a paragraph."
+      },
+      {
+        "type": "focus",
+        "t": 38490,
+        "x": 720,
+        "y": 450,
+        "w": 1440,
+        "h": 900
+      },
+      {
+        "type": "step",
+        "t": 48524,
+        "label": "One click brings the original article back."
+      },
+      {
+        "type": "focus",
+        "t": 48524,
+        "x": 720,
+        "y": 450,
+        "w": 1440,
+        "h": 900
+      },
+      {
+        "type": "click",
+        "t": 49933,
+        "x": 1352,
+        "y": 27
+      }
+    ]
+  }
+}

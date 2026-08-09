@@ -3,7 +3,7 @@ import {Html5Audio, Sequence, staticFile, useVideoConfig} from 'remotion';
 import type {AudioManifest} from '../lib/audioMix';
 import {duckedVolume, resolveSfxLayers, voWindows} from '../lib/audioMix';
 import type {Motion} from '../lib/motion';
-import {sfxCues} from '../lib/sfxCues';
+import {sfxCues, type SfxCue} from '../lib/sfxCues';
 
 export const SoundTrack: React.FC<{
   audio: AudioManifest;
@@ -12,14 +12,19 @@ export const SoundTrack: React.FC<{
   // counts per feature drive the tick cues; motion aligns them to FeaturePanel stagger.
   featureLineCounts?: number[];
   motion?: Motion;
-}> = ({audio, timing, featureLineCounts = [], motion}) => {
+  // Quiet-register override: when set, these cues replace sfxCues()'s whoosh/tick/
+  // riser table wholesale (still gated on audio.sfx.enabled below). A brand whose
+  // direction forbids hard-cut transitions passes its own cues (e.g. foldCues());
+  // every brand that doesn't pass this renders through the unchanged default path.
+  cueOverride?: SfxCue[];
+}> = ({audio, timing, featureLineCounts = [], motion, cueOverride}) => {
   const {durationInFrames} = useVideoConfig();
   const windows = voWindows(audio.lines, timing);
   // Gate on the manifest flag (set by the builder only when the sfx library is staged);
   // cue frames are derived here from launchTiming, never stored in the manifest.
   const sfxLayers =
     audio.sfx?.enabled && motion
-      ? resolveSfxLayers(sfxCues(timing, featureLineCounts, motion), () => true)
+      ? resolveSfxLayers(cueOverride ?? sfxCues(timing, featureLineCounts, motion), () => true)
       : [];
   return (
     <>

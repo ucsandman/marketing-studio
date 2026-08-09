@@ -51,6 +51,7 @@ export const RemotionRoot: React.FC = () => {
           cta: "Free in simulation",
           command: null,
           video: null,
+          videoStartFrame: null,
           burnCaptions: false,
           voLines: null,
         }}
@@ -117,6 +118,7 @@ export const RemotionRoot: React.FC = () => {
           motionOverride: null,
           actLengths: null,
           voTiming: null,
+          hookFold: null,
         }}
         // VO-driven act lengths (Phase B): engages only when the audio manifest
         // carries word timings, so every existing render is byte-identical. The

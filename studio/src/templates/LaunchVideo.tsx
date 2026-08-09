@@ -17,10 +17,12 @@ import {useFormat} from '../lib/layout';
 import {telemetrySchema, steps} from '../lib/telemetry';
 import {launchTiming, voTimingFrom} from '../lib/launchTiming';
 import {alignPhraseCues, alignWordCues} from '../lib/wordCues';
+import {foldCues} from '../lib/sfxCues';
 import {audioSchema} from '../lib/audioMix';
 import {BackgroundLoop} from '../components/BackgroundLoop';
 import {PngSequence} from '../components/PngSequence';
 import {Headline} from '../components/Headline';
+import {GalleyFold} from '../components/GalleyFold';
 import {FeaturePanel} from '../components/FeaturePanel';
 import {StagedScene} from '../components/StagedScene';
 import {stagedSceneSchema} from '../lib/staged';
@@ -92,6 +94,28 @@ export const launchVideoSchema = z.object({
   // Nullable, defaults null, so a normal render/smoke overrides nothing and stays
   // byte-identical — same nullable-override pattern as motionOverride above.
   actLengths: actLengthsSchema.nullable().default(null),
+  // Optional hook act that DEMONSTRATES the product's verb before the headline
+  // claims it: a real paragraph folds down to its condensed line, then the headline
+  // sets underneath (components/GalleyFold). foldOnWord / headlineOnWord name the
+  // narration words those two beats lock to; without measured word times they fall
+  // back to fractions of the act. Nullable, defaults null, so every other brand
+  // keeps the plain Headline hook act byte-identically.
+  hookFold: z
+    .object({
+      paragraph: z.string(),
+      folded: z.string(),
+      foldOnWord: z.string().nullable().default(null),
+      headlineOnWord: z.string().nullable().default(null),
+      accentWord: z.string().nullable().default(null),
+      // Act-local frames used ONLY while the narration has no measured word times
+      // (no manifest, or a manifest without `words`). A measured cue always wins, so
+      // the film re-locks itself to the voice the moment the VO exists, with no
+      // props edit. Absent, the beats fall back to fractions of the act.
+      foldFrame: z.number().int().nonnegative().nullable().default(null),
+      headlineFrame: z.number().int().nonnegative().nullable().default(null),
+    })
+    .nullable()
+    .default(null),
   // Optional force switch for VO-driven act lengths (lib/launchTiming's voTimingFrom
   // `force`): true pins act lengths to the measured VO even with no word timings,
   // false pins the shared constants. Nullable, defaults null = auto, which engages
@@ -160,11 +184,27 @@ const HookAct: React.FC<{
   len: number;
   brand: Brand;
   cueFrames?: (number | null)[];
-}> = ({kicker, headline, len, brand, cueFrames}) => {
+  fold?: Props['hookFold'];
+  foldFrame?: number;
+  headlineFrame?: number;
+}> = ({kicker, headline, len, brand, cueFrames, fold, foldFrame, headlineFrame}) => {
   const fade = useActFade(len);
   return (
     <AbsoluteFill style={{opacity: fade}}>
-      <Headline kicker={kicker} headline={headline} brand={brand} cueFrames={cueFrames} />
+      {fold ? (
+        <GalleyFold
+          kicker={kicker}
+          paragraph={fold.paragraph}
+          folded={fold.folded}
+          headline={headline}
+          brand={brand}
+          foldFrame={foldFrame ?? fold.foldFrame ?? Math.round(len * 0.42)}
+          headlineFrame={headlineFrame ?? fold.headlineFrame ?? Math.round(len * 0.66)}
+          accentWord={fold.accentWord ?? undefined}
+        />
+      ) : (
+        <Headline kicker={kicker} headline={headline} brand={brand} cueFrames={cueFrames} />
+      )}
     </AbsoluteFill>
   );
 };
@@ -252,7 +292,7 @@ const FeatureAct: React.FC<{
   );
 };
 
-export const LaunchVideo: React.FC<Props> = ({brandId, kicker, headline, demo, features, cta, command, assets, audio, burnCaptions, motionOverride, actLengths, voTiming}) => {
+export const LaunchVideo: React.FC<Props> = ({brandId, kicker, headline, demo, features, cta, command, assets, audio, burnCaptions, motionOverride, actLengths, voTiming, hookFold}) => {
   const frame = useCurrentFrame();
   const {durationInFrames, fps} = useVideoConfig();
   const {orientation, scale, safe} = useFormat();
@@ -276,6 +316,15 @@ export const LaunchVideo: React.FC<Props> = ({brandId, kicker, headline, demo, f
   };
   const hookLine = cueLine('hook');
   const hookCues = hookLine ? alignWordCues(headline.split(' '), hookLine, fps) : undefined;
+  // The fold and the headline are two HITS inside one narration line, so they are
+  // aligned in a SINGLE in-order pass: a separate call per beat would let the
+  // headline's word match an earlier occurrence than the fold's.
+  const foldBeats =
+    hookFold && hookLine
+      ? alignPhraseCues([hookFold.foldOnWord ?? '', hookFold.headlineOnWord ?? ''], hookLine, fps, {
+          leadFrames: 0,
+        })
+      : [null, null];
   // Three depth planes for the flat comp: the loop backdrop drifts most (far), the
   // wash sits mid, act content drifts least (near). Per-layer seeds keep the planes
   // from drifting in lockstep. At motion.parallax 0 every transform is '' and the
@@ -316,7 +365,16 @@ export const LaunchVideo: React.FC<Props> = ({brandId, kicker, headline, demo, f
         </Sequence>
         <Sequence from={t.hook.from} durationInFrames={t.hook.len}>
           <ActContainer motion={m}>
-            <HookAct kicker={kicker} headline={headline} len={t.hook.len} brand={brand} cueFrames={hookCues} />
+            <HookAct
+              kicker={kicker}
+              headline={headline}
+              len={t.hook.len}
+              brand={brand}
+              cueFrames={hookCues}
+              fold={hookFold}
+              foldFrame={foldBeats[0] ?? undefined}
+              headlineFrame={foldBeats[1] ?? undefined}
+            />
           </ActContainer>
         </Sequence>
         <Sequence from={t.demo.from} durationInFrames={t.demo.len}>
@@ -354,6 +412,11 @@ export const LaunchVideo: React.FC<Props> = ({brandId, kicker, headline, demo, f
           // nothing: report 0 display units for it.
           featureLineCounts={features.map((f) => (f.staged ? 0 : f.lines.length))}
           motion={m}
+          // hookFold brands (quiet register, no hard-cut whoosh/riser): replace the
+          // default cue table with the two fold-word-locked beats — a soft tick on
+          // the fold, a low clunk on the count landing. Every brand without hookFold
+          // keeps the default sfxCues() path, unchanged.
+          cueOverride={hookFold ? foldCues(t.hook.from, foldBeats) : undefined}
         />
       ) : null}
       <div style={{position: 'absolute', bottom: Math.max(Math.round(40 * scale), safe.bottom), left: 0, right: 0, display: 'flex', justifyContent: 'center'}}>

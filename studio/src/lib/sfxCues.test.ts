@@ -1,7 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import {launchTiming} from './launchTiming';
 import {DEFAULT_MOTION} from './motion';
-import {RISER_LEAD, sfxCues} from './sfxCues';
+import {RISER_LEAD, foldCues, sfxCues} from './sfxCues';
 
 // Real noban inputs: telemetry 16085ms, 2 features of 3 benefit lines each.
 const T = launchTiming(16085, 2); // demo len = ceil(16085/1000*30)+24 = 507
@@ -56,5 +56,33 @@ describe('sfxCues', () => {
     const wide = sfxCues(T, [2, 0], {...DEFAULT_MOTION, stagger: 1}).filter((c) => c.kind === 'tick');
     // stagger 1 => staggerDelay(i,10) = i*10*(1/0.5) = i*20
     expect(wide.map((c) => c.frame)).toEqual([858, 878]); // 843+15, 843+15+20
+  });
+});
+
+describe('foldCues', () => {
+  it('places a paper-tick on the fold beat and a clunk on the headline beat, offset by the hook act start', () => {
+    const cues = foldCues(150, [40, 62]);
+    expect(cues).toEqual([
+      {kind: 'paper-tick', frame: 190},
+      {kind: 'clunk', frame: 212},
+    ]);
+  });
+
+  it('sorts by frame regardless of beat order', () => {
+    const cues = foldCues(0, [62, 40]);
+    expect(cues.map((c) => c.frame)).toEqual([40, 62]);
+  });
+
+  it('skips a null beat instead of guessing a frame', () => {
+    expect(foldCues(150, [null, 62])).toEqual([{kind: 'clunk', frame: 212}]);
+    expect(foldCues(150, [40, null])).toEqual([{kind: 'paper-tick', frame: 190}]);
+    expect(foldCues(150, [null, null])).toEqual([]);
+  });
+
+  it('emits neither whoosh, riser, nor tick — the quiet-register brands never get them', () => {
+    const kinds = new Set(foldCues(150, [40, 62]).map((c) => c.kind));
+    expect(kinds.has('whoosh')).toBe(false);
+    expect(kinds.has('riser')).toBe(false);
+    expect(kinds.has('tick')).toBe(false);
   });
 });

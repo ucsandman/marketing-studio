@@ -11,7 +11,9 @@ export const FloatBar: React.FC<{
   height?: number;
 }> = ({progress, brand, width, height = 8}) => {
   const clamped = Math.max(0, Math.min(1, progress));
-  const {brand: brandColor, profit, line, ink} = brand.colors;
+  const {line, ink} = brand.colors;
+  const fillFrom = brand.colors[brand.progressFill.from];
+  const fillTo = brand.colors[brand.progressFill.to];
   return (
     <div style={{position: 'relative', width, height}}>
       {/* track */}
@@ -20,7 +22,7 @@ export const FloatBar: React.FC<{
           position: 'absolute',
           inset: 0,
           borderRadius: height / 2,
-          background: `linear-gradient(to right, ${brandColor}, ${profit})`,
+          background: `linear-gradient(to right, ${fillFrom}, ${fillTo})`,
           opacity: 0.25,
         }}
       />
@@ -38,7 +40,7 @@ export const FloatBar: React.FC<{
           style={{
             width,
             height,
-            background: `linear-gradient(to right, ${brandColor}, ${profit})`,
+            background: `linear-gradient(to right, ${fillFrom}, ${fillTo})`,
           }}
         />
       </div>

@@ -18,12 +18,22 @@ export const CaptionTrack: React.FC<{cues: Cue[]; brand: Brand}> = ({cues, brand
   const cue = cueAt(cues, frame);
   if (!cue) return null;
 
-  const fade = interpolate(
-    frame,
-    [cue.fromFrame, cue.fromFrame + FADE, cue.toFrame - FADE, cue.toFrame],
-    [0, 1, 1, 0],
-    {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'},
-  );
+  // A cue this short (e.g. a spoken line clamped hard against a clip's end)
+  // can leave < 2*FADE frames between its edges, which would make the two
+  // interior breakpoints collide or invert — Remotion's interpolate requires
+  // a strictly increasing inputRange. Shrink the fade to fit; below 2 frames
+  // there is no room for a ramp at all, so hold full opacity for the cue.
+  const cueLen = cue.toFrame - cue.fromFrame;
+  const fadeFrames = Math.max(0, Math.min(FADE, Math.ceil(cueLen / 2) - 1));
+  const fade =
+    fadeFrames > 0
+      ? interpolate(
+          frame,
+          [cue.fromFrame, cue.fromFrame + fadeFrames, cue.toFrame - fadeFrames, cue.toFrame],
+          [0, 1, 1, 0],
+          {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'},
+        )
+      : 1;
 
   const fonts = loadBrandFonts(brand);
   const lines = splitDisplayLines(cue.text);

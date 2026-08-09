@@ -1,0 +1,747 @@
+{
+  "music": {
+    "src": "tenwords/audio/music.mp3",
+    "durationMs": 78760
+  },
+  "lines": [
+    {
+      "act": "logo",
+      "src": "tenwords/audio/logo.mp3",
+      "durationMs": 1070,
+      "text": "TenWords.",
+      "words": [
+        {
+          "w": "TenWords.",
+          "startMs": 0,
+          "endMs": 1022
+        }
+      ]
+    },
+    {
+      "act": "hook",
+      "src": "tenwords/audio/hook.mp3",
+      "durationMs": 8490,
+      "text": "Another ten thousand word read you will never finish. Then the page collapses. Ten words per paragraph.",
+      "words": [
+        {
+          "w": "Another",
+          "startMs": 0,
+          "endMs": 430
+        },
+        {
+          "w": "ten",
+          "startMs": 488,
+          "endMs": 662
+        },
+        {
+          "w": "thousand",
+          "startMs": 708,
+          "endMs": 1033
+        },
+        {
+          "w": "word",
+          "startMs": 1080,
+          "endMs": 1265
+        },
+        {
+          "w": "read",
+          "startMs": 1324,
+          "endMs": 1533
+        },
+        {
+          "w": "you",
+          "startMs": 1683,
+          "endMs": 1811
+        },
+        {
+          "w": "will",
+          "startMs": 1858,
+          "endMs": 2020
+        },
+        {
+          "w": "never",
+          "startMs": 2136,
+          "endMs": 2403
+        },
+        {
+          "w": "finish.",
+          "startMs": 2461,
+          "endMs": 2937
+        },
+        {
+          "w": "Then",
+          "startMs": 3320,
+          "endMs": 3657
+        },
+        {
+          "w": "the",
+          "startMs": 3831,
+          "endMs": 3959
+        },
+        {
+          "w": "page",
+          "startMs": 4005,
+          "endMs": 4540
+        },
+        {
+          "w": "collapses.",
+          "startMs": 4656,
+          "endMs": 5538
+        },
+        {
+          "w": "Ten",
+          "startMs": 5921,
+          "endMs": 6420
+        },
+        {
+          "w": "words",
+          "startMs": 6699,
+          "endMs": 7256
+        },
+        {
+          "w": "per",
+          "startMs": 7500,
+          "endMs": 7663
+        },
+        {
+          "w": "paragraph.",
+          "startMs": 7709,
+          "endMs": 8452
+        }
+      ]
+    },
+    {
+      "act": "demo",
+      "src": "tenwords/audio/demo.mp3",
+      "durationMs": 14860,
+      "text": "Press alt T on any article. TenWords reads every paragraph first, then the whole page folds at once. Ten words each, with a red pilcrow where the paragraph used to be, and a ten word summary of the whole article pinned to the top.",
+      "words": [
+        {
+          "w": "Press",
+          "startMs": 0,
+          "endMs": 337
+        },
+        {
+          "w": "alt",
+          "startMs": 395,
+          "endMs": 650
+        },
+        {
+          "w": "T",
+          "startMs": 708,
+          "endMs": 917
+        },
+        {
+          "w": "on",
+          "startMs": 1126,
+          "endMs": 1242
+        },
+        {
+          "w": "any",
+          "startMs": 1324,
+          "endMs": 1533
+        },
+        {
+          "w": "article.",
+          "startMs": 1602,
+          "endMs": 2159
+        },
+        {
+          "w": "TenWords",
+          "startMs": 2543,
+          "endMs": 3123
+        },
+        {
+          "w": "reads",
+          "startMs": 3181,
+          "endMs": 3413
+        },
+        {
+          "w": "every",
+          "startMs": 3495,
+          "endMs": 3785
+        },
+        {
+          "w": "paragraph",
+          "startMs": 3831,
+          "endMs": 4342
+        },
+        {
+          "w": "first,",
+          "startMs": 4389,
+          "endMs": 4923
+        },
+        {
+          "w": "then",
+          "startMs": 5097,
+          "endMs": 5259
+        },
+        {
+          "w": "the",
+          "startMs": 5306,
+          "endMs": 5375
+        },
+        {
+          "w": "whole",
+          "startMs": 5422,
+          "endMs": 5619
+        },
+        {
+          "w": "page",
+          "startMs": 5654,
+          "endMs": 6026
+        },
+        {
+          "w": "folds",
+          "startMs": 6072,
+          "endMs": 6362
+        },
+        {
+          "w": "at",
+          "startMs": 6397,
+          "endMs": 6467
+        },
+        {
+          "w": "once.",
+          "startMs": 6536,
+          "endMs": 7012
+        },
+        {
+          "w": "Ten",
+          "startMs": 7338,
+          "endMs": 7639
+        },
+        {
+          "w": "words",
+          "startMs": 7709,
+          "endMs": 7999
+        },
+        {
+          "w": "each,",
+          "startMs": 8081,
+          "endMs": 8464
+        },
+        {
+          "w": "with",
+          "startMs": 8533,
+          "endMs": 8707
+        },
+        {
+          "w": "a",
+          "startMs": 8742,
+          "endMs": 8766
+        },
+        {
+          "w": "red",
+          "startMs": 8835,
+          "endMs": 9009
+        },
+        {
+          "w": "pilcrow",
+          "startMs": 9079,
+          "endMs": 9601
+        },
+        {
+          "w": "where",
+          "startMs": 9648,
+          "endMs": 9787
+        },
+        {
+          "w": "the",
+          "startMs": 9810,
+          "endMs": 9880
+        },
+        {
+          "w": "paragraph",
+          "startMs": 9915,
+          "endMs": 10391
+        },
+        {
+          "w": "used",
+          "startMs": 10449,
+          "endMs": 10623
+        },
+        {
+          "w": "to",
+          "startMs": 10646,
+          "endMs": 10693
+        },
+        {
+          "w": "be,",
+          "startMs": 10751,
+          "endMs": 11122
+        },
+        {
+          "w": "and",
+          "startMs": 11331,
+          "endMs": 11471
+        },
+        {
+          "w": "a",
+          "startMs": 11529,
+          "endMs": 11552
+        },
+        {
+          "w": "ten",
+          "startMs": 11610,
+          "endMs": 11842
+        },
+        {
+          "w": "word",
+          "startMs": 11900,
+          "endMs": 12121
+        },
+        {
+          "w": "summary",
+          "startMs": 12190,
+          "endMs": 12562
+        },
+        {
+          "w": "of",
+          "startMs": 12608,
+          "endMs": 12666
+        },
+        {
+          "w": "the",
+          "startMs": 12713,
+          "endMs": 12783
+        },
+        {
+          "w": "whole",
+          "startMs": 12841,
+          "endMs": 13084
+        },
+        {
+          "w": "article",
+          "startMs": 13131,
+          "endMs": 13549
+        },
+        {
+          "w": "pinned",
+          "startMs": 13607,
+          "endMs": 13874
+        },
+        {
+          "w": "to",
+          "startMs": 13897,
+          "endMs": 13944
+        },
+        {
+          "w": "the",
+          "startMs": 14002,
+          "endMs": 14071
+        },
+        {
+          "w": "top.",
+          "startMs": 14106,
+          "endMs": 14814
+        }
+      ]
+    },
+    {
+      "act": "feature-0",
+      "src": "tenwords/audio/feature-0.mp3",
+      "durationMs": 6400,
+      "text": "The ten word guarantee is enforced in code. It counts every word, so you never have to check its work.",
+      "words": [
+        {
+          "w": "The",
+          "startMs": 0,
+          "endMs": 163
+        },
+        {
+          "w": "ten",
+          "startMs": 221,
+          "endMs": 430
+        },
+        {
+          "w": "word",
+          "startMs": 488,
+          "endMs": 708
+        },
+        {
+          "w": "guarantee",
+          "startMs": 755,
+          "endMs": 1405
+        },
+        {
+          "w": "is",
+          "startMs": 1486,
+          "endMs": 1614
+        },
+        {
+          "w": "enforced",
+          "startMs": 1672,
+          "endMs": 2113
+        },
+        {
+          "w": "in",
+          "startMs": 2159,
+          "endMs": 2229
+        },
+        {
+          "w": "code.",
+          "startMs": 2310,
+          "endMs": 2833
+        },
+        {
+          "w": "It",
+          "startMs": 3077,
+          "endMs": 3204
+        },
+        {
+          "w": "counts",
+          "startMs": 3262,
+          "endMs": 3553
+        },
+        {
+          "w": "every",
+          "startMs": 3646,
+          "endMs": 3936
+        },
+        {
+          "w": "word,",
+          "startMs": 3994,
+          "endMs": 4423
+        },
+        {
+          "w": "so",
+          "startMs": 4540,
+          "endMs": 4656
+        },
+        {
+          "w": "you",
+          "startMs": 4714,
+          "endMs": 4795
+        },
+        {
+          "w": "never",
+          "startMs": 4853,
+          "endMs": 5027
+        },
+        {
+          "w": "have",
+          "startMs": 5074,
+          "endMs": 5213
+        },
+        {
+          "w": "to",
+          "startMs": 5236,
+          "endMs": 5283
+        },
+        {
+          "w": "check",
+          "startMs": 5329,
+          "endMs": 5515
+        },
+        {
+          "w": "its",
+          "startMs": 5561,
+          "endMs": 5677
+        },
+        {
+          "w": "work.",
+          "startMs": 5724,
+          "endMs": 6362
+        }
+      ]
+    },
+    {
+      "act": "feature-1",
+      "src": "tenwords/audio/feature-1.mp3",
+      "durationMs": 7760,
+      "text": "Your key stays in your browser. No middle server, no analytics. A long article costs about a tenth of a cent.",
+      "words": [
+        {
+          "w": "Your",
+          "startMs": 0,
+          "endMs": 221
+        },
+        {
+          "w": "key",
+          "startMs": 290,
+          "endMs": 511
+        },
+        {
+          "w": "stays",
+          "startMs": 580,
+          "endMs": 859
+        },
+        {
+          "w": "in",
+          "startMs": 894,
+          "endMs": 952
+        },
+        {
+          "w": "your",
+          "startMs": 998,
+          "endMs": 1103
+        },
+        {
+          "w": "browser.",
+          "startMs": 1138,
+          "endMs": 1730
+        },
+        {
+          "w": "No",
+          "startMs": 1974,
+          "endMs": 2183
+        },
+        {
+          "w": "middle",
+          "startMs": 2264,
+          "endMs": 2531
+        },
+        {
+          "w": "server,",
+          "startMs": 2566,
+          "endMs": 3065
+        },
+        {
+          "w": "no",
+          "startMs": 3274,
+          "endMs": 3541
+        },
+        {
+          "w": "analytics.",
+          "startMs": 3657,
+          "endMs": 4493
+        },
+        {
+          "w": "A",
+          "startMs": 4818,
+          "endMs": 4899
+        },
+        {
+          "w": "long",
+          "startMs": 5016,
+          "endMs": 5341
+        },
+        {
+          "w": "article",
+          "startMs": 5410,
+          "endMs": 5782
+        },
+        {
+          "w": "costs",
+          "startMs": 5828,
+          "endMs": 6118
+        },
+        {
+          "w": "about",
+          "startMs": 6153,
+          "endMs": 6339
+        },
+        {
+          "w": "a",
+          "startMs": 6374,
+          "endMs": 6397
+        },
+        {
+          "w": "tenth",
+          "startMs": 6467,
+          "endMs": 6803
+        },
+        {
+          "w": "of",
+          "startMs": 6850,
+          "endMs": 6908
+        },
+        {
+          "w": "a",
+          "startMs": 6954,
+          "endMs": 6978
+        },
+        {
+          "w": "cent.",
+          "startMs": 7024,
+          "endMs": 7709
+        }
+      ]
+    },
+    {
+      "act": "feature-2",
+      "src": "tenwords/audio/feature-2.mp3",
+      "durationMs": 6690,
+      "text": "Because the page collapses in place, restore is one click. The original page comes right back.",
+      "words": [
+        {
+          "w": "Because",
+          "startMs": 0,
+          "endMs": 348
+        },
+        {
+          "w": "the",
+          "startMs": 372,
+          "endMs": 441
+        },
+        {
+          "w": "page",
+          "startMs": 488,
+          "endMs": 778
+        },
+        {
+          "w": "collapses",
+          "startMs": 824,
+          "endMs": 1300
+        },
+        {
+          "w": "in",
+          "startMs": 1347,
+          "endMs": 1416
+        },
+        {
+          "w": "place,",
+          "startMs": 1463,
+          "endMs": 2020
+        },
+        {
+          "w": "restore",
+          "startMs": 2194,
+          "endMs": 2577
+        },
+        {
+          "w": "is",
+          "startMs": 2635,
+          "endMs": 2728
+        },
+        {
+          "w": "one",
+          "startMs": 2844,
+          "endMs": 3146
+        },
+        {
+          "w": "click.",
+          "startMs": 3216,
+          "endMs": 3738
+        },
+        {
+          "w": "The",
+          "startMs": 4342,
+          "endMs": 4458
+        },
+        {
+          "w": "original",
+          "startMs": 4516,
+          "endMs": 4888
+        },
+        {
+          "w": "page",
+          "startMs": 4946,
+          "endMs": 5283
+        },
+        {
+          "w": "comes",
+          "startMs": 5329,
+          "endMs": 5561
+        },
+        {
+          "w": "right",
+          "startMs": 5677,
+          "endMs": 5909
+        },
+        {
+          "w": "back.",
+          "startMs": 5968,
+          "endMs": 6641
+        }
+      ]
+    },
+    {
+      "act": "end",
+      "src": "tenwords/audio/end.mp3",
+      "durationMs": 8070,
+      "text": "TenWords. Condense any article, restore with one click. Your reading pile, back under control. tenwords dot io.",
+      "words": [
+        {
+          "w": "TenWords.",
+          "startMs": 0,
+          "endMs": 789
+        },
+        {
+          "w": "Condense",
+          "startMs": 964,
+          "endMs": 1312
+        },
+        {
+          "w": "any",
+          "startMs": 1347,
+          "endMs": 1474
+        },
+        {
+          "w": "article,",
+          "startMs": 1521,
+          "endMs": 1974
+        },
+        {
+          "w": "restore",
+          "startMs": 2101,
+          "endMs": 2426
+        },
+        {
+          "w": "with",
+          "startMs": 2450,
+          "endMs": 2566
+        },
+        {
+          "w": "one",
+          "startMs": 2624,
+          "endMs": 2752
+        },
+        {
+          "w": "click.",
+          "startMs": 2786,
+          "endMs": 3181
+        },
+        {
+          "w": "Your",
+          "startMs": 3425,
+          "endMs": 3576
+        },
+        {
+          "w": "reading",
+          "startMs": 3622,
+          "endMs": 3855
+        },
+        {
+          "w": "pile,",
+          "startMs": 3901,
+          "endMs": 4319
+        },
+        {
+          "w": "back",
+          "startMs": 4470,
+          "endMs": 4667
+        },
+        {
+          "w": "under",
+          "startMs": 4714,
+          "endMs": 4865
+        },
+        {
+          "w": "control.",
+          "startMs": 4911,
+          "endMs": 5433
+        },
+        {
+          "w": "tenwords",
+          "startMs": 5759,
+          "endMs": 6409
+        },
+        {
+          "w": "dot",
+          "startMs": 6618,
+          "endMs": 7001
+        },
+        {
+          "w": "io.",
+          "startMs": 7210,
+          "endMs": 8034
+        }
+      ]
+    }
+  ],
+  "sfx": {
+    "enabled": true
+  }
+}

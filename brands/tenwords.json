@@ -12,13 +12,14 @@
     "ink2": "#595959",
     "ink3": "#8a8a8a",
     "brand": "#9c2f26",
-    "profit": "#9c2f26",
+    "profit": "#595959",
     "safe": "#595959",
     "loss": "#6d2620",
     "info": "#595959",
     "rare": "#9c2f26"
   },
   "textAccent": "info",
+  "progressFill": {"from": "safe", "to": "ink"},
   "fonts": {
     "display": "Source Serif 4",
     "body": "Source Serif 4",

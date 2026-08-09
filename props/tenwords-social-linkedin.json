@@ -1,0 +1,14 @@
+{
+  "brandId": "tenwords",
+  "kicker": "tenwords.io",
+  "headline": "A 10,000-word doc, skimmable in about 30 seconds.",
+  "lines": [
+    "TenWords collapses any page to ten-word paragraphs, in place.",
+    "Every count is enforced in code, never trusted from the model.",
+    "No server in the middle: your key stays in your browser."
+  ],
+  "screenshot": "tenwords/feature-restore.png",
+  "cta": "Condense any article, restore with one click",
+  "video": "tenwords/demo.mp4",
+  "videoStartFrame": 528
+}

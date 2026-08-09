@@ -6,13 +6,17 @@ import type {Motion} from './motion';
 // act table (same source of truth voWindows uses), so cue frames are never stored in
 // the audio manifest — they are recomputed at render time, exactly like voWindows.
 //
-// Three cue kinds, one reusable brand-agnostic SFX file each:
-//   whoosh — a transition swish on every hard act boundary (logo->hook, hook->demo,
-//            demo->feature, and between features)
-//   riser  — a rising build that leads into the end-card CTA
-//   tick   — a soft UI blip on each feature benefit-line reveal
+// Five cue kinds, one reusable SFX file each:
+//   whoosh     — a transition swish on every hard act boundary (logo->hook, hook->demo,
+//                demo->feature, and between features)
+//   riser      — a rising build that leads into the end-card CTA
+//   tick       — a soft UI blip on each feature benefit-line reveal
+//   paper-tick — a quiet paper tick, used by foldCues() below for a fold beat
+//   clunk      — a single low clunk, used by foldCues() below for a count-lock beat
+// whoosh/riser/tick are brand-agnostic (used by sfxCues()); paper-tick/clunk are for
+// quiet-register brands whose direction forbids whoosh/riser (used by foldCues()).
 
-export type SfxKind = 'whoosh' | 'tick' | 'riser';
+export type SfxKind = 'whoosh' | 'tick' | 'riser' | 'paper-tick' | 'clunk';
 export type SfxCue = {kind: SfxKind; frame: number};
 
 type Timing = {logo: Act; hook: Act; demo: Act; features: Act[]; end: Act};
@@ -55,5 +59,19 @@ export const sfxCues = (
   // riser building into the end-card CTA.
   cues.push({kind: 'riser', frame: timing.end.from - RISER_LEAD});
 
+  return cues.sort((a, b) => a.frame - b.frame);
+};
+
+// Quiet-register alternative to sfxCues(): no whoosh (hard-cut transitions), no riser
+// (CTA build) — just the two beats a "narration leads, music is a bed" direction asks
+// for. `hookFrom` is the hook act's absolute start frame (timing.hook.from); `beats`
+// is the [foldFrame, headlineFrame] pair LaunchVideo already computes via
+// alignPhraseCues for GalleyFold (word-locked to the fold word and the count word), so
+// the tick lands exactly on the paper fold and the clunk exactly on the count landing.
+// A null beat (no word-cued hook line) is skipped rather than guessed.
+export const foldCues = (hookFrom: number, beats: (number | null)[]): SfxCue[] => {
+  const cues: SfxCue[] = [];
+  if (beats[0] != null) cues.push({kind: 'paper-tick', frame: hookFrom + beats[0]});
+  if (beats[1] != null) cues.push({kind: 'clunk', frame: hookFrom + beats[1]});
   return cues.sort((a, b) => a.frame - b.frame);
 };

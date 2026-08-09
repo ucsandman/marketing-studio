@@ -106,6 +106,16 @@ export const brandSchema = z.object({
   // forbids clay (colors.brand) from ever carrying text (graphic-only, and it
   // fails contrast on white), so colored text uses its umber tone instead.
   textAccent: z.enum(['brand', 'profit', 'safe', 'loss', 'info', 'rare']).default('brand'),
+  // Progress-fill gradient tokens for FloatBar. Defaults reproduce the legacy
+  // hardcoded brand->profit gradient, so a brand that omits this renders
+  // byte-identically. tenwords sets safe->ink: its accent budget forbids the
+  // pilcrow red on progress fills (red is the mark and small accents only).
+  progressFill: z
+    .object({
+      from: z.enum(['brand', 'profit', 'safe', 'loss', 'info', 'rare', 'ink', 'ink2', 'line']),
+      to: z.enum(['brand', 'profit', 'safe', 'loss', 'info', 'rare', 'ink', 'ink2', 'line']),
+    })
+    .default({from: 'brand', to: 'profit'}),
   voice: z.string().min(1),
 });
 
