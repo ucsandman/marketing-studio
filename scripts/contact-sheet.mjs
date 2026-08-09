@@ -5,7 +5,7 @@
 // frame-picking per asset skill.
 //
 // Usage: node scripts/contact-sheet.mjs <brand> <Comp> [--props <path>]
-//   <Comp> one of: LaunchVideo | SocialClip | LogoReveal | AnimatedOG
+//   <Comp> one of: LaunchVideo | SocialClip | ProductDemo | LogoReveal | AnimatedOG
 //
 // Frame selection:
 //   LaunchVideo   act boundaries from lib/launchTiming.ts (logo/hook/demo/
@@ -22,6 +22,7 @@
 //   SocialClip    props/<brand>-social-launch.json, else first
 //                 props/<brand>-social-*.json (same convention as
 //                 render-matrix.mjs's resolveBase)
+//   ProductDemo   props/<brand>-demo.json
 //   LogoReveal    props/<brand>-logo-reveal.json
 //   AnimatedOG    props/<brand>-og.json
 //
@@ -45,7 +46,7 @@ process.on('unhandledRejection', (reason) => {
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const studio = join(root, 'studio');
 
-const COMPS = new Set(['LaunchVideo', 'SocialClip', 'LogoReveal', 'AnimatedOG']);
+const COMPS = new Set(['LaunchVideo', 'SocialClip', 'ProductDemo', 'LogoReveal', 'AnimatedOG']);
 
 // ---- args --------------------------------------------------------------------
 const argv = process.argv.slice(2);
@@ -82,6 +83,7 @@ function resolveProps() {
     return p;
   }
   if (comp === 'LaunchVideo') return requireProps(join(root, 'props', `${brand}-launch.json`));
+  if (comp === 'ProductDemo') return requireProps(join(root, 'props', `${brand}-demo.json`));
   if (comp === 'LogoReveal') return requireProps(join(root, 'props', `${brand}-logo-reveal.json`));
   if (comp === 'AnimatedOG') return requireProps(join(root, 'props', `${brand}-og.json`));
   // SocialClip — same resolution as render-matrix.mjs's resolveBase

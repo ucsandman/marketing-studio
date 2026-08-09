@@ -4,7 +4,10 @@ import {Recorder} from './recorder.mjs';
 
 const fakeLocator = (box) => ({
   boundingBox: async () => box,
-  click: async () => {},
+  clickArgs: [],
+  async click(opts) {
+    this.clickArgs.push(opts);
+  },
 });
 
 test('records steps and clicks with monotonic relative timestamps', async () => {
@@ -22,6 +25,18 @@ test('records steps and clicks with monotonic relative timestamps', async () => 
   assert.equal(click.x, 125); // box center
   assert.equal(click.y, 210);
   assert.ok(tel.events.every((e) => e.t >= 0 && e.t <= tel.durationMs));
+});
+
+test('click with a position aims inside the element and forwards it', async () => {
+  const r = new Recorder();
+  r.start();
+  const loc = fakeLocator({x: 100, y: 200, width: 400, height: 800});
+  await r.click(loc, null, {position: {x: 40, y: 600}});
+  const tel = r.finish({width: 1600, height: 1000});
+
+  assert.equal(tel.events[0].x, 140);
+  assert.equal(tel.events[0].y, 800);
+  assert.deepEqual(loc.clickArgs[0], {position: {x: 40, y: 600}});
 });
 
 test('click throws loudly when the locator has no bounding box', async () => {

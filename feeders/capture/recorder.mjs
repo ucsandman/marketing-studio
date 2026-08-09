@@ -16,18 +16,23 @@ export class Recorder {
     this.#events.push({type: 'step', t: this.#now(), label});
   }
 
-  /** Logs the click at the locator's center, then performs the real click. */
-  async click(locator, label) {
+  /**
+   * Logs the click at the locator's center, then performs the real click.
+   * `position` (element-relative px) aims at a point inside the element instead
+   * of its center — needed for surfaces with no sub-elements to target, such as
+   * a video/image that stands in for a whole screen.
+   */
+  async click(locator, label, {position} = {}) {
     const box = await locator.boundingBox();
     if (!box) throw new Error('Recorder: locator has no bounding box (not visible?)');
     if (label) this.step(label);
     this.#events.push({
       type: 'click',
       t: this.#now(),
-      x: Math.round(box.x + box.width / 2),
-      y: Math.round(box.y + box.height / 2),
+      x: Math.round(box.x + (position ? position.x : box.width / 2)),
+      y: Math.round(box.y + (position ? position.y : box.height / 2)),
     });
-    await locator.click();
+    await locator.click(position ? {position} : undefined);
   }
 
   /** Logs a camera focus region of w x h centered at (x, y) in viewport px. */

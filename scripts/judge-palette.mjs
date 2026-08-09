@@ -21,7 +21,7 @@
 import {execFileSync} from 'node:child_process';
 import {existsSync, mkdirSync, readFileSync, writeFileSync, rmSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
-import {dirname, join, extname} from 'node:path';
+import {dirname, join, extname, resolve} from 'node:path';
 import {decodePng, quantize, rgbToHsv, hexToRgb, colorDistance} from './lib/png.mjs';
 
 process.on('unhandledRejection', (reason) => {
@@ -166,7 +166,10 @@ function main() {
   const forbiddenColors = parseForbiddenColors(brandDef.voice || '');
   const forbiddenRanges = forbiddenRangesFor(forbiddenColors);
 
-  const inputPath = existsSync(input) ? input : join(root, input);
+  // Absolute either way: extractVideoFrames shells out to ffmpeg with cwd=studio, so
+  // a cwd-relative path that exists here (the documented "run from the repo root"
+  // case) would resolve against studio/ and fail to open.
+  const inputPath = existsSync(input) ? resolve(input) : join(root, input);
   if (!existsSync(inputPath)) {
     console.error(`judge-palette: input not found: ${input}`);
     process.exit(1);

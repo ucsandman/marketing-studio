@@ -1,0 +1,216 @@
+{
+  "brandId": "phoneclaude",
+  "kicker": "github.com/ucsandman/phone-claude",
+  "headline": "Drive a real iPhone from Windows",
+  "demo": {
+    "video": "phoneclaude/demo.webm",
+    "telemetry": {
+      "viewport": {
+        "width": 1600,
+        "height": 1000
+      },
+      "durationMs": 39657,
+      "events": [
+        {
+          "type": "step",
+          "t": 1345,
+          "label": "One local page. The phone streams live, the checks sit beside it."
+        },
+        {
+          "type": "focus",
+          "t": 1345,
+          "x": 800,
+          "y": 500,
+          "w": 1026,
+          "h": 1000
+        },
+        {
+          "type": "step",
+          "t": 5256,
+          "label": "Eight checks on the USB chain. Every failure names its own fix."
+        },
+        {
+          "type": "focus",
+          "t": 5260,
+          "x": 1013,
+          "y": 409,
+          "w": 552,
+          "h": 641
+        },
+        {
+          "type": "step",
+          "t": 8266,
+          "label": "An agent drives it from a terminal. open_app, then tap_text by name."
+        },
+        {
+          "type": "focus",
+          "t": 8266,
+          "x": 540,
+          "y": 425,
+          "w": 438,
+          "h": 834
+        },
+        {
+          "type": "step",
+          "t": 15366,
+          "label": "The stream is live at about 34 frames per second."
+        },
+        {
+          "type": "focus",
+          "t": 15366,
+          "x": 540,
+          "y": 339,
+          "w": 402,
+          "h": 362
+        },
+        {
+          "type": "focus",
+          "t": 18168,
+          "x": 540,
+          "y": 425,
+          "w": 438,
+          "h": 834
+        },
+        {
+          "type": "step",
+          "t": 18180,
+          "label": "You can drive it too. Click the phone to tap it."
+        },
+        {
+          "type": "click",
+          "t": 18180,
+          "x": 402,
+          "y": 418
+        },
+        {
+          "type": "click",
+          "t": 19744,
+          "x": 402,
+          "y": 418
+        },
+        {
+          "type": "step",
+          "t": 21377,
+          "label": "Your keyboard types straight through to the phone."
+        },
+        {
+          "type": "click",
+          "t": 21377,
+          "x": 415,
+          "y": 899
+        },
+        {
+          "type": "click",
+          "t": 23030,
+          "x": 540,
+          "y": 672
+        },
+        {
+          "type": "step",
+          "t": 28394,
+          "label": "The agent takes it back with one call."
+        },
+        {
+          "type": "focus",
+          "t": 31701,
+          "x": 540,
+          "y": 470,
+          "w": 438,
+          "h": 920
+        },
+        {
+          "type": "step",
+          "t": 31706,
+          "label": "The stop button freezes every action. The bezel turns red."
+        },
+        {
+          "type": "click",
+          "t": 31706,
+          "x": 540,
+          "y": 856
+        },
+        {
+          "type": "step",
+          "t": 33133,
+          "label": "The agent tap is refused, and a human tap goes red."
+        },
+        {
+          "type": "click",
+          "t": 33443,
+          "x": 402,
+          "y": 418
+        },
+        {
+          "type": "step",
+          "t": 35374,
+          "label": "Resume hands control back."
+        },
+        {
+          "type": "click",
+          "t": 35374,
+          "x": 540,
+          "y": 856
+        },
+        {
+          "type": "click",
+          "t": 36607,
+          "x": 415,
+          "y": 899
+        },
+        {
+          "type": "focus",
+          "t": 36654,
+          "x": 800,
+          "y": 500,
+          "w": 1026,
+          "h": 1000
+        }
+      ]
+    }
+  },
+  "features": [
+    {
+      "screenshot": "phoneclaude/feature-tree.png",
+      "heading": "The real UI element tree",
+      "lines": [
+        "Exact UI element tree, not OCR guesses",
+        "tap_text(\"General\") finds the button and taps it",
+        "Live viewer streams the phone in your browser"
+      ]
+    },
+    {
+      "screenshot": "phoneclaude/feature-stop.png",
+      "heading": "A stop button that actually stops it",
+      "lines": [
+        "A red stop button freezes every action",
+        "Ambiguous sends abort before typing",
+        "Every message lands in an audit log"
+      ]
+    },
+    {
+      "screenshot": "phoneclaude/feature-signing.png",
+      "heading": "A free Apple ID is enough",
+      "lines": [
+        "Fixes the unsigned bundle Sideloadly leaves",
+        "No paid account, no password scripting",
+        "Doctor counts down the 7 day re-sign"
+      ]
+    }
+  ],
+  "cta": "Clone it free and drive your phone",
+  "command": "python launch.py",
+  "actLengths": {
+    "features": [
+      210,
+      285,
+      210
+    ],
+    "end": 198
+  },
+  "assets": {
+    "logoSequence": "phoneclaude/logo-reveal",
+    "logoFrames": 90,
+    "loopSequence": null,
+    "loopFrames": 1
+  }
+}

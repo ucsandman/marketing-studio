@@ -108,6 +108,63 @@ const BRANDS = {
       loopFrames: 1,
     },
   }),
+
+  // Voice (brands/phoneclaude.json): a hacker tool with real hands on a real iPhone.
+  // Terse and technical, honest about limits. Blue is the action color; red is the
+  // STOP kill switch ONLY, which is why the one red frame in this video is the
+  // feature-stop still cropped straight out of the demo's stop beat. No hype, no
+  // em dashes.
+  phoneclaude: (demo) => ({
+    brandId: 'phoneclaude',
+    kicker: 'github.com/ucsandman/phone-claude',
+    headline: 'Drive a real iPhone from Windows',
+    demo: {video: demo.video, telemetry: demo.telemetry},
+    // Feature stills are cropped from the approved demo capture by
+    // scripts/build-phoneclaude-feature-stills.mjs (real surfaces only).
+    features: [
+      {
+        screenshot: 'phoneclaude/feature-tree.png',
+        heading: 'The real UI element tree',
+        lines: [
+          'Exact UI element tree, not OCR guesses',
+          'tap_text("General") finds the button and taps it',
+          'Live viewer streams the phone in your browser',
+        ],
+      },
+      {
+        screenshot: 'phoneclaude/feature-stop.png',
+        heading: 'A stop button that actually stops it',
+        lines: [
+          'A red stop button freezes every action',
+          'Ambiguous sends abort before typing',
+          'Every message lands in an audit log',
+        ],
+      },
+      {
+        screenshot: 'phoneclaude/feature-signing.png',
+        heading: 'A free Apple ID is enough',
+        lines: [
+          'Fixes the unsigned bundle Sideloadly leaves',
+          'No paid account, no password scripting',
+          'Doctor counts down the 7 day re-sign',
+        ],
+      },
+    ],
+    cta: 'Clone it free and drive your phone',
+    command: 'python launch.py',
+    // Act lengths widened from the shared defaults so every approved narration line
+    // in out/phoneclaude/marketing/brief.json fits at ~150 wpm plus a beat (the audio
+    // pass scores this picture lock later). Defaults would clip feature-0 (15 words
+    // in 6.0s), feature-1 (20 words in 6.0s) and end (14 words in 5.0s). logo, hook
+    // and the telemetry-derived demo act all fit the shared constants untouched.
+    actLengths: {features: [210, 285, 210], end: 198},
+    assets: {
+      logoSequence: 'phoneclaude/logo-reveal',
+      logoFrames: 90,
+      loopSequence: null,
+      loopFrames: 1,
+    },
+  }),
 };
 
 const build = BRANDS[brand];

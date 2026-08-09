@@ -23,7 +23,18 @@ export const EndCard: React.FC<{cta: string; brand: Brand; command?: string | nu
       <div style={{fontFamily: fonts.display, fontWeight: 800, fontSize: 96, color: brand.colors.ink}}>
         {brand.name}
       </div>
-      <div style={{fontFamily: fonts.mono, fontSize: 34, letterSpacing: '0.2em', color: brand.colors.profit}}>
+      {/* Wide-tracked mono grows fast: without a bound a long CTA bleeds past
+          both frame edges instead of wrapping inside the card. */}
+      <div
+        style={{
+          fontFamily: fonts.mono,
+          fontSize: 34,
+          letterSpacing: '0.2em',
+          color: brand.colors.profit,
+          maxWidth: '84%',
+          textAlign: 'center',
+        }}
+      >
         {cta.toUpperCase()}
       </div>
       {command ? (

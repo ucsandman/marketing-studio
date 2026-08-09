@@ -4,6 +4,7 @@ import dashclaw from '../../../brands/dashclaw.json';
 import paperroute from '../../../brands/paperroute.json';
 import magnetic from '../../../brands/magnetic.json';
 import costclaw from '../../../brands/costclaw.json';
+import phoneclaude from '../../../brands/phoneclaude.json';
 
 const hex = z.string().regex(/^#[0-9a-f]{6}$/i, 'expected #rrggbb hex color');
 
@@ -115,7 +116,7 @@ export const alphaHex = (a: number): string =>
 
 export type Brand = z.infer<typeof brandSchema>;
 
-const registry: Record<string, unknown> = {noban, dashclaw, paperroute, magnetic, costclaw};
+const registry: Record<string, unknown> = {noban, dashclaw, paperroute, magnetic, costclaw, phoneclaude};
 
 export const getBrand = (id: string): Brand => {
   const raw = registry[id];

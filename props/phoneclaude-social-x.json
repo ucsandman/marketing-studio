@@ -1,0 +1,14 @@
+{
+  "brandId": "phoneclaude",
+  "kicker": "phone-claude",
+  "headline": "My PC just texted my mom. From my real iPhone.",
+  "lines": [
+    "A red stop button freezes every action",
+    "Ambiguous sends abort before typing",
+    "Every message lands in an audit log"
+  ],
+  "screenshot": "phoneclaude/feature-stop.png",
+  "cta": "No Mac. No jailbreak. Kill switch included.",
+  "command": null,
+  "video": "phoneclaude/social-x-open.webm"
+}
