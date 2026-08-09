@@ -1,6 +1,18 @@
 import {z} from 'zod';
-import type {Act} from './launchTiming';
+import {VO_LEAD, type Act} from './launchTiming';
 import type {SfxCue, SfxKind} from './sfxCues';
+
+// Word-level VO timestamps (feeders/audio/client.mjs --timestamps, or the
+// even-distribution `words` fallback). OPTIONAL and never defaulted: `undefined`
+// means "this line has no measured timings", which is the signal launchTiming and
+// the cue helpers gate on. Every manifest written before this feature parses
+// unchanged and keeps rendering byte-identically.
+export const wordSchema = z.object({
+  w: z.string().min(1),
+  startMs: z.number().nonnegative(),
+  endMs: z.number().nonnegative(),
+});
+export type Word = z.infer<typeof wordSchema>;
 
 export const audioSchema = z.object({
   music: z.object({src: z.string(), durationMs: z.number().positive()}).nullable(),
@@ -10,6 +22,10 @@ export const audioSchema = z.object({
       src: z.string(),
       durationMs: z.number().positive(),
       text: z.string(),
+      words: z.array(wordSchema).optional(),
+      // true when the times came from even distribution over the mp3 rather than
+      // from the TTS alignment. Sync is approximate; judge-av-sync warns.
+      wordsEstimated: z.boolean().optional(),
     }),
   ),
   // Optional sound-design cue layer. Absent (the default for every existing
@@ -25,9 +41,11 @@ export type AudioManifest = z.infer<typeof audioSchema>;
 type Timing = {logo: Act; hook: Act; demo: Act; features: Act[]; end: Act};
 
 const FPS = 30;
-// Frames of music-only lead-in before each VO line starts. Exported so
-// captionTiming.ts places captions on the exact same window as the spoken audio.
-export const VO_LEAD = 12;
+// Frames of music-only lead-in before each VO line starts. Owned by launchTiming.ts
+// (the VO-driven act length is built from it) and re-exported here so
+// captionTiming.ts and every existing `import {VO_LEAD} from './audioMix'` site
+// places captions on the exact same window as the spoken audio.
+export {VO_LEAD};
 const BASE = 0.35;
 const DUCKED = 0.12;
 const RAMP = 9;

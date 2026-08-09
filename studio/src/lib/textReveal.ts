@@ -29,6 +29,9 @@ export type RevealArgs = {
   index: number;
   total: number;
   scale: number;
+  // Word-locked cue: act-local frame this unit reveals on, overriding the stagger
+  // cascade. Absent/null -> the exact legacy wordDelay math, so byte-identity holds.
+  delayOverride?: number | null;
 };
 
 const clamp01 = (v: number): number => Math.min(1, Math.max(0, v));
@@ -38,28 +41,32 @@ const clamp01 = (v: number): number => Math.min(1, Math.max(0, v));
 const wordDelay = (index: number, motion: Motion): number => 8 + staggerDelay(index, 4, motion);
 
 // EXACT legacy Headline word math. Do not "improve" — byte-identity depends on it.
-const spring = ({frame, fps, motion, index, scale}: RevealArgs): RevealFragment => {
-  const s = brandSpring(frame, fps, motion, {delayFrames: wordDelay(index, motion)});
+const spring = ({frame, fps, motion, index, scale, delayOverride}: RevealArgs): RevealFragment => {
+  const s = brandSpring(frame, fps, motion, {delayFrames: delayOverride ?? wordDelay(index, motion)});
   return {opacity: s, transform: `translateY(${(1 - s) * 40 * scale}px)`};
 };
 
 // Terse, mechanical: a hard left->right clip wipe carried by the brand's spring easing.
-const maskWipe = ({frame, fps, motion, index}: RevealArgs): RevealFragment => {
-  const s = clamp01(brandSpring(frame, fps, motion, {delayFrames: wordDelay(index, motion)}));
+const maskWipe = ({frame, fps, motion, index, delayOverride}: RevealArgs): RevealFragment => {
+  const s = clamp01(
+    brandSpring(frame, fps, motion, {delayFrames: delayOverride ?? wordDelay(index, motion)}),
+  );
   return {opacity: 1, transform: 'translateY(0px)', clipPath: `inset(0 ${(1 - s) * 100}% 0 0)`};
 };
 
 // Soft focus-pull: blur 8px -> 0 with a small rise, per word.
-const blurIn = ({frame, fps, motion, index, scale}: RevealArgs): RevealFragment => {
-  const s = brandSpring(frame, fps, motion, {delayFrames: wordDelay(index, motion)});
+const blurIn = ({frame, fps, motion, index, scale, delayOverride}: RevealArgs): RevealFragment => {
+  const s = brandSpring(frame, fps, motion, {delayFrames: delayOverride ?? wordDelay(index, motion)});
   const c = clamp01(s);
   return {opacity: c, filter: `blur(${(1 - c) * 8}px)`, transform: `translateY(${(1 - s) * 20 * scale}px)`};
 };
 
 // Confident sequenced cascade: per-character opacity + rise on a tighter (1.5-frame)
 // gap so a whole headline's characters fan in within a hook act.
-const charStagger = ({frame, fps, motion, index, scale}: RevealArgs): RevealFragment => {
-  const s = brandSpring(frame, fps, motion, {delayFrames: 8 + staggerDelay(index, 1.5, motion)});
+const charStagger = ({frame, fps, motion, index, scale, delayOverride}: RevealArgs): RevealFragment => {
+  const s = brandSpring(frame, fps, motion, {
+    delayFrames: delayOverride ?? 8 + staggerDelay(index, 1.5, motion),
+  });
   return {opacity: clamp01(s), transform: `translateY(${(1 - s) * 28 * scale}px)`};
 };
 

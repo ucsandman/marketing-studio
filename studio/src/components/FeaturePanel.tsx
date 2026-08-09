@@ -10,7 +10,17 @@ export const FeaturePanel: React.FC<{
   brand: Brand;
   zoom?: {from: number; to: number; origin: string};
   portraitScreenshot?: string;
-}> = ({screenshot, lines, brand, zoom = {from: 1.5, to: 1.6, origin: '58% 30%'}, portraitScreenshot}) => {
+  // Act-local reveal frame per benefit line (lib/wordCues.alignPhraseCues). Absent,
+  // or a null entry, keeps the 15 + stagger(i,10) cascade -> byte-identical.
+  cueFrames?: (number | null)[];
+}> = ({
+  screenshot,
+  lines,
+  brand,
+  zoom = {from: 1.5, to: 1.6, origin: '58% 30%'},
+  portraitScreenshot,
+  cueFrames,
+}) => {
   const frame = useCurrentFrame();
   const {fps, width, height} = useVideoConfig();
   const isPortrait = height > width;
@@ -70,7 +80,9 @@ export const FeaturePanel: React.FC<{
         }}
       >
         {lines.map((line, i) => {
-          const s = brandSpring(frame, fps, brand.motion, {delayFrames: 15 + staggerDelay(i, 10, brand.motion)});
+          const s = brandSpring(frame, fps, brand.motion, {
+            delayFrames: cueFrames?.[i] ?? 15 + staggerDelay(i, 10, brand.motion),
+          });
           return (
             <div
               key={i}

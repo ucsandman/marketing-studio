@@ -6,7 +6,7 @@
 //   * launchTiming.ts act budgets (imported directly via Node TS type-stripping,
 //     never re-derived — PLAYBOOK: "Duration math lives in ONE pure lib")
 //   * props/<brand>-audio.json VO line durations (voWindows math mirrored below;
-//     VO_LEAD comes from studio/src/lib/audioMix.ts)
+//     VO_LEAD comes from studio/src/lib/launchTiming.ts)
 //   * demo telemetry step timings (caption dwell)
 //
 // Advisor to the Phase-4 judge: exit 0 with the verdict in the report. `--strict`
@@ -26,11 +26,17 @@ process.on('unhandledRejection', (reason) => {
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 export const FPS = 30;
-// Mirror of VO_LEAD in studio/src/lib/audioMix.ts: frames of music-only lead-in
+// Mirror of VO_LEAD in studio/src/lib/launchTiming.ts: frames of music-only lead-in
 // before each VO line starts. voWindows() there places every line at
 // act.from + VO_LEAD, so the time a line actually has is act.len - VO_LEAD.
 export const VO_LEAD = 12;
 export const MIN_DWELL_MS = 700;
+// Mirrors of the cue-discipline constants in studio/src/lib/wordCues.ts. main()
+// passes that module's real values into checkCueDiscipline; these are the defaults
+// so the check stays callable (and unit-testable) without the dynamic import.
+export const MAX_CUES_PER_BEAT = 2;
+export const BEAT_FRAMES = 12;
+export const LAG_TOLERANCE_FRAMES = 6;
 
 // VO length in frames (mirror of voWindows: ceil(durationMs/1000 * FPS)).
 export function voFrameLen(durationMs) {
@@ -151,13 +157,185 @@ export function checkUnknownActs(lines, timing) {
     }));
 }
 
-export function runAvSync({timing, lines, features, telemetryEvents}) {
+// --- Word-locked timing checks --------------------------------------------
+// Every check below returns [] when no line carries `words`, so a manifest written
+// before Phase B produces a byte-identical report.
+
+// `words` present but not reconstructing `text` -> the cue table is aligned to the
+// wrong sentence and every reveal in the act is wrong.
+export function checkWordText(lines) {
+  const findings = [];
+  for (const line of lines) {
+    if (!Array.isArray(line.words) || line.words.length === 0) continue;
+    const rebuilt = line.words.map((w) => w.w).join(' ');
+    const expected = String(line.text ?? '').trim().replace(/\s+/g, ' ');
+    if (rebuilt !== expected) {
+      findings.push({
+        check: 'word-text-mismatch',
+        level: 'FAIL',
+        act: line.act,
+        message: `Word table for act "${line.act}" does not reconstruct its text; every cue in the act points at the wrong word.`,
+      });
+    }
+  }
+  return findings;
+}
+
+// The last word's measured END must fit inside the act after the lead-in. Stronger
+// than checkVoOverruns, which measures the FILE (trailing silence inflates it).
+export function checkWordFit(lines, timing, fps = FPS) {
+  const findings = [];
+  for (const line of lines) {
+    if (!Array.isArray(line.words) || line.words.length === 0) continue;
+    const act = actFor(line.act, timing);
+    if (!act) continue; // reported by checkUnknownActs
+    const lastEndMs = line.words[line.words.length - 1].endMs;
+    const endFrame = Math.ceil((lastEndMs / 1000) * fps);
+    const available = act.len - VO_LEAD;
+    if (endFrame > available) {
+      const overrunMs = Math.round(((endFrame - available) / fps) * 1000);
+      findings.push({
+        check: 'word-overrun',
+        level: 'FAIL',
+        act: line.act,
+        overrunMs,
+        spokenFrames: endFrame,
+        availableFrames: available,
+        message: `Spoken words in act "${line.act}" run ${overrunMs}ms past the act (measured to the last word, not the file end).`,
+      });
+    }
+  }
+  return findings;
+}
+
+// Even-distribution times: sync is approximate, the operator must know.
+export function checkEstimatedWords(lines) {
+  return lines
+    .filter((l) => l.wordsEstimated)
+    .map((l) => ({
+      check: 'estimated-word-times',
+      level: 'WARN',
+      act: l.act,
+      message: `Act "${l.act}" uses even-distribution word times (wordsEstimated), not the TTS alignment; sync is approximate — do not ship a hero film on these.`,
+    }));
+}
+
+/**
+ * Cue discipline. `cues` is [{act, frames: (number|null)[], wordFrames: number[], actLen}]
+ * built by the caller from alignWordCues/alignPhraseCues.
+ *
+ * cue-lag compares each cue to its NEAREST word frame (absolute distance): a cue
+ * derived by the align helpers sits `lead` frames BEFORE its word, so the nearest
+ * frame is always the word it was cut from, and a hand-authored late cue reads as a
+ * positive lag.
+ */
+export function checkCueDiscipline(cues, opts = {}) {
+  const maxPerBeat = opts.maxPerBeat ?? MAX_CUES_PER_BEAT;
+  const beatFrames = opts.beatFrames ?? BEAT_FRAMES;
+  const lagTolerance = opts.lagTolerance ?? LAG_TOLERANCE_FRAMES;
+  const findings = [];
+  for (const cue of cues) {
+    const frames = cue.frames ?? [];
+    const unmatched = frames.filter((f) => f === null || f === undefined).length;
+    if (unmatched > 0) {
+      findings.push({
+        check: 'cue-unmatched',
+        level: 'WARN',
+        act: cue.act,
+        unmatched,
+        message: `${unmatched} on-screen unit(s) in act "${cue.act}" have no matching VO word; they keep the stagger cascade.`,
+      });
+    }
+    const hits = frames.filter((f) => typeof f === 'number').sort((a, b) => a - b);
+    for (let i = 0; i < hits.length; i++) {
+      let inBeat = 0;
+      for (let j = i; j < hits.length && hits[j] - hits[i] < beatFrames; j++) inBeat++;
+      if (inBeat > maxPerBeat) {
+        findings.push({
+          check: 'cue-density',
+          level: 'FAIL',
+          act: cue.act,
+          frame: hits[i],
+          cuesInBeat: inBeat,
+          message: `${inBeat} cues inside ${beatFrames} frames from ${hits[i]} in act "${cue.act}" (max ${maxPerBeat} per beat).`,
+        });
+        break;
+      }
+    }
+    if (hits.length > 0 && cue.actLen) {
+      const early = hits.filter((f) => f < cue.actLen / 2).length;
+      if (early > hits.length / 2) {
+        findings.push({
+          check: 'cue-front-loaded',
+          level: 'WARN',
+          act: cue.act,
+          early,
+          total: hits.length,
+          message: `${early}/${hits.length} cues in act "${cue.act}" land in the first half; weight reveals to the back half.`,
+        });
+      }
+    }
+    const wordFrames = cue.wordFrames ?? [];
+    if (wordFrames.length > 0) {
+      for (const f of hits) {
+        const nearest = wordFrames.reduce(
+          (best, w) => (Math.abs(f - w) < Math.abs(f - best) ? w : best),
+          wordFrames[0],
+        );
+        const lag = f - nearest;
+        if (lag > lagTolerance) {
+          findings.push({
+            check: 'cue-lag',
+            level: 'FAIL',
+            act: cue.act,
+            frame: f,
+            lagFrames: lag,
+            message: `Cue at frame ${f} in act "${cue.act}" trails its word by ${lag} frames (max ${lagTolerance}); past ~200ms it reads as lag.`,
+          });
+        }
+      }
+    }
+  }
+  return findings;
+}
+
+// Known limitation (Phase B): sfxCues derives its per-feature tick frames from the
+// STAGGER formula. Once a feature act is word-cued the reveals move and the ticks
+// stay put. The fix is threading the cue arrays into SoundTrack; until then, warn.
+export function checkSfxTickDrift(sfxEnabled, cues) {
+  if (!sfxEnabled) return [];
+  const acts = cues.filter((c) => c.act.startsWith('feature-')).map((c) => c.act);
+  if (acts.length === 0) return [];
+  return [
+    {
+      check: 'sfx-tick-drift',
+      level: 'WARN',
+      acts,
+      message: `Word-cued feature act(s) ${acts.join(', ')} still get stagger-derived sfx tick frames; the ticks no longer land on the reveals.`,
+    },
+  ];
+}
+
+export function runAvSync({
+  timing,
+  lines,
+  features,
+  telemetryEvents,
+  wordCues = [],
+  sfxEnabled = false,
+  cueOpts,
+}) {
   const findings = [
     ...checkUnknownActs(lines, timing),
     ...checkVoLead(lines, timing),
     ...checkVoOverruns(lines, timing),
     ...checkFeatureCoverage(features, lines),
     ...checkCaptionDwell(telemetryEvents),
+    ...checkWordText(lines),
+    ...checkWordFit(lines, timing),
+    ...checkEstimatedWords(lines),
+    ...checkCueDiscipline(wordCues, cueOpts),
+    ...checkSfxTickDrift(sfxEnabled, wordCues),
   ];
   const verdict = findings.some((f) => f.level === 'FAIL') ? 'FAIL' : 'PASS';
   return {findings, verdict};
@@ -204,9 +382,53 @@ async function main() {
 
   const telemetryDurationMs = launch.demo?.telemetry?.durationMs ?? null;
   const mod = await import(new URL('../studio/src/lib/launchTiming.ts', import.meta.url));
-  const timing = mod.launchTiming(telemetryDurationMs, features.length, launch.actLengths ?? null);
+  const wc = await import(new URL('../studio/src/lib/wordCues.ts', import.meta.url));
+  // Same four arguments the renderer builds (Root.tsx calculateMetadata +
+  // LaunchVideo): with word timings present the acts are VO-driven, so the judge
+  // must measure against the picture that will actually render.
+  const timing = mod.launchTiming(
+    telemetryDurationMs,
+    features.length,
+    launch.actLengths ?? null,
+    mod.voTimingFrom(lines, features.length, {force: launch.voTiming ?? null}),
+  );
 
-  const {findings, verdict} = runAvSync({timing, lines, features, telemetryEvents});
+  // Cue tables the renderer will build for the word-locked reveals.
+  const wordCues = [];
+  const hookLine = lines.find((l) => l.act === 'hook');
+  if (hookLine?.words && launch.headline) {
+    wordCues.push({
+      act: 'hook',
+      frames: wc.alignWordCues(String(launch.headline).split(' '), hookLine, FPS),
+      wordFrames: wc.wordCueFrames(hookLine, FPS),
+      actLen: timing.hook.len,
+    });
+  }
+  features.forEach((f, i) => {
+    const line = lines.find((l) => l.act === `feature-${i}`);
+    if (line?.words && Array.isArray(f.lines)) {
+      wordCues.push({
+        act: `feature-${i}`,
+        frames: wc.alignPhraseCues(f.lines, line, FPS),
+        wordFrames: wc.wordCueFrames(line, FPS),
+        actLen: timing.features[i].len,
+      });
+    }
+  });
+
+  const {findings, verdict} = runAvSync({
+    timing,
+    lines,
+    features,
+    telemetryEvents,
+    wordCues,
+    sfxEnabled: Boolean(audio.sfx?.enabled),
+    cueOpts: {
+      maxPerBeat: wc.MAX_CUES_PER_BEAT,
+      beatFrames: wc.BEAT_FRAMES,
+      lagTolerance: wc.LAG_TOLERANCE_FRAMES,
+    },
+  });
 
   const report = {
     judge: 'av-sync',
@@ -228,6 +450,9 @@ async function main() {
     },
     summary: {
       voLines: lines.length,
+      wordLines: lines.filter((l) => l.words).length,
+      estimatedWordLines: lines.filter((l) => l.wordsEstimated).length,
+      cuedActs: wordCues.length,
       features: features.length,
       captionSteps: telemetryEvents.filter((e) => e.type === 'step').length,
       findings: findings.length,

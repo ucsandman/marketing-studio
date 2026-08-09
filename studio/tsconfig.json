@@ -10,7 +10,11 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "noUnusedLocals": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    // lib/wordCues.ts imports './launchTiming.ts' WITH the extension on purpose: it
+    // is loaded by scripts/judge-av-sync.mjs through Node type-stripping, which does
+    // no extensionless resolution. noEmit is on, so nothing is rewritten.
+    "allowImportingTsExtensions": true
   },
   "exclude": ["remotion.config.ts"]
 }

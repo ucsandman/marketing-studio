@@ -23,13 +23,28 @@
 // are completely unaffected.
 //
 // Also writes manifest.json at the kit root — machine-readable kit index
-// consumed by launch-engine (plus a `segments` key when segment kits exist).
+// consumed by launch-engine (plus a `segments` key when segment kits exist) — and
+// two more root-level files: LICENCES.md (see below) and, per copied video, a
+// silent -an cut for muted-autoplay embeds.
+//
+// Silent cuts: every copied video (`<name>.mp4`) gets a sibling `<name>-silent.mp4`
+// via plain `ffmpeg -c copy -an` (stream-copy, no re-encode) — same ffmpeg-on-PATH
+// convention as scripts/master-audio.mjs, since Remotion's bundled ffmpeg build
+// lacks features this repo's post-render scripts depend on. A missing/failing
+// ffmpeg is a logged skip for that one file, not a build failure (same partial-kit
+// philosophy as a missing video/thumbnail source below).
+//
+// LICENCES.md: a stub record, at the kit root, of the music/SFX/font assets baked
+// into this brand's renders (read from props/<brand>-audio.json and brands/<brand>.json)
+// — one TODO line per asset actually present, so a human fills in the source/licence
+// before external distribution instead of it being silently missing from the handoff.
 //
 // caption.txt is gated by scripts/lint-copy.mjs (imported directly, not spawned):
 // any ERROR-level violation FAILS the whole build. Exits non-zero only if NOTHING
 // could be assembled across every platform; partial kits are the expected outcome
 // before render-matrix.mjs has produced full videos.
 import {copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync} from 'node:fs';
+import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
 import {lintJson, formatReport} from './lint-copy.mjs';
@@ -200,12 +215,13 @@ export function wrapKitEntry(segmentId, platformKey, cfg, hasVideo) {
   };
 }
 
-function postMd(brandLabel, platformKey, cfg, videoStatus, thumbStatus, captionFilesLine) {
+function postMd(brandLabel, platformKey, cfg, videoStatus, thumbStatus, silentStatus, captionFilesLine) {
   const label = PLATFORM_LABELS[platformKey];
+  const silentLine = silentStatus ? `\n- Silent cut: ${silentStatus} (muted-autoplay embeds)` : '';
   return `# ${brandLabel} — ${label} post kit
 
 ## Files
-- Video: ${videoStatus}
+- Video: ${videoStatus}${silentLine}
 - Thumbnail: ${thumbStatus}
 - Caption: caption.txt (paste as the post copy)
 - Alt text: alt.txt (one-sentence video description)
@@ -214,6 +230,59 @@ ${captionFilesLine}
 ## Notes
 ${cfg.note}
 `;
+}
+
+// LICENCES.md content for the postkit root (see the header comment). Assets not
+// used by this brand (no music track, sfx not enabled) get a one-line "not used"
+// note instead of an invented TODO — a stub records only what is actually present.
+export function buildLicencesMd(brandLabel, brandData, audioManifest) {
+  const musicSrc = audioManifest?.music?.src ?? null;
+  const musicLines = musicSrc
+    ? [`- \`${musicSrc}\`: TODO source, licence, and attribution requirement`]
+    : audioManifest
+      ? ['- No music track for this brand.']
+      : ['- No audio manifest for this brand (`props/<brand>-audio.json` not found), so renders are silent.'];
+
+  const sfxEnabled = audioManifest?.sfx?.enabled === true;
+  const sfxLines = sfxEnabled
+    ? ['whoosh', 'tick', 'riser'].map(
+        (kind) => `- \`assets/sfx/${kind}.mp3\`: TODO source, licence, and commercial-use terms`,
+      )
+    : ['- SFX not enabled for this brand.'];
+
+  const fonts = brandData?.fonts ?? {};
+  const fontFamilies = [...new Set([fonts.display, fonts.body, fonts.mono].filter(Boolean))];
+  const fontLines = fontFamilies.length
+    ? fontFamilies.map((f) => `- ${f} (Google Fonts, studio/src/lib/fonts.ts): TODO confirm OFL licence and weights in use`)
+    : ['- No fonts recorded for this brand.'];
+
+  return `# ${brandLabel} postkit LICENCES
+
+Source/licence record for the music, SFX, and font assets baked into this postkit's
+video renders. Fill in every TODO before external distribution.
+
+## Music
+${musicLines.join('\n')}
+
+## SFX
+${sfxLines.join('\n')}
+
+## Fonts
+${fontLines.join('\n')}
+`;
+}
+
+// Silent cut: `-c copy -an` strips the audio stream without re-encoding. Returns
+// true on success; a missing/failing ffmpeg logs a skip and returns false (never
+// throws — see the header comment on why this is a soft skip, not a build failure).
+function writeSilentCut(srcPath, destPath, label) {
+  const res = spawnSync('ffmpeg', ['-y', '-i', srcPath, '-c', 'copy', '-an', destPath], {encoding: 'utf8'});
+  if (res.error || res.status !== 0 || !existsSync(destPath)) {
+    const reason = res.error ? res.error.message : `ffmpeg exited ${res.status}`;
+    console.log(`postkit: ${label}: skipped silent cut, ${reason}`);
+    return false;
+  }
+  return true;
 }
 
 // --- main pipeline (I/O) -----------------------------------------------------
@@ -259,6 +328,11 @@ function main() {
     console.log(`build-postkit: no out/${brand}/marketing/brief.json — all captions use the brand tagline fallback`);
   }
 
+  // Audio manifest, for LICENCES.md's music/SFX lines only (build-captions.mjs and
+  // render-matrix.mjs are the consumers that drive the actual render/caption path).
+  const audioPropsPath = join(root, 'props', `${brand}-audio.json`);
+  const audioManifest = existsSync(audioPropsPath) ? JSON.parse(readFileSync(audioPropsPath, 'utf8')) : null;
+
   const matrixDir = join(root, 'out', brand, 'matrix');
   const thumbsDir = join(root, 'out', brand, 'thumbs');
   const captionsDir = join(root, 'out', brand, 'captions');
@@ -285,13 +359,21 @@ function main() {
     const dir = join(postkitDir, platformKey);
     mkdirSync(dir, {recursive: true});
 
-    // Video.
+    // Video, plus a silent -an cut for muted-autoplay embeds (see header comment).
     const videoSrc = join(matrixDir, `${cfg.videoSource}.mp4`);
     let videoStatus;
+    let silentFile = null;
     if (existsSync(videoSrc)) {
-      copyFileSync(videoSrc, join(dir, `${cfg.videoSource}.mp4`));
+      const destVideo = join(dir, `${cfg.videoSource}.mp4`);
+      copyFileSync(videoSrc, destVideo);
       videoStatus = `${cfg.videoSource}.mp4`;
       assembledCount += 1;
+
+      const silentName = `${cfg.videoSource}-silent.mp4`;
+      if (writeSilentCut(destVideo, join(dir, silentName), platformKey)) {
+        silentFile = silentName;
+        assembledCount += 1;
+      }
     } else {
       videoStatus = `NOT INCLUDED (missing out/${brand}/matrix/${cfg.videoSource}.mp4 — run render-matrix.mjs)`;
       console.log(`postkit: ${platformKey}: skipped video, ${cfg.videoSource}.mp4 not found in out/${brand}/matrix/`);
@@ -349,15 +431,19 @@ function main() {
       }
     }
 
-    writeFileSync(join(dir, 'POST.md'), postMd(brandData.name ?? brand, platformKey, cfg, videoStatus, thumbStatus, captionFilesLine));
+    const silentStatus = silentFile ?? (existsSync(videoSrc) ? 'NOT INCLUDED (ffmpeg unavailable — see console output above)' : null);
+    writeFileSync(join(dir, 'POST.md'), postMd(brandData.name ?? brand, platformKey, cfg, videoStatus, thumbStatus, silentStatus, captionFilesLine));
     assembledCount += 1;
 
-    manifestPlatforms[platformKey] = manifestEntry(platformKey, cfg, {
-      hasVideo: existsSync(videoSrc),
-      thumbFile,
-      srtCopied,
-      vttCopied,
-    });
+    manifestPlatforms[platformKey] = {
+      ...manifestEntry(platformKey, cfg, {
+        hasVideo: existsSync(videoSrc),
+        thumbFile,
+        srtCopied,
+        vttCopied,
+      }),
+      silent: silentFile ? `${platformKey}/${silentFile}` : null,
+    };
 
     console.log(`postkit: wrote out/${brand}/postkit/${platformKey}/ (video: ${existsSync(videoSrc) ? 'yes' : 'skipped'}, thumb: ${thumbStatus.startsWith('NOT') ? 'skipped' : 'yes'})`);
   }
@@ -386,15 +472,23 @@ function main() {
       const dir = join(postkitDir, `wrap-${segmentId}`, platformKey);
       mkdirSync(dir, {recursive: true});
 
-      // Video: the segment's own aspect-matched export.
+      // Video: the segment's own aspect-matched export, plus a silent -an cut.
       const videoName = `wrap-${cfg.aspect}.mp4`;
       const videoSrc = join(segMatrixDir, videoName);
       const hasVideo = existsSync(videoSrc);
       let videoStatus;
+      let wrapSilentFile = null;
       if (hasVideo) {
-        copyFileSync(videoSrc, join(dir, videoName));
+        const destVideo = join(dir, videoName);
+        copyFileSync(videoSrc, destVideo);
         videoStatus = videoName;
         assembledCount += 1;
+
+        const silentName = `wrap-${cfg.aspect}-silent.mp4`;
+        if (writeSilentCut(destVideo, join(dir, silentName), kitLabel)) {
+          wrapSilentFile = silentName;
+          assembledCount += 1;
+        }
       } else {
         videoStatus = `NOT INCLUDED (missing out/${brand}/matrix/wrap-${segmentId}/${videoName} — run render-matrix.mjs --comp WrapClip --props props/${brand}-wrap-${segmentId}.json)`;
         console.log(`postkit: ${kitLabel}: skipped video, ${videoName} not found in out/${brand}/matrix/wrap-${segmentId}/`);
@@ -406,13 +500,17 @@ function main() {
       writeFileSync(join(dir, 'alt.txt'), buildWrapAlt(brief, brandData) + '\n');
       assembledCount += 1;
 
+      const wrapSilentStatus = wrapSilentFile ?? (hasVideo ? 'NOT INCLUDED (ffmpeg unavailable — see console output above)' : null);
       writeFileSync(
         join(dir, 'POST.md'),
-        postMd(brandData.name ?? brand, platformKey, cfg, videoStatus, 'NOT INCLUDED (segment kits omit the brand launch thumbnail)', ''),
+        postMd(brandData.name ?? brand, platformKey, cfg, videoStatus, 'NOT INCLUDED (segment kits omit the brand launch thumbnail)', wrapSilentStatus, ''),
       );
       assembledCount += 1;
 
-      segEntries[platformKey] = wrapKitEntry(segmentId, platformKey, cfg, hasVideo);
+      segEntries[platformKey] = {
+        ...wrapKitEntry(segmentId, platformKey, cfg, hasVideo),
+        silent: wrapSilentFile ? `wrap-${segmentId}/${platformKey}/${wrapSilentFile}` : null,
+      };
     }
     manifestSegments[segmentId] = segEntries;
     console.log(`postkit: wrote out/${brand}/postkit/wrap-${segmentId}/ (${Object.keys(PLATFORM_MAP).length} platform folders)`);
@@ -428,6 +526,9 @@ function main() {
     JSON.stringify(buildManifest(brand, new Date().toISOString(), manifestPlatforms, manifestSegments), null, 2) + '\n',
   );
   console.log(`postkit: wrote out/${brand}/postkit/manifest.json`);
+
+  writeFileSync(join(postkitDir, 'LICENCES.md'), buildLicencesMd(brandData.name ?? brand, brandData, audioManifest));
+  console.log(`postkit: wrote out/${brand}/postkit/LICENCES.md`);
 
   console.log(`postkit OK: ${Object.keys(PLATFORM_MAP).length} platform folders in out/${brand}/postkit/`);
 }

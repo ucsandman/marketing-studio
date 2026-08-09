@@ -27,6 +27,16 @@ const forceIds = forceFlagIdx >= 0 && forceArg && !forceArg.startsWith('--')
 const forceAll = forceFlagIdx >= 0 && !forceIds;
 const shouldForce = (id) => forceAll || (forceIds?.has(id) ?? false);
 
+// --no-timestamps  opt out of word-level VO timings entirely (manifest lines carry no
+//                  `words`, so launchTiming stays on the shared act constants).
+//
+// TRAP: re-rendering the VO, changing ELEVENLABS_VOICE_ID, or changing model_id
+// invalidates every word time in the film. There is no partial rescue — delete the
+// affected studio/public/costclaw/audio/*.words.json sidecars and re-run with
+// --force <id>. A uniform atempo change is the only case where rescaling
+// startMs / factor is valid, and it must be spot-checked at three points.
+const WANT_TIMESTAMPS = !process.argv.includes('--no-timestamps');
+
 // Spoken copy: written for the ear ("n p x costclaw audit", never "npx costclaw
 // audit"). Dry, precise, technical narrator — no hype, no exclamation marks.
 // Text mirrors out/costclaw/marketing/brief.json's narration array verbatim.
@@ -94,7 +104,9 @@ if (pending.length > 0) {
   const scriptPath = join(root, 'out', 'costclaw', 'vo-script.json');
   mkdirSync(dirname(scriptPath), {recursive: true});
   writeFileSync(scriptPath, JSON.stringify({lines: pending}));
-  const out = run(`node feeders/audio/client.mjs vo --script "${scriptPath}" --out "${outDir}"`);
+  const out = run(
+    `node feeders/audio/client.mjs vo --script "${scriptPath}" --out "${outDir}"${WANT_TIMESTAMPS ? ' --timestamps' : ''}`,
+  );
   process.stdout.write(out);
   for (const m of out.matchAll(/vo OK: (.+)\.mp3 (\d+)ms/g)) durations[m[1]] = Number(m[2]);
 }
@@ -109,6 +121,27 @@ for (const l of LINES) {
   process.stdout.write(out);
   const m = out.match(/probe OK: .+ (\d+)ms/);
   if (m) durations[l.id] = Number(m[1]);
+}
+
+// Word-level timings per line. A sidecar written by `vo --timestamps` is MEASURED;
+// an mp3 that predates this feature gets even-distribution times instead of a paid
+// re-generation (marked estimated, warned about by judge-av-sync).
+const wordTables = {}; // id -> {words, estimated}
+for (const l of LINES) {
+  const sidecar = join(outDir, `${l.id}.words.json`);
+  if (existsSync(sidecar)) {
+    const j = JSON.parse(readFileSync(sidecar, 'utf8'));
+    wordTables[l.id] = {words: j.words, estimated: Boolean(j.estimated)};
+    continue;
+  }
+  if (!WANT_TIMESTAMPS) continue; // explicit opt-out -> no words -> constants mode
+  if (!existsSync(join(outDir, `${l.id}.mp3`))) continue; // caught by the completeness check below
+  const out = run(
+    `node feeders/audio/client.mjs words --file "${join(outDir, `${l.id}.mp3`)}" --text "${l.text.replaceAll('"', '\\"')}" --out "${sidecar}"`,
+  );
+  process.stdout.write(out);
+  const j = JSON.parse(readFileSync(sidecar, 'utf8'));
+  wordTables[l.id] = {words: j.words, estimated: true};
 }
 
 const musicFile = join(outDir, 'music.mp3');
@@ -136,11 +169,16 @@ if (!durations.music) {
 
 const manifest = {
   music: {src: 'costclaw/audio/music.mp3', durationMs: durations.music},
+  // Spread-only-when-present: an explicit `words: undefined` serializes the key away
+  // in some paths, and an explicit `wordsEstimated: false` would dirty every existing
+  // manifest diff.
   lines: LINES.map((l) => ({
     act: l.id,
     src: `costclaw/audio/${l.id}.mp3`,
     durationMs: durations[l.id],
     text: l.text,
+    ...(wordTables[l.id] ? {words: wordTables[l.id].words} : {}),
+    ...(wordTables[l.id]?.estimated ? {wordsEstimated: true} : {}),
   })),
 };
 

@@ -8,19 +8,24 @@ import {useFormat} from '../lib/layout';
 
 const easeOutExpo = Easing.out(Easing.exp);
 
-export const Headline: React.FC<{kicker: string; headline: string; brand: Brand; hideKicker?: boolean}> = ({
-  kicker,
-  headline,
-  brand,
-  hideKicker,
-}) => {
+export const Headline: React.FC<{
+  kicker: string;
+  headline: string;
+  brand: Brand;
+  hideKicker?: boolean;
+  // Act-local reveal frame per headline word (lib/wordCues.alignWordCues). Absent, or
+  // a null entry, falls back to the stagger cascade -> byte-identical.
+  cueFrames?: (number | null)[];
+}> = ({kicker, headline, brand, hideKicker, cueFrames}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   const {scale, width, safe} = useFormat();
   const fonts = loadBrandFonts(brand);
   const words = headline.split(' ');
   const preset = brand.motion.textReveal;
-  const byChar = revealUnit(preset, headline) === 'char';
+  // Word cues are per WORD, so a cued headline reveals by word even on a
+  // charStagger brand — a per-character cascade has nothing to lock to.
+  const byChar = revealUnit(preset, headline) === 'char' && !cueFrames;
   const totalChars = words.reduce((n, w) => n + w.length, 0);
   // Global char index each word starts at, so the charStagger cascade runs
   // continuously across word boundaries (the inter-word gap is the flex gap below).
@@ -67,7 +72,15 @@ export const Headline: React.FC<{kicker: string; headline: string; brand: Brand;
       >
         {words.map((w, i) => {
           if (!byChar) {
-            const frag = revealFragment(preset, {frame, fps, motion: brand.motion, index: i, total: words.length, scale});
+            const frag = revealFragment(preset, {
+              frame,
+              fps,
+              motion: brand.motion,
+              index: i,
+              total: words.length,
+              scale,
+              delayOverride: cueFrames?.[i] ?? null,
+            });
             return (
               <span key={i} style={{...wordStyle, ...frag}}>
                 {w}

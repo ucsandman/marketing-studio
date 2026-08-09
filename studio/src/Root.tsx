@@ -2,13 +2,14 @@ import "./index.css";
 import React from "react";
 import { Composition } from "remotion";
 import { ComponentGallery } from "./templates/ComponentGallery";
+import { StagedGallery } from "./templates/StagedGallery";
 import { SocialClip, socialClipSchema } from "./templates/SocialClip";
 import { ProductDemo, productDemoSchema } from "./templates/ProductDemo";
 import { LogoReveal, logoRevealSchema } from "./templates/LogoReveal";
 import { LaunchVideo, launchVideoSchema } from "./templates/LaunchVideo";
 import { AnimatedOG, animatedOgSchema } from "./templates/AnimatedOG";
 import { WrapClip, wrapClipSchema, wrapDurationInFrames } from "./templates/WrapClip";
-import { launchTiming } from "./lib/launchTiming";
+import { launchTiming, voTimingFrom } from "./lib/launchTiming";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -17,6 +18,14 @@ export const RemotionRoot: React.FC = () => {
         id="ComponentGallery"
         component={ComponentGallery}
         durationInFrames={90}
+        fps={30}
+        width={1920}
+        height={1080}
+      />
+      <Composition
+        id="StagedGallery"
+        component={StagedGallery}
+        durationInFrames={510}
         fps={30}
         width={1920}
         height={1080}
@@ -107,12 +116,20 @@ export const RemotionRoot: React.FC = () => {
           burnCaptions: false,
           motionOverride: null,
           actLengths: null,
+          voTiming: null,
         }}
+        // VO-driven act lengths (Phase B): engages only when the audio manifest
+        // carries word timings, so every existing render is byte-identical. The
+        // component must build the SAME fourth argument — a mismatch here silently
+        // truncates or pads the film.
         calculateMetadata={({props}) => ({
           durationInFrames: launchTiming(
             props.demo.telemetry?.durationMs ?? null,
             props.features.length,
             props.actLengths ?? null,
+            voTimingFrom(props.audio?.lines ?? null, props.features.length, {
+              force: props.voTiming ?? null,
+            }),
           ).total,
           width: props.formatWidth ?? 1920,
           height: props.formatHeight ?? 1080,

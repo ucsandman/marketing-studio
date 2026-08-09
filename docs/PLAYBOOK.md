@@ -31,8 +31,8 @@ repo. Assets are copied out to the calling repo at the end.
 | Results loop | `scripts/fetch-results.mjs <brand>` | posts.json ({platform, url, variant, metrics?}) -> results.json; X metrics via X_BEARER_TOKEN in .env (exit 2 fallback), LinkedIn manual; closes the hook A/B loop with real engagement |
 | Export matrix | `scripts/render-matrix.mjs <brand> [--comp] [--stills-only]` + `scripts/platforms.json` | fans LaunchVideo/SocialClip into 16:9/9:16/1:1/4:5 via calculateMetadata props (no --width CLI flag in Remotion 4.0.486); captioned variants for muted-autoplay rows when audio props exist |
 | Caption sidecars | `scripts/build-captions.mjs <brand> [--check]` | props/<brand>-audio.json -> out/<brand>/captions/launch.srt + .vtt |
-| Thumbnails | `scripts/extract-thumbs.mjs <brand> [--comp]` | poster JPG per aspect -> out/<brand>/thumbs/ |
-| Post kit | `scripts/build-postkit.mjs <brand>` | per-platform folders (video, lint-gated caption.txt, alt.txt, thumb, POST.md, SRT/VTT for yt/li) -> out/<brand>/postkit/ |
+| Thumbnails | `scripts/extract-thumbs.mjs <brand> [--comp] [--frame <n>] [--frame-<aspect> <n>]` | poster JPG per aspect -> out/<brand>/thumbs/; the poster frame is CHOSEN, never defaulted (precedence: `--frame-<aspect>` > `--frame` > a dormant `posterFrame` in props/<brand>-launch.json > the script default). Never mid-motion, half-typed, or cursor-visible; test it at 200px wide |
+| Post kit | `scripts/build-postkit.mjs <brand>` | per-platform folders (video, lint-gated caption.txt, alt.txt, thumb, POST.md, SRT/VTT for yt/li) -> out/<brand>/postkit/; also writes a `<video>-silent.mp4` per copied video (ffmpeg `-c copy -an`, skipped with a log line when ffmpeg is missing) and a root `LICENCES.md` stub listing the music, SFX, and font sources actually present |
 | Contact sheets | `scripts/contact-sheet.mjs <brand> <Comp>` | act-boundary stills + sheet HTML -> out/<brand>/marketing/stills/; Mission Control shows the strip |
 | Footage cache | `scripts/lib/cache.mjs`; capture scripts + stage-blender-assets consult it | key = product git HEAD+porcelain + script source + config; `--force` re-captures; caching disabled when product git state is unresolvable; capture entries also store readable meta {productRepo, productHead} so Mission Control can warn when footage falls behind the product repo |
 | SFX library | `scripts/build-sfx.mjs` (one-time, idempotent) | ElevenLabs sound-generation -> assets/sfx/ + studio/public/sfx/ (whoosh/tick/riser, exit 2 = silent fallback); cues derived at render from launchTiming via `studio/src/lib/sfxCues.ts`, gated by `sfx.enabled` in the audio manifest (builder flips it only when files are staged) |
@@ -42,7 +42,8 @@ repo. Assets are copied out to the calling repo at the end.
 | Hero takes | `scripts/render-variants.mjs <brand> <logo-reveal\|launch-hook> [--takes N]` | brand-safe motion-knob takes via nullable `motionOverride` prop (exuberant take floors at 0.65 — below ~0.55 the spring is overdamped and deltas render invisible); registers variants[] |
 
 Compositions: SocialClip, ProductDemo, LogoReveal, LaunchVideo, AnimatedOG,
-ComponentGallery (test bench). All schemas carry `brandId`; templates resolve
+WrapClip, ComponentGallery + StagedGallery (test benches). All schemas carry
+`brandId`; templates resolve
 `getBrand(brandId)` and pass `brand` down. Every asset prop is nullable with a
 placeholder so smoke stays green on a clean clone.
 
@@ -95,6 +96,33 @@ placeholder so smoke stays green on a clean clone.
   reads as sizzle.
   `transformOrigin: cx cy` does NOT center the region (it pins it) — this mismatch
   silently crops edges.
+- Staged native UI scenes (`components/StagedScene.tsx` + `lib/staged.ts`, proven in
+  the `StagedGallery` composition): three data-driven constructions, `results`
+  (skeleton waterfall resolving one row at a time, the highlighted row last),
+  `composer` (deterministic typed query, cursor clicks submit, run panel whose LAST
+  step is deliberately still running at the cut) and `status` (tracker with a real
+  subject, states completing in sequence, optional counter). A launch-video feature
+  entry sets `staged` to render one INSTEAD of its screenshot panel; `staged` is
+  nullable and defaults to null, so every existing feature renders byte-identically.
+  Rules that are already paid for, do not re-derive them: everything is authored in
+  a fixed 1600x900 stage box and geometry comes from `lib/staged` layout functions,
+  never from `getBoundingClientRect` (it lies under the rig's scale and rotation);
+  the fit-to-frame scale is a STATIC third node above CameraRig so it never shares a
+  matrix with the dolly or the turn; the dolly origin is the center of the control
+  the cursor clicks, taken from the same layout function that places it; the push
+  settles before the cursor arrives, holds dead still through the click, and
+  releases after the state resolves; beats are declared in nominal seconds and
+  scaled to the act length by k = clamp(window / nominal, 0.85, 1.4), so every shot
+  ends with a still tail of at least 15 frames; typing is one interpolate over an
+  integer index plus slice(), so a seek reproduces the frame exactly. A staged
+  feature act reveals no benefit lines, so LaunchVideo passes 0 for its
+  `featureLineCounts` entry, otherwise sfxCues ticks against nothing. Two traps found
+  by rendered proof, do not undo them: a skeleton bar uses `colors.line` (a surface2
+  bar on a surface2 plate is invisible), and the SpecularSweep is clipped to the
+  shot's card rect (across the bare stage box it reads as a grey slab floating on
+  the brand ground).
+  Suggested act lengths: results 180-210, composer 195-225, status 140-165 frames
+  (minimum viable 150/165/120).
 - PNG sequences: `frame_%04d.png`, 1-indexed. `PngSequence` clamp holds the last
   frame; loop is `(frame % frameCount) + 1`.
 - Seamless loops: every animated value must satisfy f(0) == f(duration); use
@@ -236,9 +264,42 @@ placeholder so smoke stays green on a clean clone.
   call, used when a build script skips regenerating a line that's already on disk.
 - VO text is written for the ear ("noban dot gg", never "noban.gg") — spell out
   anything a TTS model would otherwise mispronounce.
-- If a line overruns its act's time budget, trim the COPY rather than squeeze the
-  timing — shortening `launchTiming.ts`'s act lengths to fit audio inverts the
-  source of truth.
+- Manifest lines may carry `words: [{w, startMs, endMs}]` (+ `wordsEstimated: true`
+  when derived by even distribution rather than measured by the TTS alignment).
+  Emitted by `feeders/audio/client.mjs vo --timestamps` (ElevenLabs
+  `/v1/text-to-speech/{voice}/with-timestamps`, char alignment aggregated to words)
+  or `client.mjs words --file <mp3> --text "<line>"` for audio already on disk.
+  Re-rendering the VO or changing voice/model invalidates every word time: delete
+  the `*.words.json` sidecars and rebuild.
+- VO-driven timing ACTIVATES only when at least one manifest line carries `words`.
+  Manifest presence alone is not the gate: every shipped brand already has an audio
+  manifest, so gating on presence would move every existing picture lock. The
+  nullable `voTiming` prop on LaunchVideo forces it on (true) or off (false).
+- `VO_LEAD` is owned by `launchTiming.ts` (the VO act length is built from it) and
+  re-exported by `audioMix.ts`; every existing import site is unchanged.
+- `studio/src/lib/wordCues.ts` imports `'./launchTiming.ts'` WITH the extension, and
+  `studio/tsconfig.json` sets `allowImportingTsExtensions`. Both are load-bearing:
+  `scripts/judge-av-sync.mjs` loads wordCues through Node type-stripping, which does
+  no extensionless resolution. Do not "clean up" either one.
+- Timing serves the voice. When a manifest line carries measured `words`, its act
+  length is DERIVED: `VO_LEAD + ceil(voMs/1000*fps) + VO_PAD` (`voActLen()` in
+  `launchTiming.ts`, VO_PAD 12f ~= 0.4s tail hold). Estimated act constants are the
+  root cause of "the reveals feel off" — a reveal lands on the measured start of the
+  word it illustrates, so the word times, not the constants, are the source of truth.
+- Copy is still trimmed for LENGTH CEILINGS, not for act fit. The ceilings are the
+  film's total runtime (30-90s, `launchTiming.test.ts`) and per-act readability; a
+  line that pushes the film past its ceiling gets cut in `build-<brand>-audio.mjs`,
+  which is still the only place VO copy is edited.
+- Derivation never overrides a human. Precedence is
+  `actLengths override > measured VO > shared constants`, so a hand-locked picture
+  (e.g. costclaw) is untouched, and a brand with no word timings renders exactly as
+  it did before Phase B.
+- The demo act takes `max(telemetry-derived, VO-derived)`. Never shorten a recorded
+  demonstration to fit narration; widen it.
+- Known gap: `sfxCues.ts` still derives its per-feature ticks from the stagger
+  formula, so a word-cued feature act drifts off its reveals. `judge-av-sync` reports
+  this as `sfx-tick-drift` (WARN); the fix is threading the cue arrays into
+  `SoundTrack`.
 - Free tier returns 402 (`paid_plan_required`) on API voice/library access — Starter
   plan or above is required for both TTS and music generation (music also needs a
   paid plan for the commercial license). Cost is cents per video for TTS; a few
@@ -273,6 +334,22 @@ placeholder so smoke stays green on a clean clone.
 - Verify behavior-preserving refactors with SHA-256-compared stills, not eyeballs.
 - Exit criterion for any asset is the USER seeing the rendered artifact, not code
   compiling.
+
+#### Direction discipline (process, not code)
+- Write three one-page directions per `docs/templates/DIRECTION.md`, kill two by its
+  four kill questions; the survivor must differ on >= 4 of the 11 dials from the last
+  film built in this repo, or it is a variant, not a direction.
+- Record the chosen direction in `out/<brand>/marketing/direction.md` before
+  storyboarding — the artifact that lets "make another like that" be honored later.
+- Never overwrite a render: `launch-v1.mp4`, `-v2`, ... The director loop is render ->
+  watch -> write the defect list yourself -> fix -> re-render as a NEW file. Notes are
+  symptoms, not specs ("make it 3D" usually means a camera rig, not a rotation).
+- Versioning applies to the ITERATION renders only. `out/<brand>/launch.mp4` stays the
+  locked/delivered name because `mission-control.mjs` and `review-in-magnetic.mjs`
+  both hardcode it; the lock step copies the approved version there. Do not "fix" this
+  to a versioned final name.
+- Director (watching) and auditor (measuring every on-screen claim/number) are
+  DISJOINT review passes — run both; neither substitutes for the other.
 
 ## Token discipline for asset generation sessions
 

@@ -11,6 +11,11 @@ import {
   checkCaptionDwell,
   checkFeatureCoverage,
   checkUnknownActs,
+  checkWordText,
+  checkWordFit,
+  checkEstimatedWords,
+  checkCueDiscipline,
+  checkSfxTickDrift,
 } from './judge-av-sync.mjs';
 
 // A hand-built timing table (no dependency on launchTiming.ts internals).
@@ -117,4 +122,114 @@ test('checkUnknownActs: bad act reference is caught', () => {
   const findings = checkUnknownActs([{act: 'feature-99', durationMs: 1000, text: 'x'}], timing);
   assert.equal(findings.length, 1);
   assert.equal(findings[0].check, 'unknown-act');
+});
+
+// --- word-locked timing checks --------------------------------------------
+
+const wordLine = (over = {}) => ({
+  act: 'hook',
+  durationMs: 2000,
+  text: 'See spend leaks',
+  words: [
+    {w: 'See', startMs: 0, endMs: 350},
+    {w: 'spend', startMs: 400, endMs: 900},
+    {w: 'leaks', startMs: 1000, endMs: 1500},
+  ],
+  ...over,
+});
+
+// Every line the repo ships today: no `words` key at all.
+const plainLines = [
+  {act: 'hook', durationMs: 4000, text: 'a b'},
+  {act: 'logo', durationMs: 2000, text: 'c d'},
+];
+
+test('checkWordText: a table that reconstructs its text is clean', () => {
+  assert.equal(checkWordText([wordLine()]).length, 0);
+});
+
+test('checkWordText: a table aligned to another sentence fails', () => {
+  const findings = checkWordText([wordLine({text: 'See waste leaks'})]);
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].check, 'word-text-mismatch');
+  assert.equal(findings[0].level, 'FAIL');
+  assert.equal(findings[0].act, 'hook');
+});
+
+test('checkWordFit: spoken words inside the act are clean', () => {
+  // hook act = 186f, available = 174f. Last word ends at 5000ms -> 150f.
+  const line = wordLine({words: [{w: 'x', startMs: 0, endMs: 5000}], text: 'x'});
+  assert.equal(checkWordFit([line], timing).length, 0);
+});
+
+test('checkWordFit: words past the act report the overrun in ms', () => {
+  // 7000ms -> 210f, available 174f, overrun 36f = 1200ms.
+  const line = wordLine({words: [{w: 'x', startMs: 0, endMs: 7000}], text: 'x'});
+  const findings = checkWordFit([line], timing);
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].check, 'word-overrun');
+  assert.equal(findings[0].level, 'FAIL');
+  assert.equal(findings[0].overrunMs, 1200);
+});
+
+test('checkEstimatedWords: even-distribution times warn, measured ones do not', () => {
+  const findings = checkEstimatedWords([wordLine({wordsEstimated: true})]);
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].check, 'estimated-word-times');
+  assert.equal(findings[0].level, 'WARN');
+  assert.equal(checkEstimatedWords([wordLine()]).length, 0);
+});
+
+test('checkCueDiscipline: a back-weighted, on-word cue set is clean', () => {
+  const cues = [{act: 'hook', frames: [100, 130, 160], wordFrames: [100, 130, 160], actLen: 186}];
+  assert.deepEqual(checkCueDiscipline(cues), []);
+});
+
+test('checkCueDiscipline: three cues inside one beat fail on density', () => {
+  const cues = [{act: 'hook', frames: [100, 102, 104], wordFrames: [100, 102, 104], actLen: 186}];
+  const density = checkCueDiscipline(cues).filter((f) => f.check === 'cue-density');
+  assert.equal(density.length, 1);
+  assert.equal(density[0].level, 'FAIL');
+  assert.equal(density[0].cuesInBeat, 3);
+});
+
+test('checkCueDiscipline: cues bunched in the first half warn', () => {
+  const cues = [{act: 'hook', frames: [10, 40, 70], wordFrames: [10, 40, 70], actLen: 186}];
+  const front = checkCueDiscipline(cues).filter((f) => f.check === 'cue-front-loaded');
+  assert.equal(front.length, 1);
+  assert.equal(front[0].level, 'WARN');
+});
+
+test('checkCueDiscipline: an unmatched display unit warns', () => {
+  const cues = [{act: 'hook', frames: [100, null, 160], wordFrames: [100, 160], actLen: 186}];
+  const unmatched = checkCueDiscipline(cues).filter((f) => f.check === 'cue-unmatched');
+  assert.equal(unmatched.length, 1);
+  assert.equal(unmatched[0].level, 'WARN');
+  assert.equal(unmatched[0].unmatched, 1);
+});
+
+test('checkCueDiscipline: a cue trailing its word past tolerance fails', () => {
+  const cues = [{act: 'hook', frames: [19], wordFrames: [12, 100], actLen: 186}];
+  const lag = checkCueDiscipline(cues).filter((f) => f.check === 'cue-lag');
+  assert.equal(lag.length, 1);
+  assert.equal(lag[0].level, 'FAIL');
+  assert.equal(lag[0].lagFrames, 7);
+});
+
+test('checkCueDiscipline: no cues at all is clean', () => {
+  assert.deepEqual(checkCueDiscipline([]), []);
+});
+
+test('checkSfxTickDrift: warns only for word-cued feature acts with sfx on', () => {
+  const cues = [{act: 'feature-0', frames: [100], wordFrames: [100], actLen: 180}];
+  assert.equal(checkSfxTickDrift(true, cues).length, 1);
+  assert.equal(checkSfxTickDrift(true, cues)[0].level, 'WARN');
+  assert.equal(checkSfxTickDrift(false, cues).length, 0);
+  assert.equal(checkSfxTickDrift(true, [{act: 'hook', frames: [100]}]).length, 0);
+});
+
+test('every word check is a no-op on manifests with no word timings', () => {
+  assert.deepEqual(checkWordText(plainLines), []);
+  assert.deepEqual(checkWordFit(plainLines, timing), []);
+  assert.deepEqual(checkEstimatedWords(plainLines), []);
 });

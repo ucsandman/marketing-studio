@@ -15,12 +15,15 @@ import type {Motion} from '../lib/motion';
 import {parallaxOffset, settleOn, offsetTransform, settleTransform} from '../lib/depth';
 import {useFormat} from '../lib/layout';
 import {telemetrySchema, steps} from '../lib/telemetry';
-import {launchTiming} from '../lib/launchTiming';
+import {launchTiming, voTimingFrom} from '../lib/launchTiming';
+import {alignPhraseCues, alignWordCues} from '../lib/wordCues';
 import {audioSchema} from '../lib/audioMix';
 import {BackgroundLoop} from '../components/BackgroundLoop';
 import {PngSequence} from '../components/PngSequence';
 import {Headline} from '../components/Headline';
 import {FeaturePanel} from '../components/FeaturePanel';
+import {StagedScene} from '../components/StagedScene';
+import {stagedSceneSchema} from '../lib/staged';
 import {DemoStage} from '../components/DemoStage';
 import {EndCard} from '../components/EndCard';
 import {Caption} from '../components/Caption';
@@ -53,6 +56,11 @@ export const launchVideoSchema = z.object({
       portraitScreenshot: z.string().optional(),
       heading: z.string(),
       lines: z.array(z.string()).min(1).max(4),
+      // Optional staged native-UI scene rendered INSTEAD of the screenshot panel
+      // (docs/product-launch-motion-adoption.md Phase C). All content comes from
+      // props. Nullable, defaults null, so every existing feature entry parses and
+      // renders byte-identically — same nullable-override pattern as actLengths.
+      staged: stagedSceneSchema.nullable().default(null),
     }),
   ).max(3),
   cta: z.string(),
@@ -84,6 +92,11 @@ export const launchVideoSchema = z.object({
   // Nullable, defaults null, so a normal render/smoke overrides nothing and stays
   // byte-identical — same nullable-override pattern as motionOverride above.
   actLengths: actLengthsSchema.nullable().default(null),
+  // Optional force switch for VO-driven act lengths (lib/launchTiming's voTimingFrom
+  // `force`): true pins act lengths to the measured VO even with no word timings,
+  // false pins the shared constants. Nullable, defaults null = auto, which engages
+  // only when a manifest line carries `words`, so existing renders are unchanged.
+  voTiming: z.boolean().nullable().default(null),
 });
 
 type Props = z.infer<typeof launchVideoSchema>;
@@ -141,11 +154,17 @@ const LogoAct: React.FC<{assets: Props['assets']; len: number; brand: Brand}> = 
   );
 };
 
-const HookAct: React.FC<{kicker: string; headline: string; len: number; brand: Brand}> = ({kicker, headline, len, brand}) => {
+const HookAct: React.FC<{
+  kicker: string;
+  headline: string;
+  len: number;
+  brand: Brand;
+  cueFrames?: (number | null)[];
+}> = ({kicker, headline, len, brand, cueFrames}) => {
   const fade = useActFade(len);
   return (
     <AbsoluteFill style={{opacity: fade}}>
-      <Headline kicker={kicker} headline={headline} brand={brand} />
+      <Headline kicker={kicker} headline={headline} brand={brand} cueFrames={cueFrames} />
     </AbsoluteFill>
   );
 };
@@ -172,7 +191,13 @@ const DemoAct: React.FC<{demo: Props['demo']; len: number; brand: Brand}> = ({de
   );
 };
 
-const FeatureAct: React.FC<{feature: Props['features'][number]; len: number; brand: Brand}> = ({feature, len, brand}) => {
+const FeatureAct: React.FC<{
+  feature: Props['features'][number];
+  len: number;
+  brand: Brand;
+  seat: number;
+  cueFrames?: (number | null)[];
+}> = ({feature, len, brand, seat, cueFrames}) => {
   const fonts = loadBrandFonts(brand);
   const fade = useActFade(len);
   const frame = useCurrentFrame();
@@ -207,27 +232,50 @@ const FeatureAct: React.FC<{feature: Props['features'][number]; len: number; bra
       >
         {feature.heading}
       </div>
-      <AbsoluteFill style={{top: panelTop}}>
-        <FeaturePanel
-          screenshot={feature.screenshot}
-          portraitScreenshot={feature.portraitScreenshot}
-          lines={feature.lines}
-          brand={brand}
-          zoom={{from: 1, to: 1.04, origin: '50% 30%'}}
-        />
-      </AbsoluteFill>
+      {feature.staged ? (
+        // StagedScene sits OUTSIDE the panelTop wrapper on purpose: it does its own
+        // safe-area band math from useFormat.
+        <StagedScene config={feature.staged} len={len} brand={brand} seat={seat} />
+      ) : (
+        <AbsoluteFill style={{top: panelTop}}>
+          <FeaturePanel
+            screenshot={feature.screenshot}
+            portraitScreenshot={feature.portraitScreenshot}
+            lines={feature.lines}
+            brand={brand}
+            zoom={{from: 1, to: 1.04, origin: '50% 30%'}}
+            cueFrames={cueFrames}
+          />
+        </AbsoluteFill>
+      )}
     </AbsoluteFill>
   );
 };
 
-export const LaunchVideo: React.FC<Props> = ({brandId, kicker, headline, demo, features, cta, command, assets, audio, burnCaptions, motionOverride, actLengths}) => {
+export const LaunchVideo: React.FC<Props> = ({brandId, kicker, headline, demo, features, cta, command, assets, audio, burnCaptions, motionOverride, actLengths, voTiming}) => {
   const frame = useCurrentFrame();
   const {durationInFrames, fps} = useVideoConfig();
   const {orientation, scale, safe} = useFormat();
   const brand = getBrand(brandId);
   const m = motionOverride ? {...brand.motion, ...motionOverride} : brand.motion;
-  const t = launchTiming(demo.telemetry?.durationMs ?? null, features.length, actLengths);
+  // These four arguments MUST match Root.tsx's calculateMetadata exactly — a
+  // mismatch silently truncates or pads the film.
+  const t = launchTiming(
+    demo.telemetry?.durationMs ?? null,
+    features.length,
+    actLengths,
+    voTimingFrom(audio?.lines ?? null, features.length, {force: voTiming ?? null}),
+  );
   const cues = burnCaptions && audio ? captionCues(audio.lines, t, fps) : [];
+  // Word-locked reveal cues (lib/wordCues). Built ONLY for an act whose manifest line
+  // carries measured word times; every other act passes undefined and keeps its
+  // stagger cascade, so a word-free brand renders byte-identically.
+  const cueLine = (act: string) => {
+    const line = audio?.lines.find((l) => l.act === act);
+    return line?.words?.length ? line : null;
+  };
+  const hookLine = cueLine('hook');
+  const hookCues = hookLine ? alignWordCues(headline.split(' '), hookLine, fps) : undefined;
   // Three depth planes for the flat comp: the loop backdrop drifts most (far), the
   // wash sits mid, act content drifts least (near). Per-layer seeds keep the planes
   // from drifting in lockstep. At motion.parallax 0 every transform is '' and the
@@ -268,7 +316,7 @@ export const LaunchVideo: React.FC<Props> = ({brandId, kicker, headline, demo, f
         </Sequence>
         <Sequence from={t.hook.from} durationInFrames={t.hook.len}>
           <ActContainer motion={m}>
-            <HookAct kicker={kicker} headline={headline} len={t.hook.len} brand={brand} />
+            <HookAct kicker={kicker} headline={headline} len={t.hook.len} brand={brand} cueFrames={hookCues} />
           </ActContainer>
         </Sequence>
         <Sequence from={t.demo.from} durationInFrames={t.demo.len}>
@@ -276,13 +324,22 @@ export const LaunchVideo: React.FC<Props> = ({brandId, kicker, headline, demo, f
             <DemoAct demo={demo} len={t.demo.len} brand={brand} />
           </ActContainer>
         </Sequence>
-        {features.map((feature, i) => (
-          <Sequence key={i} from={t.features[i].from} durationInFrames={t.features[i].len}>
-            <ActContainer motion={m}>
-              <FeatureAct feature={feature} len={t.features[i].len} brand={brand} />
-            </ActContainer>
-          </Sequence>
-        ))}
+        {features.map((feature, i) => {
+          const line = cueLine(`feature-${i}`);
+          return (
+            <Sequence key={i} from={t.features[i].from} durationInFrames={t.features[i].len}>
+              <ActContainer motion={m}>
+                <FeatureAct
+                  feature={feature}
+                  len={t.features[i].len}
+                  brand={brand}
+                  seat={i}
+                  cueFrames={line ? alignPhraseCues(feature.lines, line, fps) : undefined}
+                />
+              </ActContainer>
+            </Sequence>
+          );
+        })}
         <Sequence from={t.end.from} durationInFrames={t.end.len}>
           <ActContainer motion={m}>
             <EndCard cta={cta} command={command} brand={brand} />
@@ -293,7 +350,9 @@ export const LaunchVideo: React.FC<Props> = ({brandId, kicker, headline, demo, f
         <SoundTrack
           audio={audio}
           timing={t}
-          featureLineCounts={features.map((f) => f.lines.length)}
+          // A staged act reveals no benefit lines, so sfxCues would tick against
+          // nothing: report 0 display units for it.
+          featureLineCounts={features.map((f) => (f.staged ? 0 : f.lines.length))}
           motion={m}
         />
       ) : null}

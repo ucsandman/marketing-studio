@@ -1,5 +1,15 @@
 import {describe, expect, it} from 'vitest';
-import {audioSchema, voWindows, duckedVolume, resolveSfxLayers, SFX_SRC, SFX_VOLUME} from './audioMix';
+import {
+  audioSchema,
+  voWindows,
+  duckedVolume,
+  resolveSfxLayers,
+  wordSchema,
+  SFX_SRC,
+  SFX_VOLUME,
+  VO_LEAD,
+} from './audioMix';
+import {VO_LEAD as TIMING_VO_LEAD} from './launchTiming';
 import type {SfxCue} from './sfxCues';
 
 const TIMING = {
@@ -27,6 +37,60 @@ describe('audioSchema', () => {
   it('accepts an optional sfx enable gate', () => {
     const m = audioSchema.parse({music: null, lines: [], sfx: {enabled: true}});
     expect(m.sfx).toEqual({enabled: true});
+  });
+
+  it('leaves words undefined on a pre-Phase-B manifest (the "no timings" signal)', () => {
+    const m = audioSchema.parse({
+      music: null,
+      lines: [{act: 'hook', src: 'a.mp3', durationMs: 3900, text: 'x'}],
+    });
+    expect(m.lines[0].words).toBeUndefined();
+    expect(m.lines[0].wordsEstimated).toBeUndefined();
+  });
+
+  it('round-trips a word table and the estimated flag', () => {
+    const m = audioSchema.parse({
+      music: null,
+      lines: [
+        {
+          act: 'hook',
+          src: 'a.mp3',
+          durationMs: 3900,
+          text: 'See leaks',
+          words: [
+            {w: 'See', startMs: 0, endMs: 350},
+            {w: 'leaks', startMs: 400, endMs: 900},
+          ],
+          wordsEstimated: true,
+        },
+      ],
+    });
+    expect(m.lines[0].words).toEqual([
+      {w: 'See', startMs: 0, endMs: 350},
+      {w: 'leaks', startMs: 400, endMs: 900},
+    ]);
+    expect(m.lines[0].wordsEstimated).toBe(true);
+  });
+});
+
+describe('wordSchema', () => {
+  it('rejects an empty word', () => {
+    expect(wordSchema.safeParse({w: '', startMs: 0, endMs: 1}).success).toBe(false);
+  });
+
+  it('rejects a negative start', () => {
+    expect(wordSchema.safeParse({w: 'a', startMs: -1, endMs: 1}).success).toBe(false);
+  });
+
+  it('accepts a zero-start word', () => {
+    expect(wordSchema.safeParse({w: 'a', startMs: 0, endMs: 1}).success).toBe(true);
+  });
+});
+
+describe('VO_LEAD re-export', () => {
+  it('is the same binding as launchTiming owns', () => {
+    expect(VO_LEAD).toBe(12);
+    expect(VO_LEAD).toBe(TIMING_VO_LEAD);
   });
 });
 
@@ -76,6 +140,26 @@ describe('voWindows', () => {
   it('clamps the ducking window to the act end', () => {
     const w = voWindows([{act: 'end', src: 'c', durationMs: 60000, text: ''}], TIMING);
     expect(w[0].toFrame).toBe(1350); // end.from + end.len
+  });
+
+  it('is unmoved by word timings (words never move the audio)', () => {
+    const bare = voWindows([{act: 'hook', src: 'a', durationMs: 4000, text: 'See leaks'}], TIMING);
+    const cued = voWindows(
+      [
+        {
+          act: 'hook',
+          src: 'a',
+          durationMs: 4000,
+          text: 'See leaks',
+          words: [
+            {w: 'See', startMs: 0, endMs: 350},
+            {w: 'leaks', startMs: 900, endMs: 1400},
+          ],
+        },
+      ],
+      TIMING,
+    );
+    expect(cued).toEqual(bare);
   });
 
   it('throws on unknown act keys', () => {
