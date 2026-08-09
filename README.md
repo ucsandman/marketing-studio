@@ -33,6 +33,10 @@ Around those assets, the pipeline adds:
 - **An export matrix.** The picture-locked launch video and social clips fan into 16:9, 9:16, 1:1, and 4:5 through responsive layout (not crops), with burned-caption variants for muted autoplay and SRT/VTT sidecars.
 - **Mission Control.** A local click-to-approve gallery: watch assets land, review act-boundary contact sheets before the expensive render, approve or request a redo with a note, and the run reacts — no terminal required.
 - **Designed sound.** Whooshes on act cuts, ticks on feature reveals, and a riser into the CTA, generated once as a shared SFX library and mixed under the voiceover automatically.
+- **Word-locked sync.** Voiceover lines carry word-level timestamps; when they do, act lengths derive from the measured voice and reveals land on the words that name them, with `judge-av-sync` verifying every cue against the timings. Wordless manifests render exactly as before.
+- **Staged product scenes.** A feature act can swap its screenshot for rebuilt native UI (a results list that resolves row by row, a composer that types its own query, a status tracker) filmed by a two-node camera rig with a stage-prop cursor that visibly clicks.
+- **A mastered mix.** Final renders pass a two-pass loudness master to -14 LUFS with a true-peak ceiling, measured in the delivered file rather than trusted from the filter graph, plus SFX asset leveling and per-cue audibility proof.
+- **A direction pass.** Before a launch film is built, three genuinely different visual directions are written and two are killed (`docs/templates/DIRECTION.md`), and iteration renders are versioned v1, v2, ... so a fix can be proven and an earlier cut recovered.
 - **Paste-ready post kits and a footage cache.** Every platform gets a folder with the right-aspect video, a lint-gated caption, alt text, and a posting checklist; the kit root also carries `manifest.json`, a machine-readable index that launch-engine reads to auto-attach videos to X and LinkedIn posts. Unchanged product UIs are never re-filmed thanks to content-hash caching of capture and Blender staging.
 
 Each asset also works standalone: run `/logo-reveal`, `/product-demo`, `/launch-video`, `/audio-track`, `/social-clip`, or `/og-assets` on its own from any repo.
@@ -156,6 +160,8 @@ node scripts/lint-copy.mjs props/<brand>-launch.json   # no-slop copy gate
 node scripts/render-matrix.mjs <brand> --stills-only   # 16:9/9:16/1:1/4:5 fan-out
 node scripts/build-captions.mjs <brand> --check        # SRT/VTT sidecars
 node scripts/mission-control.mjs <brand>               # click-to-approve run console
+node scripts/master-audio.mjs out/<brand>/launch.mp4   # -14 LUFS master, verified in the delivered file
+node scripts/verify-cue.mjs out/<brand>/launch.mp4 2 1.5  # prove a sound cue is audible in a window
 ```
 
 `docs/PLAYBOOK.md` has the full engine map: every feeder, builder script, and render command, plus the verified gotchas.
