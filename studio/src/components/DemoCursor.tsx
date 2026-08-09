@@ -2,6 +2,7 @@ import React from 'react';
 import type {Brand} from '../lib/brand';
 import type {ClickEvent} from '../lib/telemetry';
 import {cursorAt} from '../lib/telemetry';
+import {CURSOR_TIP, CursorGlyph} from './StageCursor';
 
 const RIPPLE_MS = 400;
 
@@ -35,27 +36,19 @@ export const DemoCursor: React.FC<{
           />
         );
       })}
-      {/* pointer */}
-      <svg
-        viewBox="0 0 24 24"
-        width={34}
-        height={34}
+      {/* pointer — shared stage-prop glyph (44x54, white + heavy stroke): a
+          life-size ink-colored cursor vanishes into saturated controls */}
+      <div
         style={{
           position: 'absolute',
-          left: x - 4,
-          top: y - 3,
-          transform: `scale(${press ? 0.85 : 1})`,
-          transformOrigin: '4px 3px',
-          filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.55))',
+          left: x - CURSOR_TIP.x,
+          top: y - CURSOR_TIP.y,
+          transform: `scale(${press ? 0.86 : 1})`,
+          transformOrigin: '14% 6%',
         }}
       >
-        <path
-          d="M5 2.5v16.7l4.2-3.9 2.5 5.9 2.9-1.2-2.5-5.9h5.8L5 2.5z"
-          fill={brand.colors.ink}
-          stroke={brand.colors.bg}
-          strokeWidth="1.4"
-        />
-      </svg>
+        <CursorGlyph />
+      </div>
     </div>
   );
 };

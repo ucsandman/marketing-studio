@@ -46,6 +46,9 @@ export const focuses = (tel: Telemetry): FocusEvent[] =>
 export const easeInOutCubic = (t: number): number =>
   t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
 
+const easeInOutQuad = (t: number): number =>
+  t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
+
 const APPROACH_MS = 700; // cursor travel time into a click
 const PRESS_MS = 180; // press indicator duration after a click
 
@@ -68,10 +71,15 @@ export const cursorAt = (
   if (tMs < approachStart) return {x: from.x, y: from.y, press};
 
   const span = next.t - approachStart;
-  const p = span > 0 ? easeInOutCubic((tMs - approachStart) / span) : 1;
+  // x and y run different eases (and x lands slightly early) so the travel path
+  // bows — identical single-ease axes produce the straight-line "fake cursor"
+  // tell. Both axes still arrive exactly at next.t, so click sync is unchanged.
+  const t = span > 0 ? (tMs - approachStart) / span : 1;
+  const px = easeInOutCubic(Math.min(1, t / 0.83));
+  const py = easeInOutQuad(t);
   return {
-    x: from.x + (next.x - from.x) * p,
-    y: from.y + (next.y - from.y) * p,
+    x: from.x + (next.x - from.x) * px,
+    y: from.y + (next.y - from.y) * py,
     press,
   };
 };

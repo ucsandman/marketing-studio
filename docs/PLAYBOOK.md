@@ -83,6 +83,16 @@ placeholder so smoke stays green on a clean clone.
   (see `lib/launchTiming.ts`); never duplicate the formula.
 - Camera semantics: to center a content region, use
   `transform: scale(s) translate(vpW/2 - cx, vpH/2 - cy)` about the default 50% origin.
+- Staged-shot kit (see docs/product-launch-motion-adoption.md, all demoed in
+  ComponentGallery's second strip): `CameraRig` (outer dolly node + inner 3D-turn
+  node — rotation and scale must never share one element or the matrix fights
+  judder; set `dollyOrigin` on the pushed-toward control so it stays a fixed
+  point), `StageCursor` (44x54 stage-prop cursor, waypoints ARRIVE on their cued
+  frame, bowed travel, bloom+ring+press click stack; must render INSIDE the rig),
+  `controlPressScale` (the clicked control must react), `RackFocus`,
+  `SpecularSweep` (named beats only, never a loop). FilmGrade grain reseeds at
+  12Hz, not per frame — per-frame noise defeats inter-frame compression and
+  reads as sizzle.
   `transformOrigin: cx cy` does NOT center the region (it pins it) — this mismatch
   silently crops edges.
 - PNG sequences: `frame_%04d.png`, 1-indexed. `PngSequence` clamp holds the last
@@ -238,6 +248,24 @@ placeholder so smoke stays green on a clean clone.
 - Fallback behavior is part of the contract, not an error state: missing
   `ELEVENLABS_API_KEY` makes the feeder exit 2 with guidance and the video renders
   silent — that silent render is still a valid deliverable on a clean clone.
+
+#### Loudness mastering
+- `scripts/master-audio.mjs <in.mp4> [--out <path>]` — two-pass loudnorm to
+  -14 LUFS integrated / -1.0 dBTP true peak, re-encodes, then verifies the
+  DELIVERED file and exits 1 outside those targets. `scripts/verify-cue.mjs
+  <file.mp4> <startSec> <durSec> [--strict]` proves a cue is audible in the
+  window (per-100ms envelope, not just window peak). `scripts/level-sfx.mjs
+  <in> [--gain] [--dur] [--out]` levels an SFX asset (a cue's volume prop
+  cannot rescue a quiet source). All three shell to plain `ffmpeg` on PATH,
+  not `npx remotion ffmpeg` — Remotion's bundled build has no
+  alimiter/volumedetect/ebur128 filters.
+- Three traps: `loudnorm`'s `linear=true` computes one gain for the whole file
+  and does not back off for a loud transient — the `alimiter` is the fix, not
+  belt-and-braces. `alimiter` applies makeup gain unless `level=disabled` is
+  set, which quietly overshoots the target louder than before. And `alimiter`
+  constrains SAMPLE peaks only — AAC re-encode overshoots true peak by ~0.5 dB,
+  so the processing chain works to -2.0 dBTP to deliver <= -1.0 (verified on a
+  real master: chain at -1.0 delivered -0.5 and failed the gate).
 
 ### Process
 - Every generated props file has a builder script as its source of truth

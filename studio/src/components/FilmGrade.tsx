@@ -13,15 +13,19 @@ export const FilmGrade: React.FC<{
   accent: string; // bloom color: the brand's primary/accent token
 }> = ({grade, accent}) => {
   const frame = useCurrentFrame();
-  const {durationInFrames} = useVideoConfig();
+  const {durationInFrames, fps} = useVideoConfig();
   const id = React.useId();
   const {grain, vignette, bloom, aberration, letterbox} = grade;
 
-  // Seamless-loop rule (PLAYBOOK): the grain seed cycles with a period equal to the
-  // composition duration, so the noise field returns to its frame-0 state at the loop
-  // seam — seed(0) === seed(durationInFrames). frame is always in [0, durationInFrames),
-  // so the modulo is the seam wrap made explicit and keeps AnimatedOG's loop clean.
-  const seed = frame % durationInFrames;
+  // Grain reseeds at 12Hz, not per frame: per-frame noise defeats inter-frame
+  // compression (measured 9MB -> 85MB in the product-launch-motion case study)
+  // and reads as electronic sizzle rather than film grain.
+  // Seamless-loop rule (PLAYBOOK) still holds: the tick count wraps with a period
+  // spanning the whole composition, so seed(0) === seed(durationInFrames) and
+  // AnimatedOG's loop seam stays clean.
+  const tick = Math.floor((frame / fps) * 12);
+  const period = Math.max(1, Math.round((durationInFrames / fps) * 12));
+  const seed = tick % period;
 
   return (
     <>
