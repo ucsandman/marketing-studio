@@ -1,0 +1,48 @@
+{
+  "id": "tenwords",
+  "name": "TenWords",
+  "tagline": "Every paragraph in exactly ten words",
+  "url": "tenwords.io",
+  "colors": {
+    "bg": "#fbfbfb",
+    "surface": "#ffffff",
+    "surface2": "#f6f6f4",
+    "line": "#e2e2e2",
+    "ink": "#1f1f1f",
+    "ink2": "#595959",
+    "ink3": "#8a8a8a",
+    "brand": "#9c2f26",
+    "profit": "#9c2f26",
+    "safe": "#595959",
+    "loss": "#6d2620",
+    "info": "#595959",
+    "rare": "#9c2f26"
+  },
+  "textAccent": "info",
+  "fonts": {
+    "display": "Source Serif 4",
+    "body": "Source Serif 4",
+    "mono": "JetBrains Mono"
+  },
+  "effects": {
+    "wash": 0,
+    "glow": 0
+  },
+  "grade": {
+    "grain": 0.12,
+    "vignette": 0.08,
+    "bloom": 0,
+    "aberration": 0,
+    "letterbox": 0
+  },
+  "motion": {
+    "tempo": 0.9,
+    "exuberance": 0.4,
+    "stagger": 0.65,
+    "overshoot": 0.15,
+    "parallax": 0.15,
+    "settle": 0.25,
+    "textReveal": "maskWipe"
+  },
+  "voice": "A printed page, not a screen: paper-white light surfaces (#fbfbfb, never dark mode), near-black ink, hairline rules, serif typography with italic captions and small tracked uppercase headers. THE PILCROW RULE: accent red #9c2f26 belongs to the pilcrow mark and small accents only, never a wash, never a large fill, never gradient text, zero glow or bloom because print does not glow. The signature motion is the collapse: long text folds away and ten words remain, paragraph after paragraph with a quiet stagger; restore brings it all back. The register is exact and calm; the number ten is always literal, enforced in code, never approximate. Rejects AI hype and dashboard chrome. Copy: no em dashes, no hype words, verbs like condense, skim, restore."
+}

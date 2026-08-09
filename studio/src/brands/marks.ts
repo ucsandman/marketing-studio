@@ -5,6 +5,7 @@ import {PaperRouteMark} from './PaperRouteMark';
 import {MagneticMark} from './MagneticMark';
 import {CostClawMark} from './CostClawMark';
 import {PhoneClaudeMark} from './PhoneClaudeMark';
+import {TenwordsMark} from './TenwordsMark';
 
 export type MarkComponent = React.FC<{size: number; color: string}>;
 
@@ -15,6 +16,7 @@ const registry: Record<string, MarkComponent> = {
   magnetic: MagneticMark,
   costclaw: CostClawMark,
   phoneclaude: PhoneClaudeMark,
+  tenwords: TenwordsMark,
 };
 
 export const getMark = (id: string): MarkComponent => {
