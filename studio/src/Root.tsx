@@ -8,6 +8,7 @@ import { ProductDemo, productDemoSchema } from "./templates/ProductDemo";
 import { LogoReveal, logoRevealSchema } from "./templates/LogoReveal";
 import { LaunchVideo, launchVideoSchema } from "./templates/LaunchVideo";
 import { AnimatedOG, animatedOgSchema } from "./templates/AnimatedOG";
+import { StoreTile, storeTileSchema } from "./templates/StoreTile";
 import { WrapClip, wrapClipSchema, wrapDurationInFrames } from "./templates/WrapClip";
 import { launchTiming, voTimingFrom } from "./lib/launchTiming";
 
@@ -154,6 +155,23 @@ export const RemotionRoot: React.FC = () => {
           loopSequence: null,
           loopFrames: 240,
         }}
+      />
+      <Composition
+        id="StoreTile"
+        component={StoreTile}
+        durationInFrames={1}
+        fps={30}
+        width={1400}
+        height={560}
+        schema={storeTileSchema}
+        defaultProps={{
+          brandId: "tenwords",
+          tagline: null,
+        }}
+        calculateMetadata={({props}) => ({
+          width: props.formatWidth ?? 1400,
+          height: props.formatHeight ?? 560,
+        })}
       />
       <Composition
         id="WrapClip"
