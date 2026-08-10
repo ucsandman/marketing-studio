@@ -75,8 +75,12 @@ execSync(
 // then resume -- the strongest self-contained beat in the demo, verified
 // against extracted proof frames at t=29/33.5/36.5s before this ran.
 console.log('render: readme.gif');
-const README_GIF_START = 28.3; // s -- "the agent takes it back with one call"
-const README_GIF_DURATION = 8.7; // s -- through the STOP beat and resume
+// Re-timed for the 2026-08-10 re-shoot. The old 28.3s start belonged to the
+// previous take; against the new beat map it ended at 37.0s, one second SHORT of
+// the STOP beat, so the gif promised a kill switch in its alt text and never
+// showed one. Re-time these whenever the demo is re-shot.
+const README_GIF_START = 34.0; // s -- "the agent takes it back with one call"
+const README_GIF_DURATION = 8.7; // s -- through the STOP beat, refused tap, resume
 const README_GIF_WIDTH = 800; // brief: "prefer ~800px wide"
 const README_GIF_FPS = 10;
 const README_GIF_BUDGET_BYTES = 5 * 1024 * 1024; // scripts/check-budgets.mjs hard gate
