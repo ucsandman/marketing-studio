@@ -5,7 +5,7 @@
   "lines": [
     "A red stop button freezes every action",
     "Ambiguous sends abort before typing",
-    "Every message lands in an audit log"
+    "Every action is logged, typed text never is"
   ],
   "screenshot": "phoneclaude/feature-stop.png",
   "cta": "No Mac. No jailbreak. Kill switch included.",

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * record-phoneclaude-demo.mjs - records the phone-claude viewer for ProductDemo.
+ * record-phoneclaude-demo.mjs - records the sidetap viewer for ProductDemo.
  *
  * Prereq: a real iPhone on USB with the harness chain up, and the viewer serving:
  *   cd C:\Projects\phone-claude && phone-harness up
@@ -21,8 +21,10 @@
  * PRIVACY: the footage is public. Only the home screen, the Clock app and the
  * Search pull-down are filmed - never Messages, Mail, Photos, Contacts, or the
  * Settings root (its Apple Account row carries the owner's real name). The
- * device UDID and the Apple team id printed by the doctor checks are masked in
- * the page before recording; see REDACT below.
+ * device UDID, the Apple team id, and the Windows user name printed by the
+ * doctor checks are masked in the page before recording. The dashboard's
+ * Recent sends card renders a real contact name and real message bodies, so
+ * those are swapped for demo stand-ins too; see REDACT below.
  */
 import {chromium} from '@playwright/test';
 import {spawn} from 'node:child_process';
@@ -100,20 +102,41 @@ const runPhone = (py, {allowFail = false} = {}) =>
     child.stdin.end(py);
   });
 
-// The doctor checks print a device UDID and the Apple team id of the signing
-// account. Both identify the owner's hardware and Apple ID, and this footage is
-// public, so mask the identifiers (labels and structure stay untouched).
+// The doctor checks print a device UDID, the Apple team id of the signing
+// account, and the go-ios path under the Windows home dir. All three identify
+// the owner, and this footage is public, so mask the identifiers (labels and
+// structure stay untouched). The zero-scroll dashboard additionally puts a real
+// contact name and real message bodies on the main screen in Recent sends -
+// those get demo stand-ins, because the film must never show real messages.
 const REDACT = `
   (() => {
     const mask = (s) => s
       .replace(/\\b([0-9A-F]{8})-([0-9A-F]{16})\\b/gi, '$1-XXXXXXXXXXXXXXXX')
-      .replace(/\\.xctrunner\\.([A-Z0-9]{10})\\b/gi, '.xctrunner.XXXXXXXXXX');
+      .replace(/\\.xctrunner\\.([A-Z0-9]{10})\\b/gi, '.xctrunner.XXXXXXXXXX')
+      .replace(/Users\\\\[^\\\\]+/g, 'Users\\\\you');
+    const stub = () => {
+      for (const chip of document.querySelectorAll('#contact-chips .chip')) {
+        const pin = chip.querySelector('.pin');
+        if (chip.firstChild && chip.firstChild.nodeType === 3) chip.firstChild.nodeValue = 'Mom';
+        if (pin && pin.parentNode !== chip) chip.appendChild(pin);
+      }
+      for (const row of document.querySelectorAll('#sent-list .sent-row')) {
+        const who = row.querySelector('.who');
+        if (who) who.textContent = 'Mom';
+        for (const n of row.childNodes)
+          if (n.nodeType === 3 && n.nodeValue.trim() && n.nodeValue.trim() !== ':')
+            n.nodeValue = ': be there in ten ';
+      }
+      const to = document.getElementById('text-to');
+      if (to && to.value) to.value = 'Mom';
+    };
     const sweep = () => {
       const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
       for (let n = walk.nextNode(); n; n = walk.nextNode()) {
         const next = mask(n.nodeValue);
         if (next !== n.nodeValue) n.nodeValue = next;
       }
+      stub();
     };
     const start = () => { sweep(); setInterval(sweep, 200); };
     if (document.body) start();
@@ -192,16 +215,27 @@ press_home(); time.sleep(1.5)
   // --- 1. The whole surface: live phone left, checks right --------------------
   const wide = union(await box('#phone-pane'), await box('#side'));
   const wideFocus = clampFocus(wide, {padX: 40, padY: 20});
-  rec.step('One local page. The phone streams live, the checks sit beside it.');
+  rec.step('One local page. The phone streams live, the dashboard sits beside it.');
   rec.focusAt(wideFocus.x, wideFocus.y, {w: wideFocus.w, h: wideFocus.h});
   await page.waitForTimeout(3200);
 
   // --- 2. The checks, all green ----------------------------------------------
-  await page.locator('#doctor .check').first().waitFor({timeout: 40_000});
+  // The zero-scroll dashboard keeps the checks as one dot per check in the
+  // header; the detail lives in an overlay. Film the glance, then the detail.
+  await page.locator('#checks-dots span').first().waitFor({timeout: 40_000});
   await page.waitForTimeout(SETTLE_MS);
-  rec.step('Eight checks on the USB chain. Every failure names its own fix.');
-  await focusOn('#doctor', {padX: 40, padY: 24});
-  await page.waitForTimeout(3000);
+  const checkCount = await page.locator('#checks-dots span').count();
+  rec.step('One dot per check on the USB chain.');
+  await focusOn('#dash-header', {padX: 24, padY: 18});
+  await page.waitForTimeout(2200);
+
+  await rec.click(page.locator('#hdr-checks'), `All ${checkCount} pass. Every failure names its own fix.`);
+  await page.locator('#ov-panel .check').first().waitFor({timeout: 20_000});
+  await page.waitForTimeout(SETTLE_MS);
+  await focusOn('#ov-panel', {padX: 30, padY: 20});
+  await page.waitForTimeout(3400);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(900);
 
   // --- 3. The agent drives the phone ------------------------------------------
   const phoneFocus = clampFocus(await box('#screen-wrap'), {padX: 30, padY: 16});
@@ -223,6 +257,13 @@ tap_text("Start"); time.sleep(1.2)
   rec.step('The stream is live at about 34 frames per second.');
   rec.focusAt(digits.x, digits.y, {w: digits.w, h: digits.h});
   await page.waitForTimeout(2800);
+
+  // --- 4b. The activity feed: you can see what the agent did -------------------
+  // The taps from step 3 are already in the feed. The counts are the honest bit:
+  // typed text is never recorded, only its length, because it can be a passcode.
+  rec.step('Every action lands in the feed. Typed text is never stored, only its length.');
+  await focusOn('#col-agent', {padX: 26, padY: 18});
+  await page.waitForTimeout(3000);
 
   // --- 5. The human drives the same screen ------------------------------------
   rec.focusAt(phoneFocus.x, phoneFocus.y, {w: phoneFocus.w, h: phoneFocus.h});
@@ -277,7 +318,7 @@ tap_text("Start"); time.sleep(1.2)
   const props = {
     brandId: 'phoneclaude',
     video: 'phoneclaude/demo.webm',
-    cta: 'Clone it free · github.com/ucsandman/phone-claude',
+    cta: 'Clone it free · github.com/ucsandman/sidetap',
     telemetry,
   };
   writeFileSync(propsOut, JSON.stringify(props, null, 2) + '\n');

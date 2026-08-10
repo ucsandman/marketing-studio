@@ -167,6 +167,7 @@ export const RemotionRoot: React.FC = () => {
         defaultProps={{
           brandId: "tenwords",
           tagline: null,
+          density: 1,
         }}
         calculateMetadata={({props}) => ({
           width: props.formatWidth ?? 1400,

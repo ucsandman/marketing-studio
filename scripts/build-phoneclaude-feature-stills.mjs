@@ -1,11 +1,15 @@
-// Feature-act stills for the phone-claude launch video. All three panels show REAL
+// Feature-act stills for the sidetap launch video. All three panels show REAL
 // surfaces only, cropped out of the already-approved demo capture
 // (studio/public/phoneclaude/demo.webm, 1600x1000, 25 fps):
-//   feature-tree    <- the live viewer at t=17s: phone streaming while the agent
-//                      drives it, with the tap_text("General") helper line on screen
-//   feature-stop    <- the STOP beat at t=33.8s: red bezel, STOPPED badge, RESUME
-//   feature-signing <- the doctor CHECKS column at t=6.5s, including the
+//   feature-tree    <- the activity beat at t=23s: phone streaming while the feed
+//                      lists what the agent just did, char counts and all
+//   feature-stop    <- the STOP beat at t=39s: red bezel, STOPPED badge, RESUME
+//   feature-signing <- the checks OVERLAY at t=9.5s, including the
 //                      "input signature (7-day)" countdown row
+// Timestamps track the 2026-08-10 re-shoot against the zero-scroll dashboard: the
+// checks moved from an always-on column into an overlay, and the old console beat
+// (tap_text("General") on screen) no longer exists, so feature-tree now sources the
+// activity feed instead. Re-time these whenever the capture is re-shot.
 // Crops are in the capture's own pixels and are landscape (~16:10) because
 // FeaturePanel's landscape row layout sizes the panel off the image's aspect.
 // Nothing is re-captured and nothing is invented; this script is the source of truth
@@ -33,9 +37,9 @@ const capture = join(dest, 'demo.webm');
 // a control: feature-stop would otherwise cut the red RESUME bar into a stray red
 // sliver at the panel edge, and feature-tree would clip the phone's bottom bezel.
 const shots = [
-  {name: 'feature-tree.png', crop: '1360:850:200:0', ss: '17.0'},
-  {name: 'feature-stop.png', crop: '1584:990:8:0', ss: '33.8'},
-  {name: 'feature-signing.png', crop: '580:363:735:350', ss: '6.5'},
+  {name: 'feature-tree.png', crop: '1584:850:8:0', ss: '23.0'},
+  {name: 'feature-stop.png', crop: '1584:990:8:0', ss: '39.0'},
+  {name: 'feature-signing.png', crop: '760:474:420:291', ss: '9.5'},
 ];
 
 if (!existsSync(capture)) {
