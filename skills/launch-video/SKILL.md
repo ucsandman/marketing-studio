@@ -5,7 +5,7 @@ description: Use when the user wants a full launch video / hero video / 30-90s p
 
 # Launch Video
 
-**REQUIRED BACKGROUND:** marketing-studio skill. Work in `C:\Projects\animations`.
+**REQUIRED BACKGROUND:** marketing-studio skill. Work in `${CLAUDE_SKILL_DIR}/../..`.
 
 Produces: `out/<brand>/launch.mp4` — ~45s five-act composition: logo reveal ->
 hook headline -> live demo -> feature beats (1-3) -> end card, over the brand's

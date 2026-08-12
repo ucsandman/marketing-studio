@@ -5,7 +5,7 @@ description: Use when the user wants music, voiceover, narration, or a soundtrac
 
 # Audio Track
 
-**REQUIRED BACKGROUND:** marketing-studio skill. Work in `C:\Projects\animations`.
+**REQUIRED BACKGROUND:** marketing-studio skill. Work in `${CLAUDE_SKILL_DIR}/../..`.
 Read the PLAYBOOK's Audio section first (endpoints, ducking, manifest contract).
 
 Two modes; pick by what the user wants:

@@ -7,8 +7,10 @@ here. Everything below was learned the expensive way during the 5-phase build
 
 ## Engine map
 
-All rendering happens IN THIS REPO (`C:\Projects\animations`), never in the product's
-repo. Assets are copied out to the calling repo at the end.
+All rendering happens IN THE ENGINE REPO (the directory holding this `docs/` folder),
+never in the product's repo. Assets are copied out to the calling repo at the end.
+Every path below is relative to that engine root, so they resolve whether the engine
+is a source clone or an installed plugin.
 
 | Piece | Where | Run |
 |---|---|---|

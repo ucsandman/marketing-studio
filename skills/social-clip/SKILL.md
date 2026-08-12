@@ -5,7 +5,7 @@ description: Use when the user wants a short social media video / feature announ
 
 # Social Clip
 
-**REQUIRED BACKGROUND:** marketing-studio skill. Work in `C:\Projects\animations`.
+**REQUIRED BACKGROUND:** marketing-studio skill. Work in `${CLAUDE_SKILL_DIR}/../..`.
 
 Produces: `out/<brand>/<name>.mp4` — 10s, 1920x1080, three acts:
 headline word-spring -> screenshot panel + feature lines -> end card.

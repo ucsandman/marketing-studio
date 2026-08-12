@@ -1,0 +1,22 @@
+{
+  "name": "marketing-studio",
+  "description": "Agent-driven marketing studio. One command turns a product into a full asset suite: logo reveal, product demo, launch video with generated voiceover and music, per-platform social clips, and OG images. Rendering runs through Remotion compositions in a local engine; brands are data, so a new product is a JSON file and a mark component, not a fork. Requires Node 20+, ffmpeg, and a one-time engine bootstrap. Blender and an ElevenLabs key are optional and unlock the 3D logo reveal and the audio track.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Wes Sander",
+    "url": "https://github.com/ucsandman"
+  },
+  "homepage": "https://github.com/ucsandman/marketing-studio",
+  "repository": "https://github.com/ucsandman/marketing-studio",
+  "license": "MIT",
+  "keywords": [
+    "marketing",
+    "video",
+    "remotion",
+    "animation",
+    "branding",
+    "social-media",
+    "og-images",
+    "launch"
+  ]
+}

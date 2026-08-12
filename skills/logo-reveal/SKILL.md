@@ -6,7 +6,7 @@ description: Use when the user wants a logo reveal / logo animation / brand intr
 # Logo Reveal
 
 **REQUIRED BACKGROUND:** marketing-studio skill (engine location, brand onboarding,
-PLAYBOOK gotchas). Work happens in `C:\Projects\animations`.
+PLAYBOOK gotchas). Work happens in `${CLAUDE_SKILL_DIR}/../..`.
 
 Produces: `out/<brand>/logo-reveal.mp4` — 3s Blender 3D draw-on of the brand mark
 composited in Remotion over the brand backdrop with wordmark + CTA (5s total).

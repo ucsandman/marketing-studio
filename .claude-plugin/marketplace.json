@@ -1,0 +1,30 @@
+{
+  "name": "ucsandman",
+  "owner": {
+    "name": "Wes Sander",
+    "url": "https://github.com/ucsandman"
+  },
+  "metadata": {
+    "description": "Plugins by ucsandman."
+  },
+  "plugins": [
+    {
+      "name": "marketing-studio",
+      "description": "Turn a product into a full marketing asset suite: logo reveal, product demo, launch video with generated audio, social clips, and OG images. Rendered locally through Remotion.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Wes Sander",
+        "url": "https://github.com/ucsandman"
+      },
+      "source": "./",
+      "category": "productivity",
+      "homepage": "https://github.com/ucsandman/marketing-studio",
+      "tags": [
+        "marketing",
+        "video",
+        "remotion",
+        "branding"
+      ]
+    }
+  ]
+}

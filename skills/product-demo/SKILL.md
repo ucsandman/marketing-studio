@@ -5,7 +5,7 @@ description: Use when the user wants a product demo video / screen recording wit
 
 # Product Demo
 
-**REQUIRED BACKGROUND:** marketing-studio skill. Work in `C:\Projects\animations`.
+**REQUIRED BACKGROUND:** marketing-studio skill. Work in `${CLAUDE_SKILL_DIR}/../..`.
 
 Produces: `out/<brand>/demo.mp4` — real app footage with synthetic smooth cursor,
 focus-driven camera zooms, and step captions, plus a brand end card.

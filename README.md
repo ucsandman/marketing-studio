@@ -2,7 +2,7 @@
 
 An agent-driven marketing studio for Claude Code. You type `/marketing` in your product's repo; the agent onboards your brand, films your app, renders a full marketing asset suite in this engine, and copies the finished files back to you.
 
-![Animated OG loop rendered by the studio](examples/paperroute/readme.gif)
+![Animated OG loop rendered by the studio](examples/sidetap/readme.gif)
 
 *An animated OG loop the studio rendered for a real product, from brand tokens alone. More in [`examples/`](examples/).*
 
@@ -43,32 +43,21 @@ Each asset also works standalone: run `/logo-reveal`, `/product-demo`, `/launch-
 
 ## Example output
 
-Everything below was produced by `/marketing` runs against two real products, unedited. Turn the sound on: the voiceover and music are generated too.
+Everything below was produced by one `/marketing` run against a real product, unedited. Turn the sound on: the voiceover and music are generated too.
 
-### noban.gg (CS2 skin arbitrage dashboard)
+### sidetap.io (drive a real iPhone from Windows)
 
-https://github.com/user-attachments/assets/7d184b12-1afc-4129-a4f0-87a33da986e3
-
-| File | Asset |
-|------|-------|
-| [`launch.mp4`](examples/noban/launch.mp4) | 60s launch video with generated voiceover and music |
-| [`demo.mp4`](examples/noban/demo.mp4) | Product demo with measured camera zooms ([preview still](examples/noban/demo-still.png)) |
-| [`logo-reveal.mp4`](examples/noban/logo-reveal.mp4) | Blender draw-on logo reveal |
-| [`social-launch.mp4`](examples/noban/social-launch.mp4) | X/LinkedIn announcement clip |
-| [`og.mp4`](examples/noban/og.mp4) | Animated OG loop |
-
-### paperroute.gg (wallpaper ad network)
-
-https://github.com/user-attachments/assets/1bf89936-4f8b-405a-b507-5f051ae18ef8
+<!-- For inline playback, drag examples/sidetap/launch.mp4 into a GitHub comment box
+     and paste the resulting user-attachments URL on its own line here. -->
 
 | File | Asset |
 |------|-------|
-| [`launch.mp4`](examples/paperroute/launch.mp4) | Launch video with audio |
-| [`demo.mp4`](examples/paperroute/demo.mp4) | Product demo |
-| [`logo-reveal.mp4`](examples/paperroute/logo-reveal.mp4) | Blender logo reveal |
-| [`social-x.mp4`](examples/paperroute/social-x.mp4), [`social-linkedin.mp4`](examples/paperroute/social-linkedin.mp4), [`social-vertical.mp4`](examples/paperroute/social-vertical.mp4) | Per-platform social clips |
-| [`og.png`](examples/paperroute/og.png), [`og.gif`](examples/paperroute/og.gif), [`og.mp4`](examples/paperroute/og.mp4) | OG image, loop, and video |
-| [`readme.gif`](examples/paperroute/readme.gif) | README-sized GIF (the one at the top of this page) |
+| [`launch.mp4`](examples/sidetap/launch.mp4) | 88s launch video with generated voiceover and music |
+| [`demo.mp4`](examples/sidetap/demo.mp4) | Product demo filmed against a live iPhone, with measured camera zooms |
+| [`logo-reveal.mp4`](examples/sidetap/logo-reveal.mp4) | Blender draw-on logo reveal |
+| [`social-x.mp4`](examples/sidetap/social-x.mp4), [`social-linkedin.mp4`](examples/sidetap/social-linkedin.mp4) | Per-platform social clips |
+| [`og.png`](examples/sidetap/og.png), [`og.gif`](examples/sidetap/og.gif), [`og.mp4`](examples/sidetap/og.mp4) | OG image, loop, and video |
+| [`readme.gif`](examples/sidetap/readme.gif) | README-sized GIF (the one at the top of this page) |
 
 ## How it works
 
@@ -78,18 +67,44 @@ https://github.com/user-attachments/assets/1bf89936-4f8b-405a-b507-5f051ae18ef8
 - **Feeders produce raw material.** Playwright records your running app for demos, headless Blender renders 3D logo reveals, ElevenLabs generates voiceover and music, and ComfyUI can add AI backdrops. Every feeder degrades cleanly when its dependency is missing.
 - **The knowledge lives in the skills.** The `skills/` directory ships the Claude Code skills that operate this repo, including the hard-won gotchas in `docs/PLAYBOOK.md` (camera math, seamless-loop rules, Blender API traps) so the agent does not re-derive them.
 
-## Quick start
+## Requirements
 
-Requirements: [Claude Code](https://claude.com/claude-code), Node 20+, Python 3.10+. Optional: Blender (3D logo reveals), an ElevenLabs API key (audio), ComfyUI (AI backdrops); everything falls back cleanly without them.
+Required: [Claude Code](https://claude.com/claude-code), Node 20+, Python 3.10+, and **ffmpeg on your PATH** (26 scripts shell out to `ffmpeg`/`ffprobe` directly).
+
+Optional, each degrading cleanly when absent: Blender for 3D logo reveals, an ElevenLabs API key for voiceover and music, ComfyUI for AI backdrops.
+
+**Remotion licence.** Every final video renders through [Remotion](https://www.remotion.dev/), which is free for individuals and for companies of three people or fewer. Larger companies need a Remotion company licence. That is Remotion's term, separate from this repo's MIT licence.
+
+## Install
+
+### As a plugin
+
+```
+/plugin marketplace add ucsandman/marketing-studio
+/plugin install marketing-studio@ucsandman
+```
+
+Plugin skills are namespaced, so the commands are `/marketing-studio:marketing`, `/marketing-studio:logo-reveal`, and so on.
+
+The engine ships with the plugin, but its npm dependencies do not. Bootstrap once by asking Claude to *"bootstrap the marketing studio engine"*, or run it yourself against the installed plugin directory:
+
+```bash
+python <plugin-dir>/launch.py --bootstrap
+```
+
+That installs the studio and capture-feeder dependencies and then prints a toolchain report. Copy `.env.example` to `.env` in the same directory if you have a Blender path or an ElevenLabs key.
+
+### From source
 
 ```bash
 git clone git@github.com:ucsandman/marketing-studio.git
 cd marketing-studio
-cd studio && npm install && cd ..
+python launch.py --bootstrap    # installs npm deps, then verifies the toolchain
 cp .env.example .env            # set BLENDER_PATH / ELEVENLABS_API_KEY if you have them
 node scripts/install-skills.mjs # installs /marketing and friends into ~/.claude/skills
-python launch.py --check        # verifies the toolchain
 ```
+
+Installing from source gives you unnamespaced commands (`/marketing` rather than `/marketing-studio:marketing`) and keeps renders in the clone instead of the plugin cache. Use this one if you intend to work on the engine itself.
 
 Then, from your product's repo:
 
@@ -123,11 +138,12 @@ The pipeline's supporting skills ship too, so nothing in the run dangles:
 | `/ship` | Verify, docs, secrets scan, commit, push ritual |
 | `/launch` | Announcement drafts per channel (X, LinkedIn, Show HN, email) with approval gates |
 
-`scripts/install-skills.mjs` copies all of them into `~/.claude/skills` and rewrites the engine path to wherever you cloned this repo. It never overwrites a skill you have symlinked. Two optional plugins deepen the UI-polish phase if you have them (`impeccable` and `frontend-design`); without them the pipeline films your app as-is.
+Installing the plugin ships all of them, namespaced under `marketing-studio:`. For a source checkout, `scripts/install-skills.mjs` copies them into `~/.claude/skills` unnamespaced and rewrites the engine path to wherever you cloned this repo; it never overwrites a skill you have symlinked. Two optional plugins deepen the UI-polish phase if you have them (`impeccable` and `frontend-design`); without them the pipeline films your app as-is.
 
 ## Repo layout
 
 ```
+.claude-plugin/    plugin + marketplace manifests (this repo installs as a plugin)
 brands/            per-product brand tokens (zod-validated JSON)
 studio/            Remotion project: all final video compositions
 feeders/blender/   headless bpy scenes (3D logo reveals)
@@ -135,7 +151,7 @@ feeders/capture/   Playwright recorder (product demos)
 feeders/audio/     ElevenLabs client (voiceover + music)
 feeders/comfy/     ComfyUI client (optional AI backdrops)
 skills/            the Claude Code skills that drive all of this
-examples/          real output: full asset suites for two shipped products
+examples/          real output: the full asset suite for one shipped product
 scripts/           props builders, staging, statics, smoke, copy linter, brief
                    gatherer, storyboard board, export matrix, captions, thumbs,
                    post kit, contact sheets, footage cache, SFX library,

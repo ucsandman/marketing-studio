@@ -11,12 +11,12 @@
 // suits the animated loop's motion), so og.png gets its own props file with
 // showFloatBar:false -- a static frame of a scrubber mid-fill reads as a
 // broken/frozen control, not a design element (same call as costclaw/
-// phoneclaude).
+// sidetap).
 //
 // Bundled Remotion ffmpeg is a minimal build (no `fps`/`select` filter): trim
 // via -ss/-t (container seek), decimate via the legacy `-r` OUTPUT option, and
 // use the two-pass palettegen/paletteuse pattern from
-// render-costclaw-statics.mjs / render-phoneclaude-statics.mjs.
+// render-costclaw-statics.mjs / render-sidetap-statics.mjs.
 import {mkdirSync, statSync, unlinkSync, writeFileSync} from 'node:fs';
 import {execSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
@@ -46,7 +46,7 @@ const baseProps = {
 };
 
 // Static still: bar-free (a frozen scrubber mid-fill reads as a broken
-// control, not a design element -- same call as costclaw/phoneclaude).
+// control, not a design element -- same call as costclaw/sidetap).
 const staticPropsPath = join(outDir, 'og-props-static.json');
 writeFileSync(staticPropsPath, JSON.stringify({...baseProps, showFloatBar: false}));
 
@@ -79,7 +79,7 @@ execSync(
 // folds to exactly ten words." (18.331s), into "A red pilcrow marks where each
 // one was." (22.645s) and its focus-zoom hold (23.355s) -- the fold snap itself
 // lands in the first half-second of the gif (payoff-first, matches
-// render-costclaw-statics.mjs / render-phoneclaude-statics.mjs convention).
+// render-costclaw-statics.mjs / render-sidetap-statics.mjs convention).
 console.log('render: readme.gif');
 const README_GIF_START = 17.8; // s -- just before the fold snap
 const README_GIF_DURATION = 9.0; // s -- through the pilcrow focus hold

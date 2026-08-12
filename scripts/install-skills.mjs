@@ -15,8 +15,10 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const srcDir = join(root, 'skills');
 const destDir = join(homedir(), '.claude', 'skills');
 
-// The skills ship with the author's engine path; rewrite it to this clone.
-const CANONICAL = 'C:\\Projects\\animations';
+// The skills locate the engine as ${CLAUDE_SKILL_DIR}/../.., which is correct when
+// they live inside the engine (the plugin layout: <engine>/skills/<name>/). Copying
+// them to ~/.claude/skills/<name>/ breaks that walk-up, so bake in this clone's path.
+const ENGINE_PLACEHOLDER = '${CLAUDE_SKILL_DIR}/../..';
 const enginePath = root;
 
 if (!existsSync(srcDir)) {
@@ -46,9 +48,7 @@ for (const name of skills) {
   const skillFile = join(to, 'SKILL.md');
   if (existsSync(skillFile)) {
     let text = readFileSync(skillFile, 'utf8');
-    text = text
-      .replaceAll(CANONICAL, enginePath)
-      .replaceAll(CANONICAL.replaceAll('\\', '/'), enginePath.replaceAll(sep, '/'));
+    text = text.replaceAll(ENGINE_PLACEHOLDER, enginePath.replaceAll(sep, '/'));
     writeFileSync(skillFile, text);
   }
   console.log(`installed /${name} -> ${to}`);

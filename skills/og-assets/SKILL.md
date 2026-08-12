@@ -5,7 +5,7 @@ description: Use when the user wants OG images, link-preview assets, animated OG
 
 # OG Assets
 
-**REQUIRED BACKGROUND:** marketing-studio skill. Work in `C:\Projects\animations`.
+**REQUIRED BACKGROUND:** marketing-studio skill. Work in `${CLAUDE_SKILL_DIR}/../..`.
 
 Produces: `out/<brand>/og.mp4` (8s seamless 1200x630 loop), `og.gif`, `readme.gif`
 (600x315), optionally backed by a ComfyUI AI hero texture.

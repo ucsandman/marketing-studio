@@ -1,0 +1,14 @@
+{
+  "brandId": "sidetap",
+  "kicker": "sidetap",
+  "headline": "iPhone automation without a Mac used to be a dead end.",
+  "lines": [
+    "Exact UI element tree, not OCR guesses",
+    "tap_text(\"General\") finds the button and taps it",
+    "Live viewer streams the phone in your browser"
+  ],
+  "screenshot": "sidetap/feature-tree.png",
+  "cta": "sidetap drives a real iPhone from Windows over USB.",
+  "command": null,
+  "video": "sidetap/social-linkedin-open.webm"
+}
