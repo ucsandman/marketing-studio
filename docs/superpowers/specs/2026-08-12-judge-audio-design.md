@@ -103,13 +103,27 @@ assets do not suddenly start failing a pipeline.
    re-declared. One source of truth, same rule the PLAYBOOK applies to duration math.
 3. **Silence** — `silencedetect` (`noise=-35dB`, the level
    `build-magnetic-demo-media.mjs` already uses) reports leading silence, trailing
-   silence, and the longest interior speechless stretch. Explicit thresholds, chosen
-   from the costclaw baseline and revisable once more assets are measured:
-   leading or trailing silence over **1.0s** is a FAIL (the PLAYBOOK already requires
-   trimming these before Magnetic import); an interior speechless stretch over
-   **8.0s** is a WARN carrying the measured number. Costclaw's 23.5s stretch WARNs
-   under this rule, which is the intended behavior — it is a fact worth surfacing, not
-   a defect worth blocking.
+   silence, and the longest interior speechless stretch.
+
+   **Edge-silence bars are DERIVED, never magic numbers.** `audioMix.ts` fades every
+   track in over `FADE_IN` (24 frames, 0.8s) and out over `FADE_OUT` (36 frames,
+   1.2s), so a correctly built asset ends with a quiet tail BY DESIGN. An earlier
+   draft of this spec set a flat 1.0s FAIL bar and would therefore have failed every
+   correctly built asset — costclaw measures 1.26s of trailing silence, which is the
+   fade, not a defect. Import `FADE_IN` and `FADE_OUT` from `audioMix.ts` and set each
+   bar at its fade duration plus 0.5s tolerance (today: leading 1.3s, trailing 1.7s).
+   Retuning a fade then moves the gate with it instead of leaving it stale — the same
+   one-source-of-truth rule this spec already applies to the loudness targets.
+
+   An interior speechless stretch over **8.0s** is a WARN carrying the measured
+   number. Costclaw's 23.5s stretch WARNs under this rule, which is the intended
+   behavior — a fact worth surfacing, not a defect worth blocking.
+
+   **Interior stretches come from the transcript, not `silencedetect`.** Measured:
+   `silencedetect=noise=-35dB` finds ZERO interior silence on costclaw, because the
+   music keeps playing through the gap well above the noise floor. Only the gap
+   between recognized words reveals it. Leading and trailing silence are genuine
+   digital silence and do use `silencedetect`.
 4. **Transcript** — `transcribe.py` returns segments and word timestamps.
 5. **Content diff** — normalized fuzzy match of heard vs manifest, per act, in order.
 6. **Timing diff** — measured line start/end vs manifest `durationMs` and the
