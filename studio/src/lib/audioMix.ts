@@ -1,5 +1,5 @@
 import {z} from 'zod';
-import {VO_LEAD, type Act} from './launchTiming';
+import {VO_LEAD, type Act} from './launchTiming.ts';
 import type {SfxCue, SfxKind} from './sfxCues';
 
 // Word-level VO timestamps (feeders/audio/client.mjs --timestamps, or the
@@ -49,8 +49,8 @@ export {VO_LEAD};
 const BASE = 0.35;
 const DUCKED = 0.12;
 const RAMP = 9;
-const FADE_IN = 24;
-const FADE_OUT = 36;
+export const FADE_IN = 24;
+export const FADE_OUT = 36;
 
 const actFor = (key: string, timing: Timing): Act => {
   if (key === 'logo' || key === 'hook' || key === 'demo' || key === 'end') return timing[key];

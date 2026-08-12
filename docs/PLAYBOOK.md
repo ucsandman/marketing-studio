@@ -328,6 +328,45 @@ placeholder so smoke stays green on a clean clone.
   so the processing chain works to -2.0 dBTP to deliver <= -1.0 (verified on a
   real master: chain at -1.0 delivered -0.5 and failed the gate).
 
+### Audio judge (`scripts/judge-audio.mjs`) — the ear-gate
+
+Reads the FINAL rendered file, not the plan. Everything else in this repo checks
+JSON against JSON: `judge-av-sync` is explicitly "PURE DATA, no rendering", so
+stale VO, a wrong-brand track, a truncated line and a mispronunciation were all
+invisible until this existed. Spec:
+`docs/superpowers/specs/2026-08-12-judge-audio-design.md`.
+
+- **Use faster-whisper, never openai-whisper.** `import whisper` is BROKEN on this
+  machine: `Numba needs NumPy 2.3 or less. Got NumPy 2.4`. `faster_whisper` 1.2.1
+  is already installed (no new dependency); model `Systran/faster-whisper-small`
+  caches to `~/.cache/huggingface/hub` (464 MB) and runs offline after that.
+  Cost: 74s of audio = ~25s wall on CPU int8, of which ~16s is model load — so
+  load the model ONCE per process and transcribe every asset in that process.
+- **Never diff transcript text exactly.** Whisper heard `"NPX Cost Claw audit"` for
+  manifest `"n p x costclaw audit"`, and `"Cost Claw,"` for `"CostClaw."`. An exact
+  comparison false-positives on a known-good asset. Normalize both sides (case,
+  punctuation, whitespace, single-letter runs, camel-case splits) then score by
+  token similarity.
+- **Edge-silence bars are derived from the fades, never hardcoded.** `FADE_OUT` is
+  36 frames (1.2s), so a correct asset ENDS QUIET BY DESIGN. A flat 1.0s bar
+  failed costclaw's legitimate 1.26s tail. Bars = `FADE_IN|FADE_OUT / FPS + 0.5s`.
+- **Interior speechless stretches come from the transcript, not `silencedetect`.**
+  At `noise=-35dB` silencedetect finds ZERO interior silence on costclaw: the
+  music plays through the gap, far above the noise floor. Only the gap between
+  recognized words reveals it (costclaw: 23.5s between 19.78s and 43.28s).
+  Leading/trailing silence IS real digital silence and does use silencedetect.
+- **`master-audio.mjs` used to run its CLI on import**, so importing its loudness
+  targets called `process.exit(1)` before the importer's own code ran. Fixed with
+  the `isMain` guard `judge-av-sync.mjs` already used. If you add a new script
+  meant to be imported, guard its CLI body the same way.
+- **`audioMix.ts` now imports `'./launchTiming.ts'` WITH the extension**, for the
+  identical reason `wordCues.ts` already does (Node's ESM loader does no
+  extensionless resolution, and `judge-audio` loads it through type-stripping).
+  Do not "clean up" the extension.
+- The duck check is WARN-only by design. This master's LRA is 2.8 LU, so mean
+  level inside VO windows differs by well under 1 dB from the music-only regions;
+  a FAIL threshold would cry wolf on a known-good asset.
+
 ### Process
 - Every generated props file has a builder script as its source of truth
   (`build-launch-props.mjs` pattern) — never hand-edit generated JSON.
