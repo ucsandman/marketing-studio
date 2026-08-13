@@ -368,6 +368,29 @@ invisible until this existed. Spec:
 - The duck check is WARN-only by design. This master's LRA is 2.8 LU, so mean
   level inside VO windows differs by well under 1 dB from the music-only regions;
   a FAIL threshold would cry wolf on a known-good asset.
+- **Lines match word WINDOWS, never gap-grouped segments.** The first matcher
+  split the word stream on >1s gaps and assigned one segment per line; sidetap
+  and paperroute speak back-to-back lines with sub-second gaps, so three correct
+  lines merged into one blob, one act claimed it, and the neighbors reported
+  "not heard at all" (three-brand evidence run, docs/ERRORS.md 2026-08-13).
+  `matchLinesToWindows` scores each line against contiguous word windows, so
+  segment boundaries cannot matter.
+- **Whisper cannot hear a coined brand word without a hint.** "SideTap" came back
+  "PsyTep" (similarity 0.29 — under any usable floor). Brands with a logo act get
+  an initial_prompt built from `brands/<id>.json`: optional `speechHint` (the
+  SPOKEN casing — "SideTap" worked where the lowercase wordmark "sidetap" and
+  "Sidetap" both did not) + tagline, as PROSE. Never a glossary list (repetition
+  loop, ate 30s of transcript) and never the script itself (that hands the judge
+  its own answer key).
+- **Timing FAILs only on wrong PLACEMENT (outside the launchTiming act window).**
+  A span delta alone is WARN: the render mixes the very wav the manifest
+  measured, so a delta with correct placement is whisper timestamp noise —
+  measured -0.49s on a correct render, and the first word after a music-only
+  stretch can absorb the gap entirely (a "This" stamped 4.4s long; edge words
+  are clamped to `MAX_EDGE_WORD_S`). A dropped line is checkContent's catch.
+- **`master-audio.mjs` pins `-ar 48000`.** loudnorm resamples to 192kHz
+  internally and without the explicit rate the AAC encoder delivered 96kHz
+  masters (measured twice, 2026-08-13), tripping the gate's sample-rate check.
 
 ### Process
 - Every generated props file has a builder script as its source of truth

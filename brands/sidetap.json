@@ -1,6 +1,7 @@
 {
   "id": "sidetap",
   "name": "sidetap",
+  "speechHint": "SideTap",
   "tagline": "Your iPhone, driven from Windows",
   "url": "sidetap.io",
   "colors": {

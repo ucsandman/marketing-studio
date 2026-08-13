@@ -97,3 +97,16 @@ with `ears levels` both times).
 **Result.** Reports: `out/<brand>/marketing/judge-audio.json`. Real defect to
 fix when wanted: re-master sidetap and paperroute launch-final audio through
 master-audio (dashclaw proves the mastered path passes).
+
+**Resolved same day.** (1) `matchLinesToWindows` replaced the gap-grouped
+matcher — lines match contiguous word windows, so sub-second inter-line gaps
+cannot merge acts. (2) Brands with a logo act get a prose transcription hint
+from `brands/<id>.json` (`speechHint` carries the spoken casing; "SideTap"
+recovered the word, "sidetap"/"Sidetap" did not). (3) Timing FAILs only on
+wrong act placement; span deltas alone are WARN (whisper stamped a "This" as
+4.4s long after a music gap; edge words now clamp to 1s). (4) sidetap and
+paperroute re-mastered to -13.9/-14.2 LUFS; master-audio now pins `-ar 48000`
+(loudnorm's internal 192kHz resample had delivered 96kHz masters). All four
+brands re-judged: costclaw and dashclaw PASS unchanged, sidetap and paperroute
+down to ONE real FAIL each — 2.2s/2.7s of trailing silence in the composition
+itself (the end card outlives the fade), which only a re-render can fix.

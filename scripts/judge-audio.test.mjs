@@ -12,8 +12,8 @@ import {
   parseEbur128,
   parseSilenceEvents,
   parseVolumeDetect,
-  groupWordsByGap,
-  matchLinesToSegments,
+  matchLinesToWindows,
+  MATCH_MIN_SCORE,
   checkStream,
   checkLoudness,
   checkEdgeSilence,
@@ -158,10 +158,10 @@ test('parseVolumeDetect: extracts mean and max volume from real volumedetect out
   assert.deepEqual(parseVolumeDetect(VOLUMEDETECT_OUTPUT), {meanDb: -18.7, maxDb: -1.5});
 });
 
-// --- word-stream segmentation + line matching -------------------------------
+// --- windowed line matching --------------------------------------------------
 // A real word list (costclaw launch-final.mp4, faster-whisper "small"): logo,
 // then a 40.4s gap spanning the interior speechless stretch, then feature-0 —
-// enough to exercise gap grouping, matching, and ordering together.
+// enough to exercise window matching and ordering together.
 const WORDS = [
   {w: 'Cost', start: 0.0, end: 0.78}, {w: 'Claw,', start: 0.78, end: 1.06},
   {w: 'a', start: 1.36, end: 1.5}, {w: 'local', start: 1.5, end: 1.7},
@@ -175,30 +175,83 @@ const LINES = [
   {act: 'feature-0', text: 'Cache misses,', durationMs: 500},
 ];
 
-test('groupWordsByGap: splits into segments wherever the gap exceeds the threshold', () => {
-  const segments = groupWordsByGap(WORDS);
-  assert.equal(segments.length, 2);
-  assert.equal(segments[0].startMs, 0);
-  assert.equal(segments[0].endMs, 2840);
-  assert.equal(segments[1].startMs, 43280);
-  assert.equal(segments[1].endMs, 44260);
-});
-
-test('matchLinesToSegments: finds the best-content-matching segment per line, unconstrained by position', () => {
-  const segments = groupWordsByGap(WORDS);
-  const matches = matchLinesToSegments(LINES, segments);
+test('matchLinesToWindows: finds the best-content-matching word window per line, unconstrained by position', () => {
+  const matches = matchLinesToWindows(LINES, WORDS);
   assert.equal(matches[0].act, 'logo');
   assert.equal(matches[0].segment.startMs, 0);
+  assert.equal(matches[0].segment.endMs, 2840);
   assert.equal(matches[0].score, 1);
   assert.equal(matches[1].act, 'feature-0');
   assert.equal(matches[1].segment.startMs, 43280);
 });
 
-test('matchLinesToSegments: a line with no available segment gets null (more lines than segments)', () => {
-  const segments = groupWordsByGap(WORDS.slice(0, 8)); // only the logo words
-  const matches = matchLinesToSegments(LINES, segments);
+test('matchLinesToWindows: a line whose words are nowhere in the transcript gets null', () => {
+  const matches = matchLinesToWindows(LINES, WORDS.slice(0, 8)); // only the logo words
   const feature0 = matches.find((m) => m.act === 'feature-0');
   assert.equal(feature0.segment, null);
+  assert.equal(feature0.score, 0);
+});
+
+// REGRESSION (three-brand evidence run, docs/ERRORS.md 2026-08-13): back-to-back
+// VO lines with sub-second gaps. The old gap-grouped matcher merged all three
+// into one blob, matched it to ONE act, and reported the neighbors "not heard at
+// all" with their words sitting verbatim in the transcript — the sidetap
+// feature-0/feature-2 and paperroute end false FAILs. Windows must not care
+// about the 0.5s gaps.
+test('matchLinesToWindows: back-to-back lines with sub-second gaps each match their own window', () => {
+  const words = [
+    {w: 'Under', start: 57.3, end: 57.6}, {w: 'it', start: 57.6, end: 57.8},
+    {w: 'all,', start: 57.8, end: 58.2}, {w: 'the', start: 58.2, end: 58.4},
+    {w: 'real', start: 58.4, end: 58.8}, {w: 'tree.', start: 58.8, end: 59.4},
+    // 0.5s gap — under the old 1s threshold, so the old matcher merged here
+    {w: 'Nervous?', start: 59.9, end: 60.4}, {w: 'Same.', start: 60.6, end: 61.0},
+    // 0.6s gap
+    {w: 'A', start: 61.6, end: 61.7}, {w: 'free', start: 61.7, end: 62.0},
+    {w: 'Apple', start: 62.0, end: 62.4}, {w: 'ID.', start: 62.4, end: 62.9},
+  ];
+  const lines = [
+    {act: 'feature-0', text: 'Under it all, the real tree.', durationMs: 2100},
+    {act: 'feature-1', text: 'Nervous? Same.', durationMs: 1100},
+    {act: 'feature-2', text: 'A free Apple ID.', durationMs: 1300},
+  ];
+  const matches = matchLinesToWindows(lines, words);
+  for (const m of matches) assert.notEqual(m.segment, null, `${m.act} must be heard`);
+  assert.equal(matches[0].segment.startMs, 57300);
+  assert.equal(matches[0].segment.endMs, 59400);
+  assert.equal(matches[1].segment.startMs, 59900);
+  assert.equal(matches[1].segment.endMs, 61000);
+  assert.equal(matches[2].segment.startMs, 61600);
+  assert.equal(matches[2].segment.endMs, 62900);
+  for (const m of matches) assert.ok(m.score >= CONTENT_SIMILARITY_THRESHOLD);
+});
+
+// REGRESSION: whisper stamped sidetap's hook-opening "This" as 1.2s-5.62s — the
+// first word after a music-only stretch absorbs the gap, and 3.7s of music landed
+// inside the measured VO span. Edge words longer than MAX_EDGE_WORD_S keep only
+// their final (leading) second.
+test('matchLinesToWindows: a pathologically stretched edge word does not inflate the window span', () => {
+  const words = [
+    {w: 'This', start: 1.2, end: 5.62}, // the real measured artifact
+    {w: 'is', start: 5.62, end: 5.8},
+    {w: 'real.', start: 5.8, end: 6.3},
+  ];
+  const matches = matchLinesToWindows([{act: 'hook', text: 'This is real.', durationMs: 1400}], words);
+  assert.equal(matches[0].segment.startMs, 4620); // 5.62 - 1.0s, not 1.2
+  assert.equal(matches[0].segment.endMs, 6300);
+});
+
+test('matchLinesToWindows: a lightly mangled line still matches (above the floor, below a perfect score)', () => {
+  // paperroute's real end line: whisper heard "paperoot .gg" for "paperoute.gg".
+  const words = [
+    {w: 'Try', start: 0, end: 0.2}, {w: 'it', start: 0.2, end: 0.4},
+    {w: 'free', start: 0.4, end: 0.7}, {w: 'at', start: 0.7, end: 0.9},
+    {w: 'paperoot', start: 0.9, end: 1.5}, {w: '.gg', start: 1.5, end: 1.9},
+  ];
+  const lines = [{act: 'end', text: 'Try it free at paperoute.gg', durationMs: 1900}];
+  const matches = matchLinesToWindows(lines, words);
+  assert.notEqual(matches[0].segment, null);
+  assert.ok(matches[0].score >= MATCH_MIN_SCORE);
+  assert.ok(matches[0].score < 1);
 });
 
 // --- findings ----------------------------------------------------------------
@@ -305,14 +358,14 @@ test('checkOrder: FAIL when a later act is heard before an earlier one finishes'
   assert.equal(finding.level, 'FAIL');
 });
 
-test('checkTiming: PASS within tolerance, FAIL outside it (measured vs manifest durationMs)', () => {
+test('checkTiming: PASS within tolerance; a span delta alone is WARN, not FAIL (whisper timestamp noise)', () => {
   const matches = [
     {act: 'logo', durationMs: 2870, segment: {startMs: 0, endMs: 2840}},
     {act: 'hook', durationMs: 2000, segment: {startMs: 0, endMs: 3000}},
   ];
   const findings = checkTiming(matches, {});
   assert.equal(findings[0].level, 'PASS'); // delta -0.03s
-  assert.equal(findings[1].level, 'FAIL'); // delta +1.0s
+  assert.equal(findings[1].level, 'WARN'); // delta +1.0s but nothing says it landed in the wrong act
 });
 
 test('checkTiming: FAIL when the measured span falls outside its launchTiming act window', () => {

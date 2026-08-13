@@ -97,6 +97,10 @@ function main() {
     '-hide_banner', '-y', '-i', inputAbs,
     '-c:v', 'libx264', '-preset', 'slow', '-crf', '19', '-tune', 'film', '-pix_fmt', 'yuv420p',
     '-af', af,
+    // loudnorm resamples to 192kHz internally; without an explicit rate the AAC
+    // encoder lands on 96kHz (measured: two 96k masters on 2026-08-13) and the
+    // ear-gate's sample-rate check flags the delivered file. Pin the chain's rate.
+    '-ar', '48000',
     '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart',
     outputAbs,
   ]);

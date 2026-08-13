@@ -42,10 +42,24 @@ export const EDGE_SILENCE_TOLERANCE_S = 0.5; // slack added on top of the fade d
 export const LEADING_SILENCE_FAIL_S = FADE_IN / FPS + EDGE_SILENCE_TOLERANCE_S;
 export const TRAILING_SILENCE_FAIL_S = FADE_OUT / FPS + EDGE_SILENCE_TOLERANCE_S;
 export const INTERIOR_GAP_WARN_S = 8.0; // interior speechless stretch over this -> WARN
-// Heard-word gap that separates one VO line's segment from the next. Measured on the
-// costclaw baseline: largest INTRA-line gap 0.72s (mid-sentence breath), smallest
-// INTER-line (act-transition) gap 1.42s — 1.0s sits cleanly between the two.
-export const SEGMENT_GAP_MS = 1000;
+// Floor under which a candidate word window is not considered a match at all. Sits
+// well under CONTENT_SIMILARITY_THRESHOLD on purpose: a lightly mangled line
+// ("paperoot .gg" for "paperoute.gg", ~0.9) should surface as a match, and even a
+// heavier one as a wording-mismatch FAIL that SHOWS both strings — while random
+// music-section noise cannot claim a truly absent line. A mangle as total as
+// "PsyTep" for "sidetap." (similarity 0.29) still lands under the floor; that
+// case is what the transcription hint exists for, not the matcher.
+export const MATCH_MIN_SCORE = 0.35;
+// Candidate windows are kept within this band of the manifest line's squashed
+// length, so a window can neither swallow a neighboring line nor match on a
+// fragment. 0.5/1.5 is deliberately loose: whisper drops and pads words.
+export const WINDOW_LEN_BAND = [0.5, 1.5];
+// Whisper anchors the FIRST word after a music-only stretch at the previous
+// speech's tail: sidetap's hook opened with a "This" stamped 1.2s-5.62s — a
+// 4.4-second "This" that put 3.7s of music inside the measured VO span. No real
+// word in these reads runs anywhere near 1s, so an edge word longer than this
+// keeps only its final/leading second when a window's span is measured.
+export const MAX_EDGE_WORD_S = 1.0;
 export const CONTENT_SIMILARITY_THRESHOLD = 0.7;
 export const TIMING_TOLERANCE_S = 0.35;
 export const ACT_WINDOW_SLACK_S = 0.5; // VO_LEAD (0.4s) plus rendering slop
@@ -179,63 +193,72 @@ export function parseVolumeDetect(text) {
 }
 
 // ---------------------------------------------------------------------------
-// Word-stream segmentation + line matching
+// Windowed line matching
 // ---------------------------------------------------------------------------
+// The first shape of this matcher grouped words into segments split on >1s word
+// gaps, then assigned ONE segment per manifest line. Measured false-positive mode
+// (three-brand evidence run, docs/ERRORS.md 2026-08-13): back-to-back VO lines
+// with sub-second gaps merged into one blob that matched one act, so its
+// neighbors reported "not heard at all" with the words sitting verbatim in the
+// transcript, and the blob's duration then failed the timing checks too. Matching
+// each line against contiguous WORD WINDOWS makes segment boundaries irrelevant.
 
-// Heard words (seconds, from transcribe.py) -> contiguous segments split wherever
-// the gap to the next word exceeds gapMs. On a correctly rendered launch video this
-// lines up with VO-line boundaries (see SEGMENT_GAP_MS).
-export function groupWordsByGap(words, gapMs = SEGMENT_GAP_MS) {
-  const groups = [];
-  let cur = [];
-  for (const w of words) {
-    const startMs = w.start * 1000;
-    if (cur.length && startMs - cur[cur.length - 1].endMs > gapMs) {
-      groups.push(cur);
-      cur = [];
-    }
-    cur.push({w: w.w, startMs, endMs: w.end * 1000});
-  }
-  if (cur.length) groups.push(cur);
-  return groups.map((g) => ({
-    startMs: g[0].startMs,
-    endMs: g[g.length - 1].endMs,
-    tokens: g.flatMap((w) => normalizeTokens(w.w)),
-    text: g.map((w) => w.w).join(' '),
-  }));
-}
-
-// Greedy best-content-match bipartite assignment of manifest lines to heard
-// segments, unconstrained by position — so a reordered-but-correct transcript is
-// still FOUND (checkOrder reports the reordering separately from checkContent
-// reporting the wording). Returns one entry per manifest line, in manifest order;
-// `segment`/`segmentIndex` are null when no segment was left to claim.
-export function matchLinesToSegments(lines, segments) {
-  const pairs = [];
+// Best-score-first assignment of manifest lines to contiguous word windows,
+// unconstrained by position — a reordered-but-correct transcript is still FOUND
+// (checkOrder reports the reordering separately from checkContent reporting the
+// wording). Candidate windows stay within WINDOW_LEN_BAND of the line's squashed
+// length; claimed word ranges never overlap. Returns one entry per manifest line,
+// in manifest order; `segment` is null when nothing scored >= minScore.
+export function matchLinesToWindows(lines, words, minScore = MATCH_MIN_SCORE) {
+  const toks = words.map((w) => normalizeTokens(w.w));
+  const lens = toks.map((t) => squash(t).length);
+  const candidates = [];
   for (const line of lines) {
     const lineTokens = normalizeTokens(line.text);
-    for (let si = 0; si < segments.length; si++) {
-      pairs.push({act: line.act, si, score: similarity(lineTokens, segments[si].tokens)});
+    const target = squash(lineTokens).length;
+    for (let i = 0; i < words.length; i++) {
+      let winToks = [];
+      let len = 0;
+      for (let j = i; j < words.length; j++) {
+        winToks = winToks.concat(toks[j]);
+        len += lens[j];
+        if (len > target * WINDOW_LEN_BAND[1]) break;
+        if (len < target * WINDOW_LEN_BAND[0]) continue;
+        const score = similarity(lineTokens, winToks);
+        if (score >= minScore) candidates.push({act: line.act, i, j, score});
+      }
     }
   }
-  pairs.sort((a, b) => b.score - a.score);
+  // Deterministic: score, then earliest/shortest window, then act name.
+  candidates.sort((a, b) =>
+    b.score - a.score || a.i - b.i || a.j - b.j || (a.act < b.act ? -1 : 1));
   const usedActs = new Set();
-  const usedSegs = new Set();
+  const claimed = [];
   const bestFor = new Map();
-  for (const p of pairs) {
-    if (usedActs.has(p.act) || usedSegs.has(p.si)) continue;
-    usedActs.add(p.act);
-    usedSegs.add(p.si);
-    bestFor.set(p.act, p);
+  for (const c of candidates) {
+    if (usedActs.has(c.act)) continue;
+    if (claimed.some(([lo, hi]) => c.i <= hi && c.j >= lo)) continue;
+    usedActs.add(c.act);
+    claimed.push([c.i, c.j]);
+    bestFor.set(c.act, c);
   }
   return lines.map((line) => {
     const best = bestFor.get(line.act);
+    const win = best ? words.slice(best.i, best.j + 1) : null;
+    const first = win ? win[0] : null;
+    const last = win ? win[win.length - 1] : null;
     return {
       act: line.act,
       manifestText: line.text,
       durationMs: line.durationMs,
-      segment: best ? segments[best.si] : null,
-      segmentIndex: best ? best.si : null,
+      segment: win
+        ? {
+            startMs: Math.max(first.start, first.end - MAX_EDGE_WORD_S) * 1000,
+            endMs: Math.min(last.end, last.start + MAX_EDGE_WORD_S) * 1000,
+            tokens: win.flatMap((w) => normalizeTokens(w.w)),
+            text: win.map((w) => w.w).join(' '),
+          }
+        : null,
       score: best ? best.score : 0,
     };
   });
@@ -391,6 +414,12 @@ export function checkOrder(matches) {
 // Measured spoken span vs manifest durationMs AND vs the act's absolute window from
 // launchTiming.ts (`acts`, {from,len} in frames) — the comparison judge-av-sync
 // structurally cannot make because it never touches the rendered file.
+//
+// FAIL is reserved for the placement half: the VO wav in the render IS the wav the
+// manifest measured, so a span delta with the line sitting in its correct act
+// window can only be whisper's word-timestamp noise (measured -0.49s on a correct
+// sidetap render; a dropped or truncated line is checkContent's job to catch).
+// Landing outside the act window is a real render bug and stays FAIL.
 export function checkTiming(matches, acts) {
   return matches.map((m) => {
     if (!m.segment) {
@@ -408,15 +437,17 @@ export function checkTiming(matches, acts) {
         m.segment.startMs / 1000 >= actStartS - ACT_WINDOW_SLACK_S &&
         m.segment.endMs / 1000 <= actEndS + ACT_WINDOW_SLACK_S;
     }
-    const pass = Math.abs(deltaS) <= TIMING_TOLERANCE_S && withinActWindow !== false;
+    const deltaOk = Math.abs(deltaS) <= TIMING_TOLERANCE_S;
+    const level = withinActWindow === false ? 'FAIL' : deltaOk ? 'PASS' : 'WARN';
     return {
-      check: 'timing', level: pass ? 'PASS' : 'FAIL', act: m.act,
+      check: 'timing', level, act: m.act,
       measuredS: Number(measuredS.toFixed(2)), manifestS: Number(manifestS.toFixed(2)), deltaS: Number(deltaS.toFixed(2)),
       withinActWindow,
-      message: pass
+      message: level === 'PASS'
         ? `Act "${m.act}": measured ${measuredS.toFixed(2)}s vs manifest ${manifestS.toFixed(2)}s (delta ${deltaS.toFixed(2)}s).`
-        : `Act "${m.act}": measured ${measuredS.toFixed(2)}s vs manifest ${manifestS.toFixed(2)}s (delta ${deltaS.toFixed(2)}s, tolerance ${TIMING_TOLERANCE_S}s)` +
-          (withinActWindow === false ? ' and falls outside its launchTiming.ts act window.' : '.'),
+        : level === 'WARN'
+          ? `Act "${m.act}": measured ${measuredS.toFixed(2)}s vs manifest ${manifestS.toFixed(2)}s (delta ${deltaS.toFixed(2)}s, tolerance ${TIMING_TOLERANCE_S}s) but the line sits in its correct act window — likely whisper word-timestamp noise, worth an ear only if other findings agree.`
+          : `Act "${m.act}": measured ${measuredS.toFixed(2)}s vs manifest ${manifestS.toFixed(2)}s (delta ${deltaS.toFixed(2)}s, tolerance ${TIMING_TOLERANCE_S}s) and falls outside its launchTiming.ts act window.`,
     };
   });
 }
@@ -485,9 +516,11 @@ function volumeDetectMean(file, startS, endS) {
 // every requested file in that load. Returns {available:false} when faster_whisper
 // or its model can't be loaded (exit 2 from transcribe.py, or the interpreter/script
 // itself is missing) — the judge degrades to levels-and-picture rather than dying.
-function transcribe(files) {
+function transcribe(files, hint) {
   const script = join(root, 'feeders', 'audio', 'transcribe.py');
-  const res = spawnSync('python', [script, ...files], {encoding: 'utf8', maxBuffer: 64 * 1024 * 1024});
+  const args = [script, ...files];
+  if (hint) args.push('--hint', hint);
+  const res = spawnSync('python', args, {encoding: 'utf8', maxBuffer: 64 * 1024 * 1024});
   if (res.error || res.status === 2) {
     return {available: false, reason: res.error ? String(res.error.message) : (res.stderr ?? '').trim()};
   }
@@ -505,22 +538,24 @@ function transcribe(files) {
   }
 }
 
-function loadOrTranscribe(assetPathAbs, cachePath) {
+function loadOrTranscribe(assetPathAbs, cachePath, hint) {
   const stat = statSync(assetPathAbs);
   if (existsSync(cachePath)) {
     try {
       const cache = JSON.parse(readFileSync(cachePath, 'utf8'));
-      if (cache.size === stat.size && cache.mtimeMs === stat.mtimeMs) {
+      // The hint changes the transcript, so it is part of cache validity (the
+      // harness ears tool keys its own cache the same way).
+      if (cache.size === stat.size && cache.mtimeMs === stat.mtimeMs && (cache.hint ?? '') === (hint ?? '')) {
         return {available: true, data: cache.data};
       }
     } catch {
       // fall through to a fresh transcribe
     }
   }
-  const result = transcribe([assetPathAbs]);
+  const result = transcribe([assetPathAbs], hint);
   if (!result.available) return result;
   const data = result.data[assetPathAbs];
-  writeFileSync(cachePath, JSON.stringify({size: stat.size, mtimeMs: stat.mtimeMs, model: 'small', data}, null, 2));
+  writeFileSync(cachePath, JSON.stringify({size: stat.size, mtimeMs: stat.mtimeMs, model: 'small', hint: hint ?? '', data}, null, 2));
   return {available: true, data};
 }
 
@@ -627,7 +662,23 @@ async function main() {
   const outDir = join(root, 'out', brand, 'marketing');
   mkdirSync(outDir, {recursive: true});
   const cachePath = join(outDir, `heard-${asset}.json`);
-  const transcript = loadOrTranscribe(assetPathAbs, cachePath);
+  // Whisper cannot transcribe a coined brand word it has never seen ("SideTap" ->
+  // "PsyTep", measured), so brands WITH a logo act — the one act that is a bare
+  // brand word — get a short PROSE hint: "<name>, <tagline>." Measured facts
+  // behind the shape (docs/ERRORS.md 2026-08-13): the spelling must be the
+  // SPOKEN word's casing ("SideTap" recovered it; the lowercase wordmark
+  // "sidetap" and title-case "Sidetap" both did not — that is what the optional
+  // brands/<id>.json speechHint field is for), a glossary-style hint threw the
+  // small model into a repetition loop, and priming whisper with the full script
+  // would hand the judge its own answer key. Brands without a logo line get no
+  // hint at all, which also keeps their transcript caches valid.
+  const logoLine = lines.find((l) => l.act === 'logo');
+  const brandPath = join(root, 'brands', `${brand}.json`);
+  const brandMeta = existsSync(brandPath) ? JSON.parse(readFileSync(brandPath, 'utf8')) : {};
+  const hint = logoLine
+    ? `${brandMeta.speechHint ?? brandMeta.name ?? brand}, ${brandMeta.tagline ?? 'the product this video is about'}.`
+    : null;
+  const transcript = loadOrTranscribe(assetPathAbs, cachePath, hint);
 
   const findings = [...checkStream(stream)];
 
@@ -658,8 +709,7 @@ async function main() {
     findings.push({check: 'interior-speechless', level: 'SKIPPED', message: 'transcript unavailable.'});
   } else {
     const words = transcript.data.words ?? [];
-    const segments = groupWordsByGap(words);
-    matches = matchLinesToSegments(lines, segments);
+    matches = matchLinesToWindows(lines, words);
     voWindowsMs = matches.filter((m) => m.segment).map((m) => ({startMs: m.segment.startMs, endMs: m.segment.endMs}));
 
     findings.push(...checkContent(matches));
@@ -667,9 +717,14 @@ async function main() {
     findings.push(...checkTiming(matches, actByKey));
     findings.push(...checkInteriorGap(words));
 
+    // The music-only reference for the duck check is the space between matched
+    // VO windows (time-sorted), which survives back-to-back lines: a sub-second
+    // inter-line gap simply falls under MIN_GAP_FOR_DUCK_S and skips the check.
+    const windowList = matches.filter((m) => m.segment).map((m) => m.segment)
+      .sort((a, b) => a.startMs - b.startMs);
     for (const m of matches) {
       if (!m.segment) continue;
-      const gap = neighborGapWindow(segments, m.segmentIndex);
+      const gap = neighborGapWindow(windowList, windowList.indexOf(m.segment));
       if (!gap) continue;
       const voDb = volumeDetectMean(assetPathAbs, m.segment.startMs / 1000, m.segment.endMs / 1000);
       const musicDb = volumeDetectMean(assetPathAbs, gap.startMs / 1000, gap.endMs / 1000);
