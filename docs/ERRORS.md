@@ -63,3 +63,37 @@ in `skills/marketing-studio/SKILL.md`.
 **Also.** In this shell, sed does not see `\\` as a literal backslash, so
 `s|C:\\Projects\\x|...|` silently matches nothing while `grep -F` finds the string.
 Use `.` for the separator instead: `s|C:.Projects.x|...|`.
+
+## judge-audio false positives: merged segments and mangled brand words
+
+**Date:** 2026-08-13
+
+**Context.** Three-brand evidence run (sidetap, dashclaw, paperroute) to decide
+whether the ear-gate can become a blocking pipeline stage. dashclaw (the one
+mastered render) passed clean. sidetap and paperroute each produced one TRUE
+finding — both unmastered (-25.7 / -25.2 LUFS vs the -14 target, peaks -6+ dB
+under the -2 chain ceiling) — buried in ~7 false FAILs apiece, all from two
+matcher failure modes:
+
+1. **Sub-second gaps merge acts.** The matcher merges adjacent whisper segments
+   before scoring, so back-to-back VO lines with <1s gaps become one blob that
+   matches ONE act; the neighbors report "manifest line was not heard at all"
+   even though the words are in the transcript verbatim (sidetap feature-0/
+   feature-2 at 57.3s/73.9s; paperroute's end line inside feature-1's blob).
+   Blob durations then fail the timing checks too (10.18s vs 5.25s "hook").
+2. **Whisper mangles brand words.** "SideTap" → "PsyTep", "paperoute" →
+   "paperoot" — the logo/CTA act then can't match. The harness ears tool now
+   takes `--hint` (initial_prompt) which recovers the brand word, but hints are
+   opt-in: a glossary-style hint threw the small model into an "I, I, I…"
+   repetition loop on spelled-out letters ("U I") that ate 30s of transcript.
+
+**Fix (before the gate can block anything).** (a) Match manifest lines WITHIN a
+merged blob (windowed alignment) instead of blob-to-one-act; (b) pass a short
+prose brand hint through the transcribe shim, or alias-normalize brand words
+before scoring. Until then the gate is advisory: a FAIL means "read the
+findings", and loudness FAILs are the trustworthy ones (verified independently
+with `ears levels` both times).
+
+**Result.** Reports: `out/<brand>/marketing/judge-audio.json`. Real defect to
+fix when wanted: re-master sidetap and paperroute launch-final audio through
+master-audio (dashclaw proves the mastered path passes).
