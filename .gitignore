@@ -10,3 +10,5 @@ __pycache__/
 .ruff_cache/
 .dashclaw-local/
 .offlocal/
+.context-handoffs/
+.handoff-notes-*.md
