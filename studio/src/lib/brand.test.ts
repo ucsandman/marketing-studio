@@ -26,19 +26,60 @@ describe('getBrand', () => {
     }
   });
 
+  it('preserves speechHint, the field judge-audio primes the transcriber with', () => {
+    // Before this was declared, zod's key stripping dropped it from getBrand()
+    // entirely — judge-audio only saw it because it re-reads the raw JSON. A
+    // brand could set it and any schema-based consumer would never know.
+    expect(getBrand('sidetap').speechHint).toBe('SideTap');
+    // Brands whose name transcribes fine omit it; judge-audio falls back to name.
+    expect(getBrand('noban').speechHint).toBeUndefined();
+  });
+
+  it('rejects an empty speechHint rather than priming with a blank word', () => {
+    const base = {...(getBrand('noban') as unknown as Record<string, unknown>), speechHint: ''};
+    expect(() => brandSchema.parse(base)).toThrow();
+  });
+
   it('throws a loud error for unknown brand ids', () => {
     expect(() => getBrand('nope')).toThrowError(/Unknown brand "nope"/);
   });
 
   it('applies restrained FilmGrade grade defaults when a brand omits the block', () => {
-    // noban carries no `grade` block, so it must receive the zod defaults unchanged.
-    expect(getBrand('noban').grade).toEqual({
+    // Asserted against the SCHEMA, not against whichever brand happens to omit
+    // the block today: every brand currently sets one, so pinning this to a brand
+    // id made the test a hostage to a config choice rather than a check on the
+    // default.
+    const noGrade: Record<string, unknown> = {...getBrand('noban')};
+    delete noGrade.grade;
+    expect(brandSchema.parse(noGrade).grade).toEqual({
       grain: 0.12,
+      grainSize: 0.8,
+      halation: 0,
       vignette: 0.18,
       bloom: 0.1,
       aberration: 0,
       letterbox: 0,
     });
+  });
+
+  it('defaults grainSize to the value grain was hardcoded to, and halation off', () => {
+    // grainSize 0.8 is the exact feTurbulence baseFrequency FilmGrade used before
+    // the token existed, so every brand omitting it renders byte-identically at
+    // 1080p. halation defaults OFF because it is opt-in production value, not a
+    // change every existing asset should silently acquire.
+    for (const id of ['dashclaw', 'paperroute', 'magnetic', 'costclaw', 'sidetap', 'tenwords']) {
+      expect(getBrand(id).grade.grainSize).toBe(0.8);
+      expect(getBrand(id).grade.halation).toBe(0);
+    }
+  });
+
+  it('keeps noban’s opted-in halation inside the judged ceiling', () => {
+    // noban is the one brand that turns halation on. 0.22 was chosen against a
+    // rendered frame: 0.55 grew a neon halo on the wordmark, which its voice
+    // ("instrument-grade ... Not esports-neon") forbids. judge-motion warns above
+    // 0.35, so this asserts the shipped value stays on the right side of the gate.
+    expect(getBrand('noban').grade.halation).toBe(0.22);
+    expect(getBrand('noban').grade.halation).toBeLessThanOrEqual(0.35);
   });
 
   it('keeps paperroute and dashclaw grade restrained with no accent bloom', () => {
@@ -51,6 +92,11 @@ describe('getBrand', () => {
       expect(g.vignette).toBeLessThanOrEqual(0.18);
       expect(g.aberration).toBe(0);
       expect(g.letterbox).toBe(0);
+      // Halation blooms whatever is bright in the frame, which for these two
+      // brands is their accent by construction — paperroute's One Green Rule
+      // forbids a green hero wash and dashclaw's orange is signal, never
+      // decoration. Neither may ever turn halation on.
+      expect(g.halation).toBe(0);
     }
   });
 

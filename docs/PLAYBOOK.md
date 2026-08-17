@@ -248,6 +248,67 @@ placeholder so smoke stays green on a clean clone.
   registered in fonts.ts. Subset new Google Fonts loaders to 'latin' — an unsubset
   family fans out to dozens of font requests per render.
 
+### FilmGrade — halation and grain (2026-08-17, all rendered-proof facts)
+- **`backdrop-filter` DOES render in Remotion's headless Chromium.** Verified with a
+  rendered LogoReveal still, not assumed. This is what makes `grade.halation`
+  possible: it samples the composited content underneath, so unlike `bloom` (a fixed
+  radial gradient that glows the same spot whatever the frame holds) halation blooms
+  wherever the frame is *actually* bright. `contrast()` inside the filter chain acts
+  as the highlight threshold — it crushes darks toward black, and screen-blending
+  near-black adds nothing, so only real highlights bloom.
+- Halation renders FIRST in the FilmGrade stack, before the vignette. Put it after
+  and it samples the darkened edges as if they were dark content.
+- **Halation is the knob that turns a comp into generic AI-glow.** Measured on noban:
+  0.55 grew a pronounced halo on the wordmark that read as esports-neon — the exact
+  thing noban's voice forbids. 0.22 kept the mark instrument-sharp while still
+  reading as photographed. judge-motion WARNs above 0.35.
+- **Grain needs no luminance mask.** The colorist rule "real grain is dense in the
+  midtones, thin in shadows and highlights" is already satisfied by the
+  `mixBlendMode: 'overlay'` the grain layer has always used: overlay is identity at
+  both ends of the base (overlay(0,x)=0, overlay(1,x)=1) and peaks at 0.5. Adding a
+  tonal mask would double-apply a curve that is already correct.
+- `grade.grainSize` is the feTurbulence `baseFrequency` **at 1080p**, and FilmGrade
+  scales it by frame height. feTurbulence frequency is in user-space px, so a fixed
+  frequency means a fixed PIXEL feature size — i.e. finer grain as a fraction of a
+  taller frame. Without the normalisation the same asset carried visibly different
+  grain at 1080p and 4K. Default 0.8 is the old hardcoded value, so 1080p output is
+  byte-identical.
+
+### Cross-asset drift judge (`scripts/judge-drift.mjs`)
+- Every other judge scores ONE asset. This one scores `out/<brand>/` as a **set**,
+  because the failure it looks for is invisible per file: assets that are each
+  individually on-palette can collectively fragment into several distinct brands, and
+  no per-file gate — including judge-palette, including a human approving one
+  storyboard frame — can see that. Run it LAST, once everything has rendered.
+- Two signals, and they fail independently. `tokenShare` is ABSOLUTE (share of
+  colourful pixels sitting on a brand token) and catches an asset that went off
+  palette even if every sibling went off the same way. `driftZ` is RELATIVE (distance
+  from the set centroid in sd) and catches the asset that does not belong with its
+  siblings whatever they agreed on. Verdict follows judge-palette's two-condition
+  idiom for the same false-positive reason: captured product UI legitimately carries
+  the PRODUCT's colours, so low tokenShare alone is a WARN. Both together is a FAIL.
+- **There is no absolute drift threshold, and inventing one would be wrong.** Nobody
+  publishes a number mapping an image distance to "a human would call this a
+  different brand" — Chromatic (YIQ 0.063), Playwright (maxDiffPixelRatio
+  0.01-0.025), Arize and pHash all answer the same way: calibrate on your own
+  labelled data. So driftZ is scored against the set's own dispersion, the report
+  always states the basis, and sets below `MIN_SET` (4) or with zero dispersion
+  report distances with z-scores **withheld** rather than fabricated.
+  Calibrate properly with `--ref <dir>` pointed at already-approved assets.
+- **Trap, cost a real bug:** measure token adherence on a COARSE colour grid and a
+  bucket's reported centre can sit inside `TOKEN_RADIUS` of a brand token when the
+  actual pixels do not. A flat `#ff1493` probe is 92 RGB units from noban's magenta
+  token (correctly off-brand) but its 64-wide bucket centre is 70 units away
+  (wrongly on-brand) — so a deliberately off-brand asset scored 100% on-palette and
+  the FAIL verdict was silently unreachable. `describe()` therefore quantizes at 32
+  (matching judge-palette's calibration) and FOLDS the coarse histogram from it.
+  Found only by injecting an off-brand probe on purpose; a green judge proves nothing.
+- Descriptors are histograms, so they are resolution-invariant and stills of
+  different sizes compare directly. The upgrade path if layout/composition drift ever
+  matters is to swap `describe()` for a DINOv2 embedding — the set math
+  (centroid/driftZ) is agnostic to where the vector came from. DINOv2 over CLIP:
+  CLIP is language-aligned, so a gold dollar sign and a gold trophy score alike.
+
 ### Audio (ElevenLabs feeder)
 - Verified endpoints (Context7, do not re-derive): TTS
   `POST https://api.elevenlabs.io/v1/text-to-speech/{voice_id}?output_format=mp3_44100_128`

@@ -3,19 +3,38 @@ import {AbsoluteFill, useCurrentFrame, useVideoConfig} from 'remotion';
 import type {Brand} from '../lib/brand';
 import {alphaHex} from '../lib/brand';
 
-// Production-value overlay rendered LAST inside each template root: animated film
-// grain, radial vignette, accent bloom, chromatic aberration, optional letterbox.
-// Every layer is intensity 0..1 and is skipped entirely at 0, so a zeroed grade
-// costs nothing. Intensities are meant to stay RESTRAINED — see the grade defaults
-// in lib/brand.ts and each brand's stated rules (paperroute: no green bloom).
+// Production-value overlay rendered LAST inside each template root: halation,
+// animated film grain, radial vignette, accent bloom, chromatic aberration,
+// optional letterbox. Every layer is intensity 0..1 and is skipped entirely at 0,
+// so a zeroed grade costs nothing. Intensities are meant to stay RESTRAINED — see
+// the grade defaults in lib/brand.ts and each brand's stated rules (paperroute:
+// no green bloom). judge-motion enforces the grain ceiling.
+//
+// WHY GRAIN NEEDS NO TONAL MASK: a colorist's rule is that real film grain is
+// dense in the midtones and thin in shadows and highlights, and the obvious
+// reading is that the grain layer wants a luminance mask. It does not — the
+// `overlay` blend function is already identity at both ends of the base
+// (overlay(0,x) === 0 and overlay(1,x) === 1) and has maximum effect at 0.5. The
+// midtone weighting is inherent to the blend mode this layer already uses.
+// An added mask would double-apply a curve that is already correct.
 export const FilmGrade: React.FC<{
   grade: Brand['grade'];
   accent: string; // bloom color: the brand's primary/accent token
 }> = ({grade, accent}) => {
   const frame = useCurrentFrame();
-  const {durationInFrames, fps} = useVideoConfig();
+  const {durationInFrames, fps, height} = useVideoConfig();
   const id = React.useId();
-  const {grain, vignette, bloom, aberration, letterbox} = grade;
+  const {grain, grainSize, halation, vignette, bloom, aberration, letterbox} = grade;
+
+  // Resolution-normalised sizes. Both grain and halation are stated at 1080p and
+  // scaled by frame height, so the SAME asset rendered at 1080p and 2160p reads
+  // identically instead of growing a finer grain and a tighter bloom at 4K.
+  // feTurbulence's baseFrequency is in user-space px, so a constant frequency
+  // means a constant PIXEL feature size — i.e. a smaller fraction of a taller
+  // frame. Scaling inversely with height holds the visual size still.
+  const REF_HEIGHT = 1080;
+  const grainFreq = (grainSize * REF_HEIGHT) / height;
+  const halationBlur = (height / REF_HEIGHT) * 14;
 
   // Grain reseeds at 12Hz, not per frame: per-frame noise defeats inter-frame
   // compression (measured 9MB -> 85MB in the product-launch-motion case study)
@@ -29,6 +48,29 @@ export const FilmGrade: React.FC<{
 
   return (
     <>
+      {/* (f) halation — the one layer that knows WHERE the highlights are.
+          `bloom` below is a fixed radial gradient: it glows the same spot whatever
+          the frame contains. Real film halation blooms around whatever is actually
+          bright, because light scatters back off the film base. backdrop-filter
+          samples the composited content underneath, so:
+            blur      spreads the light
+            contrast  acts as a soft highlight threshold — it crushes the darks to
+                      near-black, and screen-blending near-black adds nothing, so
+                      only genuinely bright regions bloom
+            saturate  keeps the scattered light tinted by its source, not white
+          This renders FIRST in the stack so it samples the raw comp, before the
+          vignette darkens the edges it would otherwise read as dark content. */}
+      {halation > 0 ? (
+        <AbsoluteFill
+          style={{
+            backdropFilter: `blur(${halationBlur.toFixed(2)}px) brightness(${(1 + halation * 0.18).toFixed(3)}) contrast(${(1 + halation * 1.9).toFixed(3)}) saturate(${(1 + halation * 0.35).toFixed(3)})`,
+            WebkitBackdropFilter: `blur(${halationBlur.toFixed(2)}px) brightness(${(1 + halation * 0.18).toFixed(3)}) contrast(${(1 + halation * 1.9).toFixed(3)}) saturate(${(1 + halation * 0.35).toFixed(3)})`,
+            mixBlendMode: 'screen',
+            opacity: halation * 0.5,
+          }}
+        />
+      ) : null}
+
       {/* (c) bloom — soft accent glow, very low opacity, screen-blended */}
       {bloom > 0 ? (
         <AbsoluteFill
@@ -75,7 +117,7 @@ export const FilmGrade: React.FC<{
             <filter id={id}>
               <feTurbulence
                 type="fractalNoise"
-                baseFrequency="0.8"
+                baseFrequency={grainFreq}
                 numOctaves={2}
                 seed={seed}
                 stitchTiles="stitch"

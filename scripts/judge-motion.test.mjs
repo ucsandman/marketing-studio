@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {join, dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {scanSource, checkMotionTokens, stripComments} from './judge-motion.mjs';
+import {scanSource, checkMotionTokens, checkGradeTokens, stripComments} from './judge-motion.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const cli = join(here, 'judge-motion.mjs');
@@ -49,6 +49,42 @@ test('scale(0.95) and interpolated scale do not fire scale-zero', () => {
     'const u = {transform: `scale(${cam.scale})`};',
   ].join('\n');
   assert.equal(findingsFor('scale-zero', scanSource(clean, 'studio/src/components/X.tsx')).length, 0);
+});
+
+test('a scale start under the entrance band fires entry-scale WARN', () => {
+  const findings = scanSource("const s = {transform: 'scale(0.6)'};", 'studio/src/components/X.tsx');
+  const hits = findingsFor('entry-scale', findings);
+  assert.equal(hits.length, 1);
+  assert.equal(hits[0].level, 'WARN');
+  // ERROR-level scale-zero must NOT also claim this one.
+  assert.equal(findingsFor('scale-zero', findings).length, 0);
+});
+
+test('a leading-dot scale literal still fires entry-scale', () => {
+  const findings = scanSource("const s = {transform: 'scale(.72)'};", 'studio/src/components/X.tsx');
+  assert.equal(findingsFor('entry-scale', findings).length, 1);
+});
+
+test('scale starts inside the entrance band do not fire entry-scale', () => {
+  const clean = [
+    "const a = {transform: 'scale(0.9)'};",
+    "const b = {transform: 'scale(0.94)'};",
+    "const c = {transform: 'scale(0.97)'};",
+    'const d = {scale: 0.95};',
+    'const e = {transform: `scale(${cam.scale})`};',
+  ].join('\n');
+  assert.equal(findingsFor('entry-scale', scanSource(clean, 'studio/src/components/X.tsx')).length, 0);
+});
+
+test('scale(0) stays an ERROR and is not downgraded to entry-scale', () => {
+  const findings = scanSource("const s = {transform: 'scale(0)'};", 'studio/src/components/X.tsx');
+  assert.equal(findingsFor('scale-zero', findings).length, 1);
+  assert.equal(findingsFor('entry-scale', findings).length, 0);
+});
+
+test('lib/motion.ts is exempt from entry-scale (it defines the band)', () => {
+  const findings = scanSource("const from = 'scale(0.6)';", 'studio/src/lib/motion.ts');
+  assert.equal(findingsFor('entry-scale', findings).length, 0);
 });
 
 test('CSS transition fires css-transition ERROR', () => {
@@ -108,6 +144,44 @@ test('exuberance above 0.85 fires WARN exuberance-band', () => {
 test('tempo outside [0.5, 2] fires WARN tempo-band', () => {
   assert.equal(findingsFor('tempo-band', checkMotionTokens({tempo: 2.5}, 't')).length, 1);
   assert.equal(findingsFor('tempo-band', checkMotionTokens({tempo: 0.4}, 't')).length, 1);
+});
+
+test('a stagger multiplier outside the perceptible band fires stagger-band WARN', () => {
+  // 0.65 -> 87ms at the 2-frame/30fps reference cadence: past the 80ms ceiling.
+  const wide = findingsFor('stagger-band', checkMotionTokens({tempo: 1, exuberance: 0.35, stagger: 0.65}, 'x'));
+  assert.equal(wide.length, 1);
+  assert.equal(wide[0].level, 'WARN');
+  assert.match(wide[0].message, /stops reading as one/);
+
+  // 0 -> a 0ms gap: everything lands together.
+  const tight = findingsFor('stagger-band', checkMotionTokens({tempo: 1, exuberance: 0.35, stagger: 0}, 'x'));
+  assert.equal(tight.length, 1);
+  assert.match(tight[0].message, /reads mechanical/);
+});
+
+test('the default stagger multiplier is inside the perceptible band', () => {
+  assert.equal(findingsFor('stagger-band', checkMotionTokens({tempo: 1, exuberance: 0.35, stagger: 0.5}, 'x')).length, 0);
+});
+
+test('grain past the ceiling fires grain-ceiling WARN', () => {
+  const hits = findingsFor('grain-ceiling', checkGradeTokens({grain: 0.55, vignette: 0.1}, 'x'));
+  assert.equal(hits.length, 1);
+  assert.equal(hits[0].level, 'WARN');
+  assert.equal(hits[0].file, 'brands/x.json');
+});
+
+test('halation past the ceiling fires halation-ceiling WARN', () => {
+  // 0.55 is the value that visibly turned the noban wordmark into a neon halo.
+  const hits = findingsFor('halation-ceiling', checkGradeTokens({grain: 0.12, halation: 0.55}, 'x'));
+  assert.equal(hits.length, 1);
+  assert.equal(hits[0].level, 'WARN');
+});
+
+test('restrained grain and halation, and a missing grade block, produce no grade findings', () => {
+  assert.equal(checkGradeTokens({grain: 0.12, vignette: 0.18}, 'x').length, 0);
+  // 0.22 is the shipped noban value — it must stay inside the band.
+  assert.equal(checkGradeTokens({grain: 0.12, halation: 0.22}, 'x').length, 0);
+  assert.equal(checkGradeTokens(undefined, 'x').length, 0);
 });
 
 test('in-band motion block produces no findings', () => {

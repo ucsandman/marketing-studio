@@ -67,15 +67,35 @@ export const brandSchema = z.object({
   // deliberately RESTRAINED (grain barely-there, gentle vignette, faint accent bloom,
   // no aberration, no letterbox); brands whose rules forbid a hero wash/glow
   // (paperroute One Green Rule, dashclaw orange-is-signal) zero their bloom.
+  // `grainSize` is the feTurbulence baseFrequency AT 1080p; FilmGrade scales it by
+  // frame height so an asset rendered at 1080p and 2160p carries the same visual
+  // grain instead of a finer one at 4K. The default is the value grain was
+  // hardcoded to, so a brand that omits it renders byte-identically at 1080p.
+  // `halation` is the highlight bloom (see FilmGrade): unlike `bloom`, which is a
+  // fixed radial gradient, halation samples the frame and glows wherever the
+  // content is actually bright. It defaults to 0 — brands whose rules forbid a
+  // hero wash (paperroute's One Green Rule, dashclaw's orange-is-signal) must
+  // leave it there, since halation would bloom their accent by definition.
+  // judge-motion warns above a `grain` of 0.4: grain is felt, not seen.
   grade: z
     .object({
       grain: z.number().min(0).max(1),
+      grainSize: z.number().min(0.1).max(3).default(0.8),
+      halation: z.number().min(0).max(1).default(0),
       vignette: z.number().min(0).max(1),
       bloom: z.number().min(0).max(1),
       aberration: z.number().min(0).max(1),
       letterbox: z.number().min(0).max(0.15),
     })
-    .default({grain: 0.12, vignette: 0.18, bloom: 0.1, aberration: 0, letterbox: 0}),
+    .default({
+      grain: 0.12,
+      grainSize: 0.8,
+      halation: 0,
+      vignette: 0.18,
+      bloom: 0.1,
+      aberration: 0,
+      letterbox: 0,
+    }),
   // Per-brand motion personality — retunes ALL entrance choreography (springs,
   // eased reveals, inter-element stagger) without ever moving a rest position, so
   // one knob per brand keeps a terse/mechanical brand terse and lets a lively one
@@ -117,6 +137,20 @@ export const brandSchema = z.object({
     })
     .default({from: 'brand', to: 'profit'}),
   voice: z.string().min(1),
+  // How the brand's coined name is SPOKEN, when that differs from how it is
+  // written. Whisper cannot transcribe a coined word it has never seen (measured:
+  // "SideTap" -> "PsyTep"), so scripts/judge-audio.mjs primes the transcriber with
+  // a short prose hint built from this field, and docs/ERRORS.md 2026-08-13
+  // records that the SPOKEN word's casing is what recovers it — the lowercase
+  // wordmark "sidetap" and title-case "Sidetap" both failed where "SideTap"
+  // worked. Optional: brands whose name transcribes correctly omit it and
+  // judge-audio falls back to `name`.
+  //
+  // Declared here because judge-audio already reads it off the raw JSON. Without
+  // a schema entry it was unvalidated, undocumented, and silently dropped from
+  // getBrand() by zod's default key stripping — a field the audio gate depends on
+  // that the type system did not know existed.
+  speechHint: z.string().min(1).optional(),
 });
 
 /** 0..1 alpha -> the two-digit hex suffix of an #rrggbbaa color. */

@@ -5,6 +5,40 @@ git history or the PLAYBOOK.
 
 ---
 
+## A new judge's FAIL verdict was unreachable, and the judge reported PASS
+
+**Date:** 2026-08-17
+
+**Symptom:** `judge-drift` shipped with a two-condition FAIL (off-palette AND
+unlike its siblings). Run against the real noban set it reported PASS with only
+WARNs, which looked like a clean repo. It was not: the FAIL branch could not fire
+at all.
+
+**Root cause:** `describe()` measured token adherence on the same coarse 64-wide
+colour grid it used for the histogram vector. `quantize()` reports each bucket's
+CENTRE colour, and a coarse centre can land inside `TOKEN_RADIUS` of a brand token
+when none of the actual pixels do. A flat `#ff1493` probe sits 92 RGB units from
+noban's magenta `rare` token (correctly off-brand) but its bucket centre sits 70
+units away (wrongly on-brand), so `tokenShare` came back 1.0 for a deliberately
+off-brand asset and `offPalette` was never true.
+
+**Fix:** quantize at 32 (the resolution `judge-palette`'s `TOKEN_RADIUS` was
+calibrated against) and FOLD the coarse histogram down from it in the same pass —
+two resolutions from one scan, because the vector wants coarse bins and token
+adherence wants fine ones. Regression test pins the `#ff1493` case.
+
+**Prevention:** the bug was invisible to every green run and to reading the code;
+it surfaced only by writing an off-brand PNG into `out/<brand>/` on purpose and
+demanding a FAIL. A verdict branch that has never been observed firing has been
+written, not verified. Same lesson caught a second bug in the same script minutes
+later: `judge-audio.png`, another judge's own diagnostic plot, was being scored as
+a brand asset at 11.2 sd — which inflated the set's stdev enough to MASK three
+real outliers, since `driftZ` is denominated in stdevs. Tool exhaust must be
+excluded from a set judge, and the exclusions listed, or the denominator shrinks
+silently.
+
+---
+
 ## Privacy assertion passed while the leak shipped
 
 **Date:** 2026-08-12 (leak introduced in the 2026-08-09/10 sidetap run)

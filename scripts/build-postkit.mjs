@@ -24,8 +24,17 @@
 //
 // Also writes manifest.json at the kit root — machine-readable kit index
 // consumed by launch-engine (plus a `segments` key when segment kits exist) — and
-// two more root-level files: LICENCES.md (see below) and, per copied video, a
-// silent -an cut for muted-autoplay embeds.
+// three more root-level files: LICENCES.md and DISCLOSURE.md (both below) and,
+// per copied video, a silent -an cut for muted-autoplay embeds.
+//
+// DISCLOSURE.md: the synthetic-media sibling of LICENCES.md, at the kit root, for
+// the same reason — an obligation that attaches at DISTRIBUTION time belongs next
+// to the files being distributed. It lists what this pipeline actually
+// synthesised for THIS brand (never a blanket "AI-generated" claim over
+// programmatic motion graphics or over genuine screen capture), the per-platform
+// self-disclosure control to set at upload, and the gaps it does not close —
+// notably that no C2PA credential is embedded, which EU AI Act Article 50 has
+// required for EU-facing synthetic content since 2026-08-02.
 //
 // Silent cuts: every copied video (`<name>.mp4`) gets a sibling `<name>-silent.mp4`
 // via plain `ffmpeg -c copy -an` (stream-copy, no re-encode) — same ffmpeg-on-PATH
@@ -64,6 +73,7 @@ export const PLATFORM_MAP = {
     charBudget: 280,
     sourceKey: 'x',
     note: 'Upload the video file directly to X. Do not link out to YouTube; X suppresses off-platform links in the feed.',
+    aiDisclosure: null,
   },
   linkedin: {
     aspect: '16x9',
@@ -72,6 +82,7 @@ export const PLATFORM_MAP = {
     charBudget: 3000,
     sourceKey: 'linkedin',
     note: 'Upload the video natively to LinkedIn (native video outperforms a link post). Paste caption.txt as the post body.',
+    aiDisclosure: null,
   },
   tiktok: {
     aspect: '9x16',
@@ -80,6 +91,7 @@ export const PLATFORM_MAP = {
     charBudget: 2200,
     sourceKey: 'vertical',
     note: 'Upload as a TikTok video post. The video already has burned-in captions; paste caption.txt as the on-app caption/hashtag line.',
+    aiDisclosure: 'the "AI-generated content" toggle',
   },
   shorts: {
     aspect: '9x16',
@@ -88,6 +100,7 @@ export const PLATFORM_MAP = {
     charBudget: 5000,
     sourceKey: 'vertical',
     note: 'Upload via YouTube Studio > Create > Upload video. Keep it vertical and under 60s so YouTube routes it to the Shorts shelf; paste caption.txt as the description.',
+    aiDisclosure: 'the "Altered or synthetic content" disclosure',
   },
   youtube: {
     aspect: '16x9',
@@ -96,6 +109,7 @@ export const PLATFORM_MAP = {
     charBudget: 5000,
     sourceKey: null,
     note: 'Upload as a standard YouTube video. Paste caption.txt as the description, then upload launch.srt or launch.vtt as captions in YouTube Studio.',
+    aiDisclosure: 'the "Altered or synthetic content" disclosure',
   },
   instagram: {
     aspect: '1x1',
@@ -104,6 +118,7 @@ export const PLATFORM_MAP = {
     charBudget: 2200,
     sourceKey: 'vertical',
     note: 'Upload as an Instagram feed post or Reel. Paste caption.txt as the caption and alt.txt into Advanced settings > Accessibility > Alt text.',
+    aiDisclosure: 'the "AI info" labelling in the composer',
   },
 };
 
@@ -218,6 +233,14 @@ export function wrapKitEntry(segmentId, platformKey, cfg, hasVideo) {
 function postMd(brandLabel, platformKey, cfg, videoStatus, thumbStatus, silentStatus, captionFilesLine) {
   const label = PLATFORM_LABELS[platformKey];
   const silentLine = silentStatus ? `\n- Silent cut: ${silentStatus} (muted-autoplay embeds)` : '';
+  // Disclosure is a numbered upload step, not a footnote: declaring synthetic
+  // audio yourself costs almost nothing in reach, while being caught undisclosed
+  // applies a distribution hold during the window that decides how far the post
+  // travels. Platforms with no mandatory control still get a line, so the
+  // operator never has to remember which ones those are.
+  const disclosureStep = cfg.aiDisclosure
+    ? `Set ${cfg.aiDisclosure} before publishing if this cut has synthetic voiceover or music (see DISCLOSURE.md at the kit root).`
+    : `No mandatory AI toggle on ${label} today — if the voiceover is synthetic, say so in the copy (see DISCLOSURE.md at the kit root).`;
   return `# ${brandLabel} — ${label} post kit
 
 ## Files
@@ -226,6 +249,9 @@ function postMd(brandLabel, platformKey, cfg, videoStatus, thumbStatus, silentSt
 - Caption: caption.txt (paste as the post copy)
 - Alt text: alt.txt (one-sentence video description)
 ${captionFilesLine}
+
+## Before you publish
+1. ${disclosureStep}
 
 ## Notes
 ${cfg.note}
@@ -269,6 +295,85 @@ ${sfxLines.join('\n')}
 
 ## Fonts
 ${fontLines.join('\n')}
+`;
+}
+
+// DISCLOSURE.md content for the postkit root — the synthetic-media sibling of
+// LICENCES.md, and for the same reason: an obligation that attaches at
+// DISTRIBUTION time, recorded next to the files a human is about to distribute
+// rather than left to memory.
+//
+// Two facts drive the shape:
+//
+//   1. EU AI Act Article 50 has required machine-readable disclosure of synthetic
+//      content shown to EU users since 2026-08-02. This kit does NOT embed a C2PA
+//      credential — doing so needs `c2patool` plus a signing certificate, which is
+//      a new external dependency and a key-handling decision, not something a
+//      build script should quietly acquire. So this file states the gap plainly
+//      instead of implying coverage.
+//   2. Platform disclosure is far cheaper PROACTIVELY than retroactively. A
+//      self-declared label costs close to nothing in reach; an undisclosed asset
+//      caught by platform detection gets a distribution hold applied during
+//      exactly the early-engagement window that decides algorithmic push. The
+//      toggle is therefore a numbered upload step, not a footnote.
+//
+// What is listed is what this pipeline actually synthesises, per brand — never a
+// blanket "AI-generated" claim over hand-authored work.
+export function buildDisclosureMd(brandLabel, audioManifest, hasCapture) {
+  const synthetic = [];
+  if (audioManifest?.lines?.length) {
+    synthetic.push(
+      `- **Voiceover** — synthetic speech (${audioManifest.lines.length} line(s), text-to-speech). This is a synthetic VOICE and is disclosable on every platform below.`,
+    );
+  }
+  if (audioManifest?.music?.src) {
+    synthetic.push('- **Music bed** — generated track. Disclosable as synthetic audio.');
+  }
+  if (audioManifest?.sfx?.enabled === true) {
+    synthetic.push('- **Sound effects** — generated. Usually not separately disclosable, but it is synthetic audio.');
+  }
+  synthetic.push(
+    '- **Motion graphics / titles / mark animation** — rendered programmatically from brand tokens (Remotion). Not "AI-generated imagery": no generative image model produced these frames, so a blanket AI label would be inaccurate.',
+  );
+  if (hasCapture) {
+    synthetic.push(
+      '- **Product footage** — a real screen recording of the real application. Genuine capture, not synthetic. Do not label it as generated.',
+    );
+  }
+  const nothingSynthetic = !audioManifest?.lines?.length && !audioManifest?.music?.src;
+
+  return `# ${brandLabel} postkit DISCLOSURE
+
+What in this kit is synthetic, and what to declare when you upload it. Read this
+before distribution, the same way you read LICENCES.md.
+
+## What this pipeline actually synthesised
+
+${synthetic.join('\n')}
+
+## At upload: declare it yourself
+
+Tick the platform's own AI-content toggle **before** publishing${nothingSynthetic ? ', if any synthetic audio is added later' : ''}.
+Proactive disclosure costs close to nothing in reach. An undisclosed asset caught
+by platform detection instead gets a distribution hold applied while the label is
+applied retroactively, and that hold lands during the early-engagement window that
+decides how far the post travels. The cost is in being caught, not in disclosing.
+
+- TikTok — "AI-generated content" toggle at upload.
+- YouTube — "Altered or synthetic content" disclosure in the upload flow.
+- Instagram / Facebook — "AI info" labelling in the composer.
+- LinkedIn / X — no mandatory toggle today; say so in the copy if the voice is synthetic.
+
+## Known gaps in this kit
+
+- **No C2PA credential is embedded.** EU AI Act Article 50 has required
+  machine-readable synthetic-content disclosure for EU-facing content since
+  2026-08-02, and the files in this kit carry no cryptographic provenance
+  manifest. Platform self-declaration above is a human step, not a
+  machine-readable one. Closing this needs \`c2patool\` and a signing certificate.
+- **If you automate posting to TikTok**, note that its Content Posting API
+  publishes every video as private-only until the app passes TikTok's audit. An
+  unaudited integration succeeds at every API call and reaches nobody.
 `;
 }
 
@@ -529,6 +634,16 @@ function main() {
 
   writeFileSync(join(postkitDir, 'LICENCES.md'), buildLicencesMd(brandData.name ?? brand, brandData, audioManifest));
   console.log(`postkit: wrote out/${brand}/postkit/LICENCES.md`);
+
+  // hasCapture drives one line in the disclosure: real screen footage must NOT be
+  // labelled generated, and the kit should say so explicitly rather than let a
+  // blanket "AI video" label get applied to a genuine recording.
+  const hasCapture = existsSync(join(root, 'studio', 'public', brand, 'demo.webm'));
+  writeFileSync(
+    join(postkitDir, 'DISCLOSURE.md'),
+    buildDisclosureMd(brandData.name ?? brand, audioManifest, hasCapture),
+  );
+  console.log(`postkit: wrote out/${brand}/postkit/DISCLOSURE.md`);
 
   console.log(`postkit OK: ${Object.keys(PLATFORM_MAP).length} platform folders in out/${brand}/postkit/`);
 }

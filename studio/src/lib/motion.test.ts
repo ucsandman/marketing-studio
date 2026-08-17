@@ -1,5 +1,19 @@
 import {describe, expect, it} from 'vitest';
-import {brandSpring, entrance, staggerDelay, DEFAULT_MOTION, type Motion} from './motion';
+import {
+  brandSpring,
+  entrance,
+  staggerDelay,
+  DEFAULT_MOTION,
+  DURATION_MS,
+  ENTRY_SCALE,
+  STAGGER_MS,
+  BEAT_CEILING_MS,
+  entryScale,
+  msFrames,
+  staggerMsDelay,
+  staggerEffectiveMs,
+  type Motion,
+} from './motion';
 
 const FPS = 30;
 
@@ -83,5 +97,82 @@ describe('staggerDelay', () => {
   it('widens with higher stagger and collapses to 0 at stagger 0', () => {
     expect(staggerDelay(2, 10, {...DEFAULT_MOTION, stagger: 1})).toBe(40);
     expect(staggerDelay(2, 10, {...DEFAULT_MOTION, stagger: 0})).toBe(0);
+  });
+});
+
+describe('msFrames', () => {
+  it('converts a stated duration to frames at tempo 1', () => {
+    expect(msFrames(200, FPS, DEFAULT_MOTION)).toBe(6); // 0.2s * 30fps
+    expect(msFrames(1000, FPS, DEFAULT_MOTION)).toBe(30);
+  });
+
+  it('spends fewer frames on the same duration as tempo rises', () => {
+    // Matches the brandSpring/entrance convention (elapsed frames * tempo).
+    expect(msFrames(400, FPS, {...DEFAULT_MOTION, tempo: 2})).toBe(6);
+    expect(msFrames(400, FPS, {...DEFAULT_MOTION, tempo: 0.5})).toBe(24);
+  });
+
+  it('never returns 0 frames (a 0-length interpolate range divides by zero)', () => {
+    expect(msFrames(1, FPS, DEFAULT_MOTION)).toBe(1);
+    expect(msFrames(0, FPS, {...DEFAULT_MOTION, tempo: 2})).toBe(1);
+  });
+});
+
+describe('entryScale', () => {
+  it('settles exactly at 1 so rest positions never move', () => {
+    for (const e of [0, 0.35, 1]) {
+      expect(entryScale(1, {...DEFAULT_MOTION, exuberance: e})).toBe(1);
+    }
+  });
+
+  it('never starts at 0 — it starts inside the safe band', () => {
+    const [lo, hi] = ENTRY_SCALE;
+    for (const e of [0, 0.15, 0.5, 1]) {
+      const start = entryScale(0, {...DEFAULT_MOTION, exuberance: e});
+      expect(start).toBeGreaterThanOrEqual(lo);
+      expect(start).toBeLessThanOrEqual(hi);
+    }
+  });
+
+  it('travels further for a more exuberant brand', () => {
+    expect(entryScale(0, {...DEFAULT_MOTION, exuberance: 0})).toBeCloseTo(ENTRY_SCALE[1], 6);
+    expect(entryScale(0, {...DEFAULT_MOTION, exuberance: 1})).toBeCloseTo(ENTRY_SCALE[0], 6);
+  });
+
+  it('clamps out-of-range progress instead of overshooting the rest position', () => {
+    expect(entryScale(2, DEFAULT_MOTION)).toBe(1);
+    expect(entryScale(-1, DEFAULT_MOTION)).toBe(entryScale(0, DEFAULT_MOTION));
+  });
+});
+
+describe('stagger in milliseconds', () => {
+  it('staggerMsDelay is 0 for the first item and grows linearly', () => {
+    expect(staggerMsDelay(0, 60, FPS, DEFAULT_MOTION)).toBe(0);
+    expect(staggerMsDelay(2, 100, FPS, DEFAULT_MOTION)).toBe(6); // 2 * 0.1s * 30fps
+  });
+
+  it('staggerEffectiveMs inverts staggerDelay for one step', () => {
+    const baseFrames = 2;
+    const gapFrames = staggerDelay(1, baseFrames, DEFAULT_MOTION);
+    expect(staggerEffectiveMs(baseFrames, FPS, DEFAULT_MOTION)).toBeCloseTo(
+      (gapFrames * 1000) / FPS,
+      6,
+    );
+  });
+
+  it('the repo default cadence lands inside the perceptible band', () => {
+    // 2 base frames at 30fps with the default stagger multiplier == 66.7ms.
+    const ms = staggerEffectiveMs(2, FPS, DEFAULT_MOTION);
+    expect(ms).toBeGreaterThanOrEqual(STAGGER_MS[0]);
+    expect(ms).toBeLessThanOrEqual(STAGGER_MS[1]);
+  });
+});
+
+describe('duration standards', () => {
+  it('every band is ordered and sits under the single-beat ceiling except panel', () => {
+    for (const [name, [lo, hi]] of Object.entries(DURATION_MS)) {
+      expect(hi).toBeGreaterThan(lo);
+      if (name !== 'panel') expect(hi).toBeLessThanOrEqual(BEAT_CEILING_MS);
+    }
   });
 });

@@ -17,11 +17,24 @@
 //   css-keyframes  @keyframes / animation: — same reason.
 //   raw-spring     spring( outside lib/motion.ts (WARN) — bypasses the brand
 //                  motion personality; use brandSpring/entrance instead.
+//   entry-scale    a literal scale start below the ENTRY_SCALE floor (WARN) —
+//                  scale(0) is an ERROR above, but scale(0.6) still reads as a
+//                  different object growing rather than the same object
+//                  arriving; entrances belong in 0.9-0.97 (lib/motion.ts
+//                  entryScale()).
 //
-// Brand token bands (brands/*.json `motion` block, WARN):
+// Brand token bands (brands/*.json, WARN):
 //   exuberance > 0.85  bounce far past the subtle band (mapping crosses
 //                      critical damping ~0.55; 1.0 is toy-like).
 //   tempo outside [0.5, 2]  entrance speed drifts too far from act timing.
+//   stagger    whose effective group gap falls outside STAGGER_MS — too tight
+//              reads as one simultaneous (mechanical) event, too wide stops
+//              reading as a group at all.
+//   grade.grain > GRAIN_CEILING  grain should be felt, not seen; past the
+//              ceiling the overlay reads as video noise instead of film stock.
+//
+// The numeric bands are IMPORTED from studio/src/lib/motion.ts, never
+// re-declared here — PLAYBOOK: duration math lives in ONE pure lib.
 //
 // Advisor like the other judges: exit 0; `--strict` exits 1 on a FAIL verdict.
 //
@@ -37,6 +50,35 @@ process.on('unhandledRejection', (reason) => {
 });
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+// The single source of truth for every number below. Node's native TS type
+// stripping loads this directly (same mechanism contact-sheet.mjs uses for
+// launchTiming.ts), so the judge and the templates can never disagree.
+const {
+  ENTRY_SCALE,
+  STAGGER_MS,
+  DEFAULT_MOTION,
+  staggerEffectiveMs,
+} = await import('../studio/src/lib/motion.ts');
+
+// The cadence the band check probes with: the studio's typical "2 base frames
+// between items in a group at 30fps". stagger is a MULTIPLIER, so it only has a
+// millisecond meaning against a reference cadence — this is that reference,
+// stated once rather than guessed per call site.
+const STAGGER_PROBE_FRAMES = 2;
+const STAGGER_PROBE_FPS = 30;
+
+// "Felt rather than seen" — a working colorist's ceiling for a film-grain
+// overlay. Above this the grain stops reading as stock and starts reading as
+// compression noise. (Frame.io Insider, "How a pro colorist uses film grain".)
+const GRAIN_CEILING = 0.4;
+
+// Halation is the knob most likely to turn a comp into the generic AI-glow look:
+// past this it stops reading as light scattering off a film base and starts
+// reading as a CSS glow filter. Rendered proof for the band: at 0.55 the noban
+// wordmark grew a pronounced halo that read as esports-neon, which its voice
+// explicitly forbids; 0.22 kept the mark instrument-sharp.
+const HALATION_CEILING = 0.35;
 
 const SOURCE_RULES = [
   {
@@ -68,6 +110,19 @@ const SOURCE_RULES = [
     level: 'WARN',
     re: /(?<![A-Za-z])spring\(/,
     message: 'Raw spring( bypasses the brand motion personality; route through brandSpring/entrance (lib/motion.ts).',
+    exemptFile: /lib[\\/]motion\.ts$/,
+  },
+  {
+    check: 'entry-scale',
+    level: 'WARN',
+    // Captures the numeric literal so `predicate` can judge the VALUE. scale(0)
+    // is already an ERROR via scale-zero; this catches the band between.
+    re: /\bscale\(\s*(\.\d+|0\.\d+)\s*[,)]|(?<![\w.])scale:\s*(\.\d+|0\.\d+)\s*[,}]/,
+    predicate: (m) => {
+      const v = Number(m[1] ?? m[2]);
+      return v > 0 && v < ENTRY_SCALE[0];
+    },
+    message: `scale start below the ${ENTRY_SCALE[0]}-${ENTRY_SCALE[1]} entrance band; below it the element reads as a different object growing, not this one arriving (lib/motion.ts entryScale()).`,
     exemptFile: /lib[\\/]motion\.ts$/,
   },
 ];
@@ -121,6 +176,7 @@ export function scanSource(text, relPath) {
       if (rule.exemptFile && rule.exemptFile.test(relPath)) continue;
       const m = rule.re.exec(line);
       if (m) {
+        if (rule.predicate && !rule.predicate(m)) continue;
         findings.push({
           check: rule.check,
           level: rule.level,
@@ -157,6 +213,60 @@ export function checkMotionTokens(motion, brandId) {
       line: null,
       text: `tempo: ${motion.tempo}`,
       message: `tempo ${motion.tempo} outside [${TEMPO_MIN}, ${TEMPO_MAX}]: entrance speed drifts too far from act timing.`,
+    });
+  }
+  if (typeof motion.stagger === 'number') {
+    // staggerEffectiveMs is lib/motion.ts's own formula, not a copy of it, so a
+    // change to the stagger multiplier math can never silently desync this band.
+    const ms = staggerEffectiveMs(STAGGER_PROBE_FRAMES, STAGGER_PROBE_FPS, {
+      ...DEFAULT_MOTION,
+      stagger: motion.stagger,
+    });
+    if (ms < STAGGER_MS[0] || ms > STAGGER_MS[1]) {
+      findings.push({
+        check: 'stagger-band',
+        level: 'WARN',
+        file: `brands/${brandId}.json`,
+        line: null,
+        text: `stagger: ${motion.stagger}`,
+        message:
+          `stagger ${motion.stagger} gives a ${ms.toFixed(0)}ms group gap at the ` +
+          `${STAGGER_PROBE_FRAMES}-frame/${STAGGER_PROBE_FPS}fps reference cadence, outside ` +
+          `[${STAGGER_MS[0]}, ${STAGGER_MS[1]}]ms: ` +
+          (ms < STAGGER_MS[0]
+            ? 'items land together and the group reads mechanical.'
+            : 'items land so far apart the group stops reading as one.'),
+      });
+    }
+  }
+  return findings;
+}
+
+/**
+ * Validate one brand's grade block. Separate from checkMotionTokens so that
+ * function's tested (motion, brandId) signature stays intact.
+ */
+export function checkGradeTokens(grade, brandId) {
+  const findings = [];
+  if (!grade || typeof grade !== 'object') return findings; // zod defaults are vetted
+  if (typeof grade.grain === 'number' && grade.grain > GRAIN_CEILING) {
+    findings.push({
+      check: 'grain-ceiling',
+      level: 'WARN',
+      file: `brands/${brandId}.json`,
+      line: null,
+      text: `grade.grain: ${grade.grain}`,
+      message: `grain ${grade.grain} > ${GRAIN_CEILING}: grain should be felt, not seen — past the ceiling the overlay reads as compression noise rather than film stock.`,
+    });
+  }
+  if (typeof grade.halation === 'number' && grade.halation > HALATION_CEILING) {
+    findings.push({
+      check: 'halation-ceiling',
+      level: 'WARN',
+      file: `brands/${brandId}.json`,
+      line: null,
+      text: `grade.halation: ${grade.halation}`,
+      message: `halation ${grade.halation} > ${HALATION_CEILING}: past the ceiling highlight bloom stops reading as light scattering off film and starts reading as a CSS glow.`,
     });
   }
   return findings;
@@ -217,6 +327,7 @@ function main() {
       process.exit(1);
     }
     findings.push(...checkMotionTokens(def.motion, id));
+    findings.push(...checkGradeTokens(def.grade, id));
   }
 
   const verdict = findings.some((f) => f.level === 'ERROR') ? 'FAIL' : 'PASS';
@@ -226,7 +337,16 @@ function main() {
     generatedAt: new Date().toISOString(),
     verdict,
     input: {sourceFiles: files.length, brands: brandsChecked},
-    bands: {EXUBERANCE_MAX, TEMPO_MIN, TEMPO_MAX},
+    bands: {
+      EXUBERANCE_MAX,
+      TEMPO_MIN,
+      TEMPO_MAX,
+      ENTRY_SCALE,
+      STAGGER_MS,
+      GRAIN_CEILING,
+      HALATION_CEILING,
+      staggerProbe: {frames: STAGGER_PROBE_FRAMES, fps: STAGGER_PROBE_FPS},
+    },
     findings,
   };
 

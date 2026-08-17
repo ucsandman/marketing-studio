@@ -29,7 +29,7 @@ Around those assets, the pipeline adds:
 
 - **A derived content brief.** The agent reads your product repo (README, routes, landing page) and synthesizes the story — hooks, ranked benefit-led features, per-act narration, per-platform copy — into a validated `brief.json` that every builder consumes. You approve the whole story on a storyboard page before anything renders.
 - **A copy linter.** Every generated line is gated for em dashes, hype, and AI-slop vocabulary before it can reach a render.
-- **A film grade and per-brand motion personality.** Grain, vignette, and bloom tuned per brand, and a `motion` token block so each brand's choreography feels like itself.
+- **A film grade and per-brand motion personality.** Grain, vignette, and bloom tuned per brand, and a `motion` token block so each brand's choreography feels like itself. Grain size is stated at 1080p and scaled by frame height, so an asset carries the same visual grain at 4K. Optional `halation` blooms wherever the frame is *actually* bright rather than glowing a fixed spot, which is the difference between footage that reads photographed and a flat vector comp.
 - **An export matrix.** The picture-locked launch video and social clips fan into 16:9, 9:16, 1:1, and 4:5 through responsive layout (not crops), with burned-caption variants for muted autoplay and SRT/VTT sidecars.
 - **Mission Control.** A local click-to-approve gallery: watch assets land, review act-boundary contact sheets before the expensive render, approve or request a redo with a note, and the run reacts — no terminal required.
 - **Designed sound.** Whooshes on act cuts, ticks on feature reveals, and a riser into the CTA, generated once as a shared SFX library and mixed under the voiceover automatically.
@@ -37,7 +37,8 @@ Around those assets, the pipeline adds:
 - **Staged product scenes.** A feature act can swap its screenshot for rebuilt native UI (a results list that resolves row by row, a composer that types its own query, a status tracker) filmed by a two-node camera rig with a stage-prop cursor that visibly clicks.
 - **A mastered mix.** Final renders pass a two-pass loudness master to -14 LUFS with a true-peak ceiling, measured in the delivered file rather than trusted from the filter graph, plus SFX asset leveling and per-cue audibility proof.
 - **A direction pass.** Before a launch film is built, three genuinely different visual directions are written and two are killed (`docs/templates/DIRECTION.md`), and iteration renders are versioned v1, v2, ... so a fix can be proven and an earlier cut recovered.
-- **Paste-ready post kits and a footage cache.** Every platform gets a folder with the right-aspect video, a lint-gated caption, alt text, and a posting checklist; the kit root also carries `manifest.json`, a machine-readable index that launch-engine reads to auto-attach videos to X and LinkedIn posts. Unchanged product UIs are never re-filmed thanks to content-hash caching of capture and Blender staging.
+- **A set judge, not just file judges.** Six mechanical gates run before any human looks: motion craft, palette, A/V sync, demo dead air, size budgets, and `judge-drift`, which scores the whole output directory *as a set*. That last one catches the failure no per-file gate can see — assets that are each individually on-brand but collectively fragment into three or four different-looking brands. It emits a worst-first review grid, because attention is reliable over about six tiles, not twenty.
+- **Paste-ready post kits and a footage cache.** Every platform gets a folder with the right-aspect video, a lint-gated caption, alt text, and a posting checklist; the kit root also carries `manifest.json`, a machine-readable index that launch-engine reads to auto-attach videos to X and LinkedIn posts, plus `LICENCES.md` and `DISCLOSURE.md` — what is synthetic, which platform toggle to set at upload, and which obligations the kit does *not* yet cover. Unchanged product UIs are never re-filmed thanks to content-hash caching of capture and Blender staging.
 
 Each asset also works standalone: run `/logo-reveal`, `/product-demo`, `/launch-video`, `/audio-track`, `/social-clip`, or `/og-assets` on its own from any repo.
 
@@ -178,6 +179,9 @@ node scripts/build-captions.mjs <brand> --check        # SRT/VTT sidecars
 node scripts/mission-control.mjs <brand>               # click-to-approve run console
 node scripts/master-audio.mjs out/<brand>/launch.mp4   # -14 LUFS master, verified in the delivered file
 node scripts/verify-cue.mjs out/<brand>/launch.mp4 2 1.5  # prove a sound cue is audible in a window
+node scripts/judge-motion.mjs <brand>                  # motion-craft + motion/grade token bands
+node scripts/judge-drift.mjs <brand>                   # scores out/<brand>/ as a SET; writes a worst-first review grid
+node scripts/build-postkit.mjs <brand>                 # per-platform kits + LICENCES.md + DISCLOSURE.md
 ```
 
 `docs/PLAYBOOK.md` has the full engine map: every feeder, builder script, and render command, plus the verified gotchas.
@@ -195,7 +199,9 @@ The `/marketing` skill does all of this for you from your product repo's design 
 ```bash
 python launch.py --check   # toolchain health
 node scripts/smoke.mjs     # renders frame 0 of every composition; must stay green
-cd studio && npm test      # brand schema tests
+cd studio && npm test      # brand schema, motion standards, timing libs
+cd studio && npm run lint  # eslint + tsc
+node --test "scripts/**/*.test.mjs"  # script-side gates (judges, postkit, drift descriptors)
 ```
 
 Every asset prop is nullable with a placeholder, so the smoke test passes on a clean clone with no captures, no Blender, and no API keys.
