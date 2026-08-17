@@ -146,6 +146,19 @@ ALPHA, opacity 0.1, base frequency 0.82, 1 octave, re-seeded at 12 Hz not per fr
 FilmGrade against all of this. Lifted blacks: no pure #000; their dark ground is
 #100e19. Vignette corner alpha 0.15 max (same overlay sits over light shots).
 
+**BAN LIFTED for this engine, 2026-08-17 — do not re-apply it here.** Both halves of
+that ban have now been tested against Remotion and both fail to reproduce, for the
+same underlying reason. The source skill's white-film trap comes from per-track
+compositing against transparency: each layer is rendered in isolation, so a blend or
+a backdrop filter has nothing real behind it. Remotion renders ONE DOM in Chrome, so
+every overlay layer has a genuine backdrop. `mix-blend-mode` was audited and kept on
+2026-08-09 (Status below, proven by shipped runs); `backdrop-filter` was verified on
+2026-08-17 by rendering a LogoReveal still and inspecting it, and it is now
+load-bearing for `grade.halation` — the only layer that can know where a frame's
+highlights actually are. If you are reading the ban above and about to revert a
+halation layer: don't. Render a still and look at it instead; that is how it was
+established. See docs/PLAYBOOK.md "FilmGrade — halation and grain".
+
 ### Phase D - direction discipline (kills our house style; process not code)
 
 Our real gap vs theirs is not components, it is that every brand gets the same film.
@@ -237,3 +250,20 @@ Our real gap vs theirs is not components, it is that every brand gets the same f
 - Phase B needs the PLAYBOOK timing-rule inversion approved.
 - Phase D is PLAYBOOK + /launch-video skill changes (direction discipline).
 - Phase E deliverables gaps not started.
+- FilmGrade extended 2026-08-17 (commit f33b1d8): `grade.halation` added, and the
+  source skill's `backdrop-filter` ban lifted for this engine with rendered proof
+  (see the BAN LIFTED note in Phase C above). Halation samples the composited frame
+  and blooms where the content is actually bright, using `contrast()` as a soft
+  highlight threshold — the thing `bloom`, a fixed radial gradient, structurally
+  cannot do. It renders FIRST in the stack so it samples the comp before the vignette
+  darkens the edges. noban ships 0.22; 0.55 grew a wordmark halo that read as
+  esports-neon, which its voice forbids, so judge-motion now WARNs above 0.35.
+  Separately, `grade.grainSize` is now stated at 1080p and scaled by frame height,
+  because feTurbulence's baseFrequency is in user-space px and a fixed frequency was
+  giving visibly finer grain at 4K than at 1080p for the same asset. Their 0.82 and
+  our 0.8 default remain effectively the same stock.
+- One item from the stagger table above (line 138) is now enforced rather than
+  documented: judge-motion checks the brand `stagger` token against a 30-80ms
+  perceptible band, and studio/src/lib/motion.ts carries the duration/easing/entry-
+  scale numbers as importable constants so the judge and the templates cannot
+  disagree. The band immediately flagged tenwords at 87ms.

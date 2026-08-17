@@ -12,7 +12,8 @@ scripts/install-skills.mjs); when a skill changes, update both copies.
 **Read docs/PLAYBOOK.md before any asset or feeder work** — engine map, brand
 onboarding, and verified gotchas (Blender 5.1.2 API traps, camera math, seamless-loop
 rules, capture lessons). Do not re-derive them. User-level skills (/logo-reveal,
-/social-clip, /product-demo, /launch-video, /og-assets) drive this repo from any repo.
+/social-clip, /product-demo, /launch-video, /og-assets, /audio-track, /marketing)
+drive this repo from any repo.
 
 Rules:
 - Brand color rules live in each brand's JSON `voice` (noban: profit = gold #d6c23c
@@ -20,6 +21,12 @@ Rules:
 - Rendered proof: visual work is not done until a rendered frame was inspected;
   final assets are not done until the user saw them.
 - Smoke check before claiming done: node scripts/smoke.mjs (every composition listed).
+- Six mechanical judges gate a run (judge-av-sync, judge-demo-pacing, judge-palette,
+  judge-motion, judge-drift, check-budgets). All are advisors: exit 0 unless --strict.
+  **judge-drift runs LAST** — it scores out/<brand>/ as a SET, so running it before
+  everything has rendered scores an incomplete set and the number means nothing. It
+  has no absolute threshold on purpose (nobody publishes one); calibrate with
+  `--ref <dir>` against approved assets, never by inventing a constant.
 - Generated props JSON is edited only via its builder script (scripts/build-*-props.mjs).
 - Asset copy traces to out/<brand>/marketing/brief.json (agent-synthesized, gated by
   scripts/lint-copy.mjs and the storyboard approval); builders overlay brief copy —

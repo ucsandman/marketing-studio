@@ -34,11 +34,11 @@ is a source clone or an installed plugin.
 | Export matrix | `scripts/render-matrix.mjs <brand> [--comp] [--stills-only]` + `scripts/platforms.json` | fans LaunchVideo/SocialClip into 16:9/9:16/1:1/4:5 via calculateMetadata props (no --width CLI flag in Remotion 4.0.486); captioned variants for muted-autoplay rows when audio props exist |
 | Caption sidecars | `scripts/build-captions.mjs <brand> [--check]` | props/<brand>-audio.json -> out/<brand>/captions/launch.srt + .vtt |
 | Thumbnails | `scripts/extract-thumbs.mjs <brand> [--comp] [--frame <n>] [--frame-<aspect> <n>]` | poster JPG per aspect -> out/<brand>/thumbs/; the poster frame is CHOSEN, never defaulted (precedence: `--frame-<aspect>` > `--frame` > a dormant `posterFrame` in props/<brand>-launch.json > the script default). Never mid-motion, half-typed, or cursor-visible; test it at 200px wide |
-| Post kit | `scripts/build-postkit.mjs <brand>` | per-platform folders (video, lint-gated caption.txt, alt.txt, thumb, POST.md, SRT/VTT for yt/li) -> out/<brand>/postkit/; also writes a `<video>-silent.mp4` per copied video (ffmpeg `-c copy -an`, skipped with a log line when ffmpeg is missing) and a root `LICENCES.md` stub listing the music, SFX, and font sources actually present |
+| Post kit | `scripts/build-postkit.mjs <brand>` | per-platform folders (video, lint-gated caption.txt, alt.txt, thumb, POST.md, SRT/VTT for yt/li) -> out/<brand>/postkit/; also writes a `<video>-silent.mp4` per copied video (ffmpeg `-c copy -an`, skipped with a log line when ffmpeg is missing) and two root records: `LICENCES.md` (music/SFX/font sources actually present) and `DISCLOSURE.md` (what this pipeline actually synthesised for the brand, the per-platform AI toggle to set at upload, and the gaps it does NOT close — no C2PA credential embedded despite EU AI Act Art. 50 since 2026-08-02, plus the TikTok Content Posting API's private-until-audited trap) |
 | Contact sheets | `scripts/contact-sheet.mjs <brand> <Comp>` | act-boundary stills + sheet HTML -> out/<brand>/marketing/stills/; Mission Control shows the strip |
 | Footage cache | `scripts/lib/cache.mjs`; capture scripts + stage-blender-assets consult it | key = product git HEAD+porcelain + script source + config; `--force` re-captures; caching disabled when product git state is unresolvable; capture entries also store readable meta {productRepo, productHead} so Mission Control can warn when footage falls behind the product repo |
 | SFX library | `scripts/build-sfx.mjs` (one-time, idempotent) | ElevenLabs sound-generation -> assets/sfx/ + studio/public/sfx/ (whoosh/tick/riser, exit 2 = silent fallback); cues derived at render from launchTiming via `studio/src/lib/sfxCues.ts`, gated by `sfx.enabled` in the audio manifest (builder flips it only when files are staged) |
-| Quality judges | `scripts/judge-av-sync.mjs`, `judge-demo-pacing.mjs`, `judge-palette.mjs <brand>`, `judge-motion.mjs [brand]` | Phase-4 advisors (exit 0 + JSON verdicts; `--strict` gates): VO overruns/caption dwell, dead-air (raw-capture footage means dead = literally frozen frames, threshold 0.2), forbidden-color washes with high/low confidence + `--mask-region` (product-UI false-positive guard), motion-craft conventions (no Easing.in/scale(0)/CSS transitions in studio src, springs via lib/motion.ts, brand motion-token bands; rules adapted from Emil Kowalski's review-animations standards, MIT) |
+| Quality judges | `scripts/judge-av-sync.mjs`, `judge-demo-pacing.mjs`, `judge-palette.mjs <brand>`, `judge-motion.mjs [brand]`, `judge-drift.mjs <brand>` | Phase-4 advisors (exit 0 + JSON verdicts; `--strict` gates): VO overruns/caption dwell, dead-air (raw-capture footage means dead = literally frozen frames, threshold 0.2), forbidden-color washes with high/low confidence + `--mask-region` (product-UI false-positive guard), motion-craft conventions (no Easing.in/scale(0)/CSS transitions in studio src, springs via lib/motion.ts, brand motion-token bands, entry-scale + stagger + grain + halation ceilings — numbers IMPORTED from lib/motion.ts, never restated; adapted from Emil Kowalski's review-animations standards, MIT). **judge-drift is the only SET judge** — it scores the whole out/<brand>/ rather than one file, so it runs LAST once everything has rendered, and it emits a worst-first `drift-sheet.html` alongside its JSON. Its z-scores are relative to the set's own dispersion with NO absolute threshold; calibrate with `--ref <dir>` against approved assets (see the cross-asset drift section below) |
 | Encode budgets | `scripts/check-budgets.mjs <brand>` (hard gate, exit 1 on OVER) | byte budgets per asset class; render-matrix now faststart-remuxes every mp4 and `--webm` adds a VP9/Opus transcode |
 | Hook A/B | `scripts/render-hook-variants.mjs <brand> [--headlines '<json>']` | renders the hook act per headline (brief.json altHeadlines or flag) -> out/<brand>/marketing/hooks/ + picker.html; registers run.json variants[] for Mission Control's radio pick |
 | Hero takes | `scripts/render-variants.mjs <brand> <logo-reveal\|launch-hook> [--takes N]` | brand-safe motion-knob takes via nullable `motionOverride` prop (exuberant take floors at 0.65 — below ~0.55 the spring is overdamped and deltas render invisible); registers variants[] |
@@ -55,12 +55,17 @@ placeholder so smoke stays green on a clean clone.
    tokens, 3 fonts, tagline, voice). Derive values from the product repo's DESIGN.md,
    tailwind config, or CSS variables; ask the user for anything ambiguous. Encode the
    brand's color RULES in `voice` (e.g. noban: profit gold NEVER green). Optional
-   zod-defaulted blocks: `grade` (FilmGrade grain/vignette/bloom/aberration/letterbox —
-   zero bloom for brands whose voice forbids glow) and `motion` (tempo/exuberance/
+   zod-defaulted blocks: `grade` (FilmGrade
+   grain/grainSize/halation/vignette/bloom/aberration/letterbox — zero bloom AND zero
+   halation for brands whose voice forbids glow, since halation blooms whatever is
+   brightest and that is the accent by construction; `grainSize` is the baseFrequency
+   at 1080p and scales by frame height; judge-motion WARNs above grain 0.4 and
+   halation 0.35) and `motion` (tempo/exuberance/
    stagger/overshoot plus `parallax`/`settle` depth-and-cut kickers defaulting to 0 and
    a `textReveal` preset [spring|maskWipe|blurIn|charStagger] defaulting to spring —
    the brand's choreography personality; rest positions and zeroed defaults never
-   change existing output).
+   change existing output). Also optional: `speechHint`, the SPOKEN casing of a coined
+   brand name, which judge-audio primes the transcriber with (see the ear-gate section).
 2. Register it in `studio/src/lib/brand.ts` (import + registry entry).
 3. Mark component: `studio/src/brands/<Brand>Mark.tsx` recreating the product's logo
    SVG (viewBox-normalized, `{size, color}` props, `currentColor` strokes), then
@@ -493,4 +498,8 @@ invisible until this existed. Spec:
 1. Final artifact rendered into `out/<brand>/`.
 2. Copy the artifact into the CALLING repo (ask once where; default `marketing/assets/`
    or the repo's existing media dir).
-3. Send the file to the user for approval — the asset is not done until a human saw it.
+3. When a post kit is part of the delivery, its root records travel WITH it —
+   `LICENCES.md` and `DISCLOSURE.md`. A disclosure record that stays behind in
+   `out/` never reaches the person who actually posts the file, which is the only
+   moment it matters: the platform AI toggle is set at upload, by a human, once.
+4. Send the file to the user for approval — the asset is not done until a human saw it.

@@ -192,6 +192,20 @@ node scripts/build-postkit.mjs <brand>                 # per-platform kits + LIC
 2. Register it in `studio/src/lib/brand.ts` and add a mark component in `studio/src/brands/`.
 3. `cd studio && npm test` validates the schema.
 
+Only `id`, `name`, `tagline`, `url`, `colors` (13), `fonts` (3) and `voice` are required. Every other block is optional and defaults to the value it was hardcoded to before the token existed, so a brand that omits it renders byte-identically:
+
+| Block | What it tunes |
+|-------|---------------|
+| `motion` | Choreography personality — `tempo`, `exuberance`, `stagger`, `overshoot`, `parallax`, `settle`, `textReveal`. Retunes every entrance without moving a rest position. |
+| `grade` | The film pass — `grain`, `grainSize` (stated at 1080p, scaled by frame height), `halation` (highlight bloom that samples the frame), `vignette`, `bloom`, `aberration`, `letterbox`. |
+| `effects` | `wash` and `glow` behind the mark. Brands whose rules forbid a hero wash set `wash: 0`. |
+| `textAccent`, `progressFill` | Which color tokens carry small colored text and the progress gradient. |
+| `speechHint` | How the brand name is SPOKEN when that differs from how it is written. The transcriber cannot read a coined word it has never seen, so the audio judge primes it with this. |
+
+`voice` is not decoration — it is parsed. `judge-palette` reads "never <color>" rules out of it and fails renders that violate them, so write the real constraints there.
+
+Keep `grade` restrained. `judge-motion` warns above `grain` 0.4 and `halation` 0.35: past those, grain reads as compression noise and halation reads as a CSS glow rather than light scattering off film.
+
 The `/marketing` skill does all of this for you from your product repo's design system; the steps above are the manual path. Details in `docs/PLAYBOOK.md`.
 
 ## Verification

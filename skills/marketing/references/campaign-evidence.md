@@ -52,8 +52,12 @@ broad reach, not loyalty deepening.
 **Engine rules:** this is why brands/<id>.json + marks.ts + the motion personality
 block exist — every asset in a launch reuses the SAME mark, palette, motion feel,
 and music bed so exposures compound instead of resetting. judge-palette and
-judge-motion enforce it mechanically. Distribute wide (all platforms in
-platforms.json) rather than deep on one channel.
+judge-motion enforce it mechanically per asset, and judge-drift enforces it ACROSS
+the campaign — it scores out/<brand>/ as one set, which is the only way to catch the
+failure this finding is actually about: assets that are each individually on-brand
+but collectively fragment into three or four different-looking brands, so exposures
+stop compounding even though no single file looks wrong. Distribute wide (all
+platforms in platforms.json) rather than deep on one channel.
 
 ## 5. Sub-15s cutdowns are their own deliverable
 
