@@ -66,9 +66,13 @@ const LINES = [
   {id: 'logo', text: "postflop. An open source solver for heads up no limit hold'em."},
   {
     id: 'hook',
+    // TRIM ROUND 1 (2026-09-01): brief text verbatim measured 10340ms, 340ms over the
+    // 10000ms budget. Dropped the trailing "at every report" clause per the dispatch
+    // fallback. MUST-SURVIVE claims kept intact: "measures" + "a separate best
+    // response calculator" — never collapsed into an unqualified "it measures itself".
     text:
       'A solver that grades its own homework can be confidently wrong. This one measures ' +
-      'convergence instead: a separate best response calculator, at every report.',
+      'convergence instead: a separate best response calculator.',
   },
   {
     id: 'demo',

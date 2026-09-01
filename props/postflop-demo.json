@@ -7,16 +7,16 @@
       "width": 1920,
       "height": 1080
     },
-    "durationMs": 49472,
+    "durationMs": 49264,
     "events": [
       {
         "type": "step",
-        "t": 1810,
+        "t": 1710,
         "label": "A board, the stacks, the pot, and the sizings each seat may bet."
       },
       {
         "type": "focus",
-        "t": 2539,
+        "t": 2441,
         "x": 393,
         "y": 340,
         "w": 448,
@@ -24,12 +24,12 @@
       },
       {
         "type": "step",
-        "t": 5951,
+        "t": 5848,
         "label": "Both ranges: painted on the grid, typed as range strings, or cut to a top percentage."
       },
       {
         "type": "focus",
-        "t": 6680,
+        "t": 6575,
         "x": 1052,
         "y": 266,
         "w": 977,
@@ -37,30 +37,30 @@
       },
       {
         "type": "click",
-        "t": 7487,
+        "t": 7390,
         "x": 821,
         "y": 538
       },
       {
         "type": "click",
-        "t": 8492,
+        "t": 8399,
         "x": 1283,
         "y": 538
       },
       {
         "type": "step",
-        "t": 10296,
+        "t": 10229,
         "label": "Name the convergence target. This one is asked for 0.05% of pot."
       },
       {
         "type": "click",
-        "t": 10296,
+        "t": 10229,
         "x": 1053,
         "y": 686
       },
       {
         "type": "focus",
-        "t": 11620,
+        "t": 11536,
         "x": 1053,
         "y": 675,
         "w": 1033,
@@ -68,18 +68,18 @@
       },
       {
         "type": "step",
-        "t": 14132,
+        "t": 14047,
         "label": "Preflight prices the tree before the solver allocates it."
       },
       {
         "type": "click",
-        "t": 14132,
+        "t": 14047,
         "x": 1722,
         "y": 110
       },
       {
         "type": "focus",
-        "t": 15070,
+        "t": 14933,
         "x": 1682,
         "y": 403,
         "w": 477,
@@ -87,29 +87,29 @@
       },
       {
         "type": "step",
-        "t": 18484,
+        "t": 18347,
         "label": "Solve. The engine runs in a worker, in the tab."
       },
       {
         "type": "click",
-        "t": 18484,
+        "t": 18347,
         "x": 1722,
         "y": 59
       },
       {
         "type": "step",
-        "t": 21642,
+        "t": 21449,
         "label": "Exploitability, measured by a separate best-response walk at every report."
       },
       {
         "type": "click",
-        "t": 21642,
+        "t": 21449,
         "x": 100,
         "y": 167
       },
       {
         "type": "focus",
-        "t": 22492,
+        "t": 22275,
         "x": 1682,
         "y": 799,
         "w": 477,
@@ -117,18 +117,18 @@
       },
       {
         "type": "step",
-        "t": 26699,
+        "t": 26493,
         "label": "The solved spot: board, pot, stacks, exploitability."
       },
       {
         "type": "click",
-        "t": 26699,
+        "t": 26493,
         "x": 100,
         "y": 90
       },
       {
         "type": "focus",
-        "t": 27623,
+        "t": 27422,
         "x": 1042,
         "y": 114,
         "w": 1757,
@@ -136,12 +136,12 @@
       },
       {
         "type": "step",
-        "t": 31031,
+        "t": 30832,
         "label": "169 hand classes. Every cell is split by the action it takes."
       },
       {
         "type": "focus",
-        "t": 31763,
+        "t": 31564,
         "x": 414,
         "y": 402,
         "w": 457,
@@ -149,18 +149,18 @@
       },
       {
         "type": "step",
-        "t": 35177,
+        "t": 34972,
         "label": "Open one cell: every combo, its own mix, its own EV in big blinds."
       },
       {
         "type": "click",
-        "t": 35177,
+        "t": 34972,
         "x": 333,
         "y": 232
       },
       {
         "type": "focus",
-        "t": 36726,
+        "t": 36560,
         "x": 1314,
         "y": 439,
         "w": 580,
@@ -168,18 +168,18 @@
       },
       {
         "type": "step",
-        "t": 40139,
+        "t": 39973,
         "label": "Freeze a node and the next solve works around it."
       },
       {
         "type": "click",
-        "t": 40139,
+        "t": 39973,
         "x": 573,
         "y": 176
       },
       {
         "type": "focus",
-        "t": 41003,
+        "t": 40838,
         "x": 414,
         "y": 187,
         "w": 502,
@@ -187,29 +187,29 @@
       },
       {
         "type": "step",
-        "t": 43628,
+        "t": 43448,
         "label": "Walk the tree. Both seats act, then the river is dealt."
       },
       {
         "type": "click",
-        "t": 43628,
+        "t": 43448,
         "x": 1278,
         "y": 127
       },
       {
         "type": "click",
-        "t": 44519,
+        "t": 44331,
         "x": 1278,
         "y": 127
       },
       {
         "type": "step",
-        "t": 45331,
+        "t": 45127,
         "label": "Every runout priced by what it does to hero EV, ranked by consequence."
       },
       {
         "type": "focus",
-        "t": 46060,
+        "t": 45856,
         "x": 1676,
         "y": 439,
         "w": 488,

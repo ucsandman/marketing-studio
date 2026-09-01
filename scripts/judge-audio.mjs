@@ -634,9 +634,14 @@ async function main() {
   const launch = JSON.parse(readFileSync(launchPath, 'utf8'));
   const lines = Array.isArray(audio.lines) ? audio.lines : [];
   const features = Array.isArray(launch.features) ? launch.features : [];
-  const telemetryDurationMs = existsSync(demoPath)
-    ? JSON.parse(readFileSync(demoPath, 'utf8'))?.telemetry?.durationMs ?? null
-    : launch.demo?.telemetry?.durationMs ?? null;
+  // The act windows must come from the telemetry the LaunchVideo actually renders
+  // with, which is the copy embedded in props/<brand>-launch.json (a brand with a
+  // launch CUT, e.g. postflop's 25.3s cut of a 49s capture, embeds the cut's
+  // duration there). The standalone demo props are only a fallback; preferring
+  // them shifted every post-demo act window by 24s and failed four true lines.
+  const telemetryDurationMs =
+    launch.demo?.telemetry?.durationMs ??
+    (existsSync(demoPath) ? JSON.parse(readFileSync(demoPath, 'utf8'))?.telemetry?.durationMs ?? null : null);
 
   const mod = await import(new URL('../studio/src/lib/launchTiming.ts', import.meta.url));
   const timing = mod.launchTiming(

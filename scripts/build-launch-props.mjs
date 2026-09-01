@@ -35,7 +35,7 @@ const DEMO_PROPS = {
 // with scripts/merge-launch-audio.mjs, unchanged.
 // Membership rule (build-launch-props.test.mjs): every brand whose
 // props/<brand>-audio.json carries measured `words` is in this set.
-const EMBED_AUDIO = new Set(['tenwords', 'practicalsystems']);
+const EMBED_AUDIO = new Set(['tenwords', 'practicalsystems', 'postflop']);
 
 const BRANDS = {
   noban: (demo) => ({
