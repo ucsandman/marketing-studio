@@ -50,6 +50,12 @@ export const Card: React.FC<Props> = ({brandId, kind, value, label, source, kick
   const brand = getBrand(brandId);
   const fonts = loadBrandFonts(brand);
   const Mark = getMark(brand.id);
+  // `ctaStyle: 'block'` is a brand declaring that its accent is only ever a
+  // filled block carrying ink text -- never accent-coloured type or a
+  // coloured glyph (same contract AnimatedOG/EndCard/LogoReveal already
+  // read). Every other brand defaults to 'text', so their card stays
+  // byte-identical.
+  const block = brand.ctaStyle === 'block';
   const hero = kind === 'quote' ? `“${value}”` : value;
   return (
     <AbsoluteFill style={{backgroundColor: brand.colors.bg}}>
@@ -63,7 +69,7 @@ export const Card: React.FC<Props> = ({brandId, kind, value, label, source, kick
         }}
       >
         <div style={{display: 'flex', alignItems: 'center', gap: 16 * scale}}>
-          <Mark size={44 * scale} color={brand.colors.brand} />
+          <Mark size={44 * scale} color={block ? brand.colors.ink : brand.colors.brand} />
           {kicker ? (
             <div
               style={{
@@ -87,7 +93,22 @@ export const Card: React.FC<Props> = ({brandId, kind, value, label, source, kick
               color: kind === 'stat' ? brand.colors[brand.textAccent] : brand.colors.ink,
             }}
           >
-            {hero}
+            {kind === 'stat' && block ? (
+              <span
+                style={{
+                  display: 'inline-block',
+                  backgroundColor: brand.colors.brand,
+                  color: brand.colors.ink,
+                  fontFamily: fonts.mono,
+                  padding: '0 0.18em',
+                  borderRadius: 0,
+                }}
+              >
+                {hero}
+              </span>
+            ) : (
+              hero
+            )}
           </div>
           {label ? (
             <div style={{fontFamily: fonts.body, fontSize: 34 * scale, color: brand.colors.ink2}}>
