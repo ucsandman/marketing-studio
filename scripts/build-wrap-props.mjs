@@ -13,7 +13,7 @@
 import {readFileSync, copyFileSync, mkdirSync, writeFileSync, existsSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {basename, dirname, join, resolve} from 'node:path';
+import {dirname, join, resolve} from 'node:path';
 import {validateManifest, parseSrt, windowCues} from './lib/wrap-contract.mjs';
 
 process.on('unhandledRejection', (reason) => {
@@ -27,8 +27,10 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 // Staged video filename under studio/public/<brand>/ — derived from the handoff
 // dir's own basename, so re-running against the same handoff overwrites in place.
+// Splits on both separators: node's basename is per-host, so a Windows handoff
+// path reaching a Linux runner (CI) came back whole (bit 2026-09-01).
 export function stagedVideoName(handoffDir) {
-  return `wrap-${basename(handoffDir)}.mp4`;
+  return `wrap-${String(handoffDir).split(/[\\/]/).filter(Boolean).pop()}.mp4`;
 }
 
 // Pure WrapClip props for one segment. Captions arrive windowed + re-based to the

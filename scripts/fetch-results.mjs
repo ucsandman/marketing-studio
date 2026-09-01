@@ -15,8 +15,9 @@
 //         one that just hasn't gone out yet) is a clean skip, not an error.
 //
 // Fetching: X posts get public_metrics from the X API v2 (X_BEARER_TOKEN in the
-// repo .env — value is never printed). Other platforms (LinkedIn's stats API is
-// partner-gated) carry inline `metrics` entered manually. Posts that cannot be
+// repo .env — value is never printed). Bluesky posts get like/repost/reply counts
+// from the public AppView (no token: public.api.bsky.app). Other platforms
+// (LinkedIn's stats API is partner-gated) carry inline `metrics` entered manually. Posts that cannot be
 // resolved are written with source: 'unavailable', never dropped.
 //
 // Output: out/<brand>/marketing/results.json — Mission Control renders it next
@@ -32,6 +33,8 @@
 import {existsSync, readFileSync, writeFileSync, mkdirSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {readEnvVar} from './lib/env.mjs';
+import {normalizeBskyMetrics, parsePostUrl} from './publish-bluesky.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -40,17 +43,6 @@ process.on('unhandledRejection', (reason) => {
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-// Minimal .env reader: KEY=VALUE lines, no expansion. Values never printed.
-function readEnvVar(name) {
-  if (process.env[name]) return process.env[name];
-  const envPath = join(root, '.env');
-  if (!existsSync(envPath)) return null;
-  for (const line of readFileSync(envPath, 'utf8').split('\n')) {
-    const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/.exec(line);
-    if (m && m[1] === name && m[2]) return m[2].replace(/^["']|["']$/g, '');
-  }
-  return null;
-}
 
 export function tweetIdFromUrl(url) {
   const m = /(?:twitter\.com|x\.com)\/[^/]+\/status(?:es)?\/(\d+)/.exec(String(url ?? ''));
@@ -79,6 +71,35 @@ async function fetchXMetrics(ids, bearer) {
   const byId = new Map();
   for (const t of body.data ?? []) byId.set(t.id, normalizeXMetrics(t.public_metrics));
   return byId;
+}
+
+// Bluesky: a bsky.app URL names the actor by handle, the AppView wants the AT URI,
+// so resolve the handle to a DID first. Both endpoints are public and unauthenticated.
+const BSKY_PUBLIC = 'https://public.api.bsky.app/xrpc';
+async function fetchBskyMetrics(urls) {
+  const byUrl = new Map();
+  const uris = [];
+  for (const url of urls) {
+    const parsed = parsePostUrl(url);
+    if (!parsed) continue;
+    let did = parsed.actor;
+    if (!did.startsWith('did:')) {
+      const r = await fetch(`${BSKY_PUBLIC}/com.atproto.identity.resolveHandle?handle=${encodeURIComponent(parsed.actor)}`);
+      if (!r.ok) throw new Error(`resolveHandle ${r.status}`);
+      did = (await r.json()).did;
+    }
+    const uri = `at://${did}/app.bsky.feed.post/${parsed.rkey}`;
+    uris.push(uri);
+    byUrl.set(uri, url);
+  }
+  if (uris.length === 0) return new Map();
+  const q = uris.map((u) => `uris=${encodeURIComponent(u)}`).join('&');
+  const res = await fetch(`${BSKY_PUBLIC}/app.bsky.feed.getPosts?${q}`);
+  if (!res.ok) throw new Error(`getPosts ${res.status} ${res.statusText}`);
+  const body = await res.json();
+  const out = new Map();
+  for (const post of body.posts ?? []) out.set(byUrl.get(post.uri), normalizeBskyMetrics(post));
+  return out;
 }
 
 async function main() {
@@ -150,6 +171,26 @@ async function main() {
         degraded = true;
         for (const p of xPending) p.source = 'unavailable';
       }
+    }
+  }
+  const bskyPending = posts.filter((p) => p.platform === 'bluesky' && !p.metrics && p.url && p.source !== 'skipped');
+  if (bskyPending.length > 0) {
+    try {
+      const byUrl = await fetchBskyMetrics(bskyPending.map((p) => p.url));
+      for (const p of bskyPending) {
+        const m = byUrl.get(p.url);
+        if (m) {
+          p.metrics = m;
+          p.source = 'bsky-api';
+        } else {
+          p.source = 'unavailable';
+          degraded = true;
+        }
+      }
+    } catch (err) {
+      console.error(`fetch-results: Bluesky fetch failed: ${err.message} — Bluesky posts marked unavailable.`);
+      degraded = true;
+      for (const p of bskyPending) p.source = 'unavailable';
     }
   }
   for (const p of posts) {

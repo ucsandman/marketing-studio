@@ -183,6 +183,8 @@ node scripts/verify-cue.mjs out/<brand>/launch.mp4 2 1.5  # prove a sound cue is
 node scripts/judge-motion.mjs <brand>                  # motion-craft + motion/grade token bands
 node scripts/judge-drift.mjs <brand>                   # scores out/<brand>/ as a SET; writes a worst-first review grid
 node scripts/build-postkit.mjs <brand>                 # per-platform kits + LICENCES.md + DISCLOSURE.md
+node scripts/publish-bluesky.mjs <brand> --dry-run     # post the Bluesky kit (drop --dry-run; needs BLUESKY_* in .env)
+node scripts/fetch-results.mjs <brand>                 # engagement per hook variant from X + Bluesky into results.json
 ```
 
 `docs/PLAYBOOK.md` has the full engine map: every feeder, builder script, and render command, plus the verified gotchas.

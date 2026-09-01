@@ -120,6 +120,15 @@ export const PLATFORM_MAP = {
     note: 'Upload as an Instagram feed post or Reel. Paste caption.txt as the caption and alt.txt into Advanced settings > Accessibility > Alt text.',
     aiDisclosure: 'the "AI info" labelling in the composer',
   },
+  bluesky: {
+    aspect: '16x9',
+    videoSource: 'social-16x9',
+    captionFile: false,
+    charBudget: 300,
+    sourceKey: 'x',
+    note: 'Publish with node scripts/publish-bluesky.mjs <brand> (or the Publish to Bluesky button in Mission Control); it uploads social-16x9.mp4, posts caption.txt with alt.txt, and records the URL in posts.json. Links in the caption become tappable.',
+    aiDisclosure: null,
+  },
 };
 
 const PLATFORM_LABELS = {
@@ -129,6 +138,7 @@ const PLATFORM_LABELS = {
   shorts: 'YouTube Shorts',
   youtube: 'YouTube',
   instagram: 'Instagram',
+  bluesky: 'Bluesky',
 };
 
 // --- pure helpers (unit-testable, no I/O) -----------------------------------

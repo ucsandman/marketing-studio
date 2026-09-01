@@ -523,6 +523,18 @@ function handlePullVerdicts(res) {
   res.end(JSON.stringify(result));
 }
 
+// The one platform with an open posting API. The publisher itself writes the
+// posts.json row, so a refresh shows the post as recorded. Video processing on
+// Bluesky's side takes tens of seconds; 4 minutes is the ceiling before the
+// server declares it hung.
+// ponytail: blocks the event loop like the other two run-level actions; move to
+// execFile + a job id if a second long-running publisher lands.
+function handlePublishBluesky(res) {
+  const result = runCliScript(join(root, 'scripts', 'publish-bluesky.mjs'), [brand], {timeoutMs: 240_000});
+  res.writeHead(result.ok ? 200 : 502, {'content-type': 'application/json'});
+  res.end(JSON.stringify(result));
+}
+
 // ---- read-only advisories (judges / results / staleness) --------------------
 // All three are computed from files other tools write; Mission Control never
 // mutates them. They ride on /state so the operator approves with the machine
@@ -820,6 +832,7 @@ function consolePage() {
 <div class="advisories" id="advisories"></div>
 <div class="mcbar">
   <button class="btn approve" id="btnReviewMagnetic">Review in Magnetic</button>
+  <button class="btn posted" id="btnPublishBluesky">Publish to Bluesky</button>
   <button class="btn redo" id="btnPullVerdicts">Pull verdicts</button>
   <span class="mcstatus" id="mcStatus"></span>
 </div>
@@ -988,6 +1001,11 @@ async function runMcAction(path,btn,otherBtn,successText){
 
 btnReviewMagnetic.addEventListener('click',()=>runMcAction('/review-in-magnetic',btnReviewMagnetic,btnPullVerdicts,'Proposal sent to Magnetic.'));
 btnPullVerdicts.addEventListener('click',()=>runMcAction('/pull-verdicts',btnPullVerdicts,btnReviewMagnetic,'Verdicts pulled.'));
+const btnPublishBluesky=document.getElementById('btnPublishBluesky');
+btnPublishBluesky.addEventListener('click',()=>{
+  if(!window.confirm('Publish the Bluesky postkit now? This posts publicly.'))return;
+  runMcAction('/publish-bluesky',btnPublishBluesky,btnPullVerdicts,'Posted to Bluesky (see the bluesky row below).');
+});
 
 function renderHeader(run){
   document.getElementById('hBrand').textContent=run.brand||run.brandId||'';
@@ -1131,6 +1149,11 @@ if (isMain) {
 
     if (req.method === 'POST' && path === '/pull-verdicts') {
       handlePullVerdicts(res);
+      return;
+    }
+
+    if (req.method === 'POST' && path === '/publish-bluesky') {
+      handlePublishBluesky(res);
       return;
     }
 
