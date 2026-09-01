@@ -142,7 +142,7 @@ placeholder so smoke stays green on a clean clone.
 - Export matrix: LaunchVideo rows read `out/<brand>/launch-audio-props.json` when it
   exists (scripts/merge-launch-audio.mjs writes it), so they carry the merged audio AND
   the same VO-derived act lengths as the launch video; SocialClip rows have no audio
-  track by design and are silent. Measured 2026-09-01 before the fix: dashclaw and
+  track by design and are silent. A brand whose intake asked for audio scores its per-platform clips AFTER render with `scripts/score-social-clip.mjs` (bed + one VO line, VO compressed 4:1 so master-audio converges in one pass) and build-postkit prefers that `<clipId>-final.mp4` over the matrix row. Measured 2026-09-01 before the fix: dashclaw and
   costclaw launch-16x9.mp4 were -70.0 LUFS (digital silence), tenwords -26.3 only because
   it was the sole EMBED_AUDIO member. Already-rendered brands must be re-rendered one at
   a time and re-approved in Mission Control.

@@ -69,6 +69,10 @@ export const PLATFORM_MAP = {
   x: {
     aspect: '16x9',
     videoSource: 'social-16x9',
+    // A per-platform clip beats the generic matrix row: the matrix renders ONE
+    // social props file (alphabetically first, so postflop's X folder carried the
+    // LinkedIn clip, 2026-09-01). score-social-clip.mjs writes social-x-final.mp4.
+    directSources: ['social-x-final', 'social-x'],
     captionFile: false,
     charBudget: 280,
     sourceKey: 'x',
@@ -123,6 +127,7 @@ export const PLATFORM_MAP = {
   bluesky: {
     aspect: '16x9',
     videoSource: 'social-16x9',
+    directSources: ['social-x-final', 'social-x'],
     captionFile: false,
     charBudget: 300,
     sourceKey: 'x',
@@ -502,7 +507,15 @@ function main() {
     mkdirSync(dir, {recursive: true});
 
     // Video, plus a silent -an cut for muted-autoplay embeds (see header comment).
-    const videoSrc = join(matrixDir, `${cfg.videoSource}.mp4`);
+    let videoSrc = join(matrixDir, `${cfg.videoSource}.mp4`);
+    for (const direct of cfg.directSources ?? []) {
+      const candidate = join(root, 'out', brand, `${direct}.mp4`);
+      if (existsSync(candidate)) {
+        videoSrc = candidate;
+        console.log(`postkit: ${platformKey}: using per-platform clip ${direct}.mp4 over matrix/${cfg.videoSource}.mp4`);
+        break;
+      }
+    }
     let videoStatus;
     let silentFile = null;
     if (existsSync(videoSrc)) {
