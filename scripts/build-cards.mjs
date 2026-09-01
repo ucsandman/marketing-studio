@@ -48,7 +48,11 @@ export const cardsFor = (brief, brandId) => {
       id: `stat-${i + 1}`,
       props: {
         brandId,
-        kind: 'stat',
+        // A claim with no figure is a sentence, not a stat: render it as a quote card so a
+
+        // block brand does not paint the whole sentence into its accent block (postflop stat-7).
+
+        kind: label ? 'stat' : 'quote',
         value,
         label,
         source: point.source,

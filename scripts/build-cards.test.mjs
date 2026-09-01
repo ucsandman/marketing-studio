@@ -94,3 +94,12 @@ test('a missing brief is a clean skip, not a crash', () => {
   assert.match(stdout, /skipping \(0 cards from 0 proof points\)/);
   assert.deepEqual(readdirSync(join(dir, 'empty')), []);
 });
+
+test('a figureless proof point becomes a quote card, not a stat block', () => {
+  const cards = cardsFor(
+    {proofPoints: [{claim: 'Solved strategies are bit-identical for every thread count', source: 'README'}]},
+    'postflop',
+  );
+  assert.equal(cards[0].props.kind, 'quote');
+  assert.equal(cards[0].props.value, 'Solved strategies are bit-identical for every thread count');
+});
