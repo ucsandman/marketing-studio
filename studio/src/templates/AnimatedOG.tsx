@@ -40,6 +40,11 @@ export const AnimatedOG: React.FC<Props> = ({
   const brand = getBrand(brandId);
   const fonts = loadBrandFonts(brand);
   const Mark = getMark(brand.id);
+  // `ctaStyle: 'block'` is a brand declaring that its accent is only ever a
+  // filled block carrying ink text -- never accent-coloured type or a
+  // coloured glyph (same contract EndCard/LogoReveal already read). Every
+  // other brand defaults to 'text', so their OG frame stays byte-identical.
+  const block = brand.ctaStyle === 'block';
   const cycle = frame / durationInFrames; // 0..1, and frame N == frame 0 on loop
   // triangular ping-pong: 0 -> 1 -> 0 across the loop, continuous at the seam
   const barProgress = cycle < 0.5 ? cycle * 2 : 2 - cycle * 2;
@@ -69,7 +74,7 @@ export const AnimatedOG: React.FC<Props> = ({
       />
       <AbsoluteFill style={{justifyContent: 'center', alignItems: 'center', gap: 18}}>
         <div style={{display: 'flex', alignItems: 'center', gap: 24}}>
-          <Mark size={84} color={brand.colors.brand} />
+          <Mark size={84} color={block ? brand.colors.ink : brand.colors.brand} />
           <div style={{fontFamily: fonts.display, fontWeight: 800, fontSize: 88, color: brand.colors.ink}}>
             {brand.name}
           </div>
@@ -80,8 +85,12 @@ export const AnimatedOG: React.FC<Props> = ({
             fontFamily: fonts.mono,
             fontSize: 22,
             letterSpacing: '0.22em',
-            color: brand.colors.profit,
+            ...(block
+              ? {backgroundColor: brand.colors.brand, color: brand.colors.ink, padding: '8px 20px'}
+              : {color: brand.colors.profit}),
             marginTop: 6,
+            maxWidth: '90%',
+            textAlign: 'center',
           }}
         >
           {cta.toUpperCase()}
