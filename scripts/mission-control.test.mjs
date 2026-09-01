@@ -9,14 +9,12 @@ import assert from 'node:assert/strict';
 import {mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {
-  latestVerdictsByAsset,
+import {latestVerdictsByAsset,
   runCliScript,
   applyPosted,
   readJudges,
   snapshotApproved,
-  EXPECTED_JUDGES,
-} from './mission-control.mjs';
+  EXPECTED_JUDGES, applyApprove} from './mission-control.mjs';
 
 // --- latestVerdictsByAsset ---------------------------------------------------
 // review.json is APPEND-ONLY: Task 6's reviewer flagged that displaying it
@@ -316,4 +314,13 @@ test('snapshotApproved: a missing or escaping artifact returns null instead of f
 
 test.after(() => {
   rmSync(tmp, {recursive: true, force: true});
+});
+
+test('applyApprove stamps approval without demoting a delivered asset', () => {
+  const now = new Date('2026-09-01T22:00:00.000Z');
+  const delivered = applyApprove({id: 'launch-video', status: 'delivered'}, now);
+  assert.equal(delivered.status, 'delivered');
+  assert.equal(delivered.approvedAt, '2026-09-01T22:00:00.000Z');
+  const rendered = applyApprove({id: 'og-assets', status: 'rendered'}, now);
+  assert.equal(rendered.status, 'approved');
 });

@@ -123,6 +123,15 @@ export function snapshotApproved(brandOutDir, rel, {now = new Date()} = {}) {
   return dest;
 }
 
+// Approve is the manifest gate, not a status reset: an asset the run already
+// copied to the product repo stays 'delivered' (the click just stamps the
+// approval), anything else becomes 'approved'. Re-clicking is idempotent.
+export function applyApprove(entry, now = new Date()) {
+  if (entry.status !== 'delivered') entry.status = 'approved';
+  entry.approvedAt = now.toISOString();
+  return entry;
+}
+
 // ---- artifact resolution ---------------------------------------------------
 const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif']);
 const VIDEO_EXT = new Set(['.mp4', '.webm', '.mov', '.m4v']);
@@ -363,7 +372,7 @@ async function handleAssetPost(req, res, id) {
   }
 
   if (action === 'approve') {
-    entry.status = 'approved';
+    applyApprove(entry);
     if (typeof payload.variant === 'string' && payload.variant) entry.selectedVariant = payload.variant;
     delete entry.redoNote;
     // The click is the only moment the approval exists as an event; capture the
@@ -814,6 +823,7 @@ header .started{color:#8a929b;font-size:13px;}
 .btn:hover{filter:brightness(1.15);}
 .btn:active{filter:brightness(.9);}
 .btn.approve{background:#1c8a4c;border-color:#25a35b;color:#fff;flex:1;}
+.btn.approve.done{background:#123023;border-color:#256b45;color:#8ce6a5;cursor:default;opacity:1;}
 .btn.redo{background:#2a2f36;border-color:#3a424c;color:#e6e8eb;}
 .btn.posted{background:#1b2b46;border-color:#284876;color:#cfe0ff;}
 textarea{width:100%;background:#0d0f12;color:#e6e8eb;border:1px solid #2b3138;border-radius:8px;padding:8px 10px;font:inherit;font-size:13px;resize:vertical;min-height:48px;}
@@ -907,6 +917,7 @@ function cardHtml(e){
   if(e.platform)metaBits.push('<span>'+esc(e.platform)+'</span>');
   const meta=metaBits.length?'<div class="meta">'+metaBits.join('')+'</div>':'';
   const redo=e.redoNote?'<div class="redonote">redo: '+esc(e.redoNote)+'</div>':'';
+  const approvedLike=e.status==='approved'||e.status==='delivered';
   let variants='';
   if(Array.isArray(e.variants)&&e.variants.length){
     const opts=e.variants.map((v,i)=>{
@@ -925,7 +936,7 @@ function cardHtml(e){
     +'<div class="media">'+media+'</div>'
     +meta+redo+verdictHtml(e)+stillsHtml(e)+variants
     +'<div class="controls">'
-      +'<div class="row"><button class="btn approve" data-act="approve">Approve</button>'
+      +'<div class="row"><button class="btn approve'+(approvedLike?' done':'')+'" data-act="approve"'+(approvedLike?' disabled':'')+'>'+(approvedLike?'Approved ✓':'Approve')+'</button>'
         +'<button class="btn posted" data-act="posted">Mark posted</button></div>'
       +'<textarea placeholder="Redo note: what should change"></textarea>'
       +'<div class="row"><button class="btn redo" data-act="redo">Request redo</button></div>'
@@ -944,12 +955,14 @@ async function act(id,action,cardEl){
   const variant=selectedVariant(cardEl);
   if(variant!==undefined)body.variant=variant;
   const btns=cardEl.querySelectorAll('button');btns.forEach(b=>b.disabled=true);
+  const actBtn=cardEl.querySelector('button[data-act="'+action+'"]');const prevLabel=actBtn?actBtn.textContent:'';
+  if(actBtn)actBtn.textContent=action==='approve'?'Approving…':'Requesting…';
   try{
     const r=await fetch('/asset/'+encodeURIComponent(id),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
     if(!r.ok){const t=await r.text();alert('Action failed: '+t);}
-  }catch(err){alert('Action failed: '+err.message);}
+  }catch(err){alert('Action failed: '+err.message);if(actBtn)actBtn.textContent=prevLabel;}
   finally{btns.forEach(b=>b.disabled=false);}
-  refresh(); // pull fresh state immediately
+  refresh(); // pull fresh state immediately; the card re-renders as Approved ✓
 }
 
 // Records the live URL for the variant this card is showing, so the operator
