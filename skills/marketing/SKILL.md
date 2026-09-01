@@ -56,7 +56,7 @@ The engine repo is shared mutable state (props builders, registries, render queu
 | 1 | /logo-reveal | Cheapest comp — surfaces brand-token bugs before the expensive assets |
 | 2 | /product-demo | Films the (now polished) UI; footage feeds everything downstream |
 | 3 | /launch-video | Picture-lock the hero video (composes demo + logo + copy). Before locking, when the brief carries altHeadlines: `node scripts/render-hook-variants.mjs <brand>` renders the competing hook takes and registers them as Mission Control variants — pick the winner there, then lock. Optionally `node scripts/render-variants.mjs <brand> logo-reveal` for hero takes. |
-| 4 | /audio-track | Score the locked launch video (music/VO per intake) and merge |
+| 4 | /audio-track | Score the locked launch video (music/VO per intake), master to `launch-final.mp4`, then set the launch-video asset's `artifact` to that file (keep the silent lock as `silentLock`). The gallery must play the scored film on the launch card; a silent launch card next to an audio-track card reads as a missing soundtrack (postflop 2026-09-01) |
 | 5 | /social-clip × N | Reuse demo/logo footage per platform; add stings if audio opted in |
 | 6 | /og-assets | Statics + README GIF pulled from final footage |
 | 7 | Cards (`node scripts/build-cards.mjs <brand>`) | One stat card per brief proofPoint plus a quote card from hook.headline, rendered as Card stills into out/<brand>/marketing/cards/; skips clean with exit 0 when there is no brief. Not an asset skill, a builder |
