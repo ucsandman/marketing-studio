@@ -63,6 +63,17 @@ The engine repo is shared mutable state (props builders, registries, render queu
 
 Per asset: stills gate before full render — `node scripts/contact-sheet.mjs <brand> <Comp>` is the standard gate artifact (each sub-skill enforces it), render logs `| tail -2`, then update the manifest. Assets #1 (/logo-reveal's Blender staging) and #2 (/product-demo's Playwright capture) check the content-hash footage cache first and skip the expensive stage when their inputs (product git state, capture/staging script, and resolved config) are byte-identical to the last run; pass `--force` to re-capture.
 
+**Render budget: one full-resolution render per asset.** The renderer is not where a
+two-hour run goes; correction rounds are. Measured 2026-09-01 on the 24-core box: a
+full-res LaunchVideo render is ~9 minutes and `--x264-preset` barely moves it (Chrome
+frame rendering is the bottleneck, not encoding), while `--scale=0.5` renders 3.3x
+faster. So: judge every round from the contact sheet, and when a round needs motion,
+render the preview at `--scale=0.5` as `launch-vN-preview.mp4`. The full-res render
+happens ONCE, after the stills pass. The postflop launch step rendered three full
+passes (27 minutes of the step's 48); this rule makes that one. A product bug found
+mid-capture is a note in `run.json` judgeNotes for the user, not a fix inside the
+run (postflop's demo step spent 64 minutes that way).
+
 **Budget the VO before you dispatch #4, not after.** Picture-lock (#3) and audio (#4) are separate steps, and the trap between them is that measured VO word timings DERIVE act lengths, so scoring a locked film can push it past the 30-90s band `launchTiming.test.ts` enforces. Do the arithmetic yourself at dispatch time and hand it to the executor: `frames_available = 2700 - current_total`, minus the demo act which is FIXED (the PLAYBOOK forbids shortening a recorded demonstration to fit narration). Estimate each act's need at ~150wpm plus `VO_LEAD` + `VO_PAD`. If the narration overruns, say so in the brief and name the act to cut hardest — copy is trimmed ONLY in `build-<brand>-audio.mjs`, never by editing act constants. Measured on the practicalsystems run (2026-08-17): an 80.8s lock left 276 frames of headroom against ~564 needed, so ~25 words had to go. **Name any claim that must survive the trim**, because the shortest phrasing is often the false one — "cold outreach never sends without a human" compresses to "nothing sends without a human", which was untrue there.
 
 **Phase 3.5 — Responsive export matrix.** Once the launch video is picture-locked and the social clips are rendered, run `node scripts/render-matrix.mjs <brand>` to fan the launch video and social clips into all four aspects (16:9, 1:1, 4:5, 9:16) by responsive layout, not crops. Variants land in `out/<brand>/matrix/` and register in the manifest's `exports[]`. Add `--stills-only` first to prove the layout with one still per aspect before committing CPU to full renders. The muted-autoplay rows (9:16 and 1:1) additionally emit an `<id>-captioned` variant with the VO burned into on-screen captions, and `node scripts/build-captions.mjs <brand>` writes matching `launch.srt`/`launch.vtt` sidecars — both require the brand's audio props (skipped silently without them).
@@ -121,6 +132,8 @@ Fable never goes inside a workflow (the model-guard hook blocks it in `parallel(
 ## Red flags — stop and re-read this skill
 
 - Running two asset skills concurrently "to save time" → engine-repo collision.
+- A second full-res render of the same asset before its stills passed → the render budget above; preview at `--scale=0.5`.
+- Fixing the product mid-run because the capture exposed a bug → note it, keep filming.
 - Starting with /launch-video "because it matters most" → brand bugs found at the expensive end.
 - Capturing before Phase 2 finished → everything gets re-shot.
 - "Session died, start over" → read `run.json` and resume.

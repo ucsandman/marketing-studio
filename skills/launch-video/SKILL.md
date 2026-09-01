@@ -32,8 +32,12 @@ background loop.
 6. Render as a VERSIONED file, never overwritten: `out/<brand>/launch-v1.mp4`, `-v2`,
    ... The director loop is render -> watch -> write your own defect list -> fix ->
    re-render as a NEW versioned file (notes are symptoms, not specs — translate before
-   fixing). `npx remotion render LaunchVideo out/<brand>/launch-vN.mp4
-   --props=props/<brand>-launch.json` (~1350 frames, minutes).
+   fixing). Iterations render at half scale, `npx remotion render LaunchVideo
+   out/<brand>/launch-vN-preview.mp4 --props=props/<brand>-launch.json --scale=0.5`
+   (3.3x faster than full res, measured 2026-09-01; the x264 preset does not help,
+   Chrome frame rendering is the cost). Only the version whose stills passed gets the
+   full-res render, once: `npx remotion render LaunchVideo out/<brand>/launch-vN.mp4
+   --props=props/<brand>-launch.json` (~2400 frames, ~9 minutes).
 7. Lock: copy the approved version to `out/<brand>/launch.mp4` — mission-control and
    review-in-magnetic expect that exact path. Deliver per marketing-studio.
 8. Audio: run the audio-track skill to add music + voiceover to the locked render.
