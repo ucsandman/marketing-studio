@@ -8,7 +8,7 @@ import {Headline} from '../components/Headline';
 import {FeaturePanel} from '../components/FeaturePanel';
 import {FilmGrade} from '../components/FilmGrade';
 import {CaptionTrack} from '../components/CaptionTrack';
-import {useFormat} from '../lib/layout';
+import {plateFit, useFormat} from '../lib/layout';
 import {sequentialCues} from '../lib/captionTiming';
 
 export const socialClipSchema = z.object({
@@ -62,6 +62,11 @@ export const socialClipSchema = z.object({
     .default(null),
   // Optional responsive-matrix overrides read by calculateMetadata (Root.tsx);
   // absent for normal renders/smoke so the declared 1920x1080 is untouched.
+  // Opening headline treatment over footage: a paper-toned card behind the words
+  // and the block pinned to the top band (Headline's `scrim` + `topAlign`). Opt-in
+  // per clip, never inferred from `video`: six older clips (costclaw, tenwords,
+  // sidetap) open on footage too and were approved without it.
+  headlineOverVideo: z.boolean().default(false),
   formatWidth: z.number().int().positive().optional(),
   formatHeight: z.number().int().positive().optional(),
 });
@@ -82,6 +87,7 @@ export const SocialClip: React.FC<Props> = ({
   videoCropRegion,
   burnCaptions,
   voLines,
+  headlineOverVideo,
 }) => {
   const frame = useCurrentFrame();
   const {durationInFrames, fps} = useVideoConfig();
@@ -145,12 +151,9 @@ export const SocialClip: React.FC<Props> = ({
                 // so the opening motion is legible content, not empty terminal.
                 // `videoStartFrame` overrides this per brand for a different money shot.
                 startFrom={videoStartFrame ?? 120}
-                // 'contain', not 'cover': a 16:9 source into a 9:16 frame under cover
-                // keeps only a ~32%-wide center sliver of the plate, which slices clean
-                // through any on-screen line of text. Contain shows the whole frame
-                // (letterboxed into the brand ground behind it); a same-aspect landscape
-                // render is unaffected (contain == cover when source and frame match).
-                style={{width: '100%', height: '100%', objectFit: 'contain', display: 'block'}}
+                // plateFit: 'contain' on portrait only (see lib/layout). Captures are
+                // 16:10, not 16:9, so 'contain' on landscape pillarboxes the plate.
+                style={{width: '100%', height: '100%', objectFit: plateFit(orientation), display: 'block'}}
               />
             )}
             {/* Paper-toned scrim: keeps the opening headline legible over moving
@@ -172,8 +175,8 @@ export const SocialClip: React.FC<Props> = ({
             headline={headline}
             brand={brand}
             hideKicker={Boolean(video)}
-            scrim={Boolean(video)}
-            topAlign={Boolean(video)}
+            scrim={headlineOverVideo}
+            topAlign={headlineOverVideo}
           />
         </AbsoluteFill>
       </Sequence>

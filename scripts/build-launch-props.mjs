@@ -33,7 +33,9 @@ const DEMO_PROPS = {
 // (contact-sheet, render-matrix, hook variants, the render itself) computes the
 // SAME act lengths. Other brands keep audio out of the launch props and merge it
 // with scripts/merge-launch-audio.mjs, unchanged.
-const EMBED_AUDIO = new Set(['tenwords']);
+// Membership rule (build-launch-props.test.mjs): every brand whose
+// props/<brand>-audio.json carries measured `words` is in this set.
+const EMBED_AUDIO = new Set(['tenwords', 'practicalsystems']);
 
 const BRANDS = {
   noban: (demo) => ({

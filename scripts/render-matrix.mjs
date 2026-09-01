@@ -287,7 +287,7 @@ for (const p of platforms) {
     console.log(`matrix: skipped ${p.id} (WrapClip rows need --props props/${brand}-wrap-<segmentId>.json)`);
     continue;
   }
-  const base = withFormat(propsOverrideData ?? loadBase(p.comp), p.width, p.height);
+  const base = withFormat(propsOverrideData ?? loadBase(p.comp, {portrait: p.height > p.width}), p.width, p.height);
   rendered.push(renderVariant(p.id, p.comp, p.width, p.height, base));
 
   if (p.captioned) {

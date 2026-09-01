@@ -126,3 +126,21 @@ test('checkFiles: files with no matching budget are excluded from the results', 
     rmSync(dir, {recursive: true, force: true});
   }
 });
+
+// --- statics scripts: their local readme.gif gate must equal the hard gate ----
+
+test('every render-*-statics.mjs readme gif budget equals BUDGETS.readme-gif', async () => {
+  const {readFileSync, readdirSync} = await import('node:fs');
+  const {join, dirname} = await import('node:path');
+  const {fileURLToPath} = await import('node:url');
+  const dir = dirname(fileURLToPath(import.meta.url));
+  const scripts = readdirSync(dir).filter((f) => /^render-.*-statics\.mjs$/.test(f));
+  const seen = [];
+  for (const f of scripts) {
+    const m = readFileSync(join(dir, f), 'utf8').match(/README_GIF_BUDGET_BYTES = (\d+) \* 1024 \* 1024/);
+    if (!m) continue;
+    seen.push(f);
+    assert.equal(Number(m[1]) * 1024 * 1024, BUDGETS['readme-gif'].maxBytes, `${f} gates readme.gif at ${m[1]}MB`);
+  }
+  assert.ok(seen.length >= 4, `checked ${seen.length} statics scripts`);
+});

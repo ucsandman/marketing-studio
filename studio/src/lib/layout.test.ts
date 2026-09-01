@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {formatFor} from './layout';
+import {formatFor, plateFit} from './layout';
 
 describe('formatFor bucketing', () => {
   it('maps each exact social size to its aspect + orientation', () => {
@@ -62,5 +62,16 @@ describe('formatFor safe insets', () => {
     expect(safe.left).toBe(77); // round(0.04 * 1920)
     expect(safe.top).toBeLessThanOrEqual(64); // FeatureAct heading top base
     expect(safe.bottom).toBeLessThanOrEqual(40); // LaunchVideo FloatBar bottom base
+  });
+});
+
+describe('plateFit', () => {
+  it('keeps cover on landscape and square; contain only on portrait', () => {
+    // Every capture in the repo is 16:10 (1440x900 / 1600x1000): contain into a
+    // 16:9 frame pillarboxes it, cover into a 9:16 frame slices on-screen text.
+    expect(plateFit(formatFor(1920, 1080).orientation)).toBe('cover');
+    expect(plateFit(formatFor(1080, 1080).orientation)).toBe('cover');
+    expect(plateFit(formatFor(1080, 1350).orientation)).toBe('contain');
+    expect(plateFit(formatFor(1080, 1920).orientation)).toBe('contain');
   });
 });

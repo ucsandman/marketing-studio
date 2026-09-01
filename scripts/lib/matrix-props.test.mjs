@@ -76,3 +76,28 @@ test('withFormat overlays the dimension props on whichever base was resolved', (
     formatHeight: 1920,
   });
 });
+
+test('a portrait SocialClip row prefers <brand>-social-vertical.json (the file that carries videoCropRegion)', () => {
+  const root = fixture('crop', {merged: false});
+  const VERTICAL = {...SOCIAL, videoCropRegion: {x: 300, y: 400, w: 1350, h: 620, sourceWidth: 1920, sourceHeight: 1080}};
+  writeFileSync(join(root, 'props', 'crop-social-vertical.json'), JSON.stringify(VERTICAL));
+  writeFileSync(join(root, 'props', 'crop-social-linkedin.json'), JSON.stringify(SOCIAL));
+  try {
+    assert.equal(resolveBaseProps(root, 'crop', 'SocialClip', {portrait: true}), join(root, 'props', 'crop-social-vertical.json'));
+    assert.equal(resolveBaseProps(root, 'crop', 'SocialClip'), join(root, 'props', 'crop-social-launch.json'));
+    const load = makeBaseLoader(root, 'crop');
+    assert.deepEqual(load('SocialClip', {portrait: true}), VERTICAL);
+    assert.deepEqual(load('SocialClip'), SOCIAL, 'landscape rows are unchanged and not served from the portrait cache entry');
+  } finally {
+    rmSync(root, {recursive: true, force: true});
+  }
+});
+
+test('a portrait row with no vertical file falls back exactly as before', () => {
+  const root = fixture('novert', {merged: false});
+  try {
+    assert.equal(resolveBaseProps(root, 'novert', 'SocialClip', {portrait: true}), join(root, 'props', 'novert-social-launch.json'));
+  } finally {
+    rmSync(root, {recursive: true, force: true});
+  }
+});

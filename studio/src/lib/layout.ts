@@ -86,6 +86,15 @@ export const formatFor = (width: number, height: number): Format => {
 };
 
 /** React hook: derives the current composition's responsive format. */
+/**
+ * objectFit for a full-bleed 16:10 capture plate. Landscape and square frames keep
+ * `cover` (every capture in the repo is 1440x900 / 1600x1000, so `contain` into a
+ * 16:9 frame pillarboxes the plate); a portrait frame under `cover` keeps only a
+ * ~32%-wide sliver that slices through on-screen text, so it gets `contain`.
+ */
+export const plateFit = (orientation: Orientation): 'cover' | 'contain' =>
+  orientation === 'portrait' ? 'contain' : 'cover';
+
 export const useFormat = (): Format => {
   const {width, height} = useVideoConfig();
   return formatFor(width, height);

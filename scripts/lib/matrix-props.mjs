@@ -8,7 +8,10 @@ import {existsSync, readdirSync, readFileSync} from 'node:fs';
 import {join} from 'node:path';
 
 // Base props per composition. Launch is the canonical <brand>-launch.json; social
-// prefers <brand>-social-launch.json, falling back to the first <brand>-social-*.json.
+// prefers <brand>-social-vertical.json for a portrait row (it is the one hand-tuned
+// file that carries videoCropRegion; the alphabetical fallback lands on -linkedin,
+// whose null crop rendered every 9:16 / 4:5 row uncropped and reported OK), then
+// <brand>-social-launch.json, then the first <brand>-social-*.json.
 //
 // Launch exception: props/<brand>-launch.json carries no `audio` (only the
 // EMBED_AUDIO brands in build-launch-props.mjs do), so rows built off it render
@@ -18,7 +21,7 @@ import {join} from 'node:path';
 // manifest to out/<brand>/launch-audio-props.json; prefer it when it exists. With
 // no merged file the resolution is unchanged. SocialClip has no audio track by
 // design and is untouched.
-export function resolveBaseProps(root, brand, comp) {
+export function resolveBaseProps(root, brand, comp, {portrait = false} = {}) {
   if (comp === 'LaunchVideo') {
     const merged = join(root, 'out', brand, 'launch-audio-props.json');
     if (existsSync(merged)) return merged;
@@ -29,6 +32,8 @@ export function resolveBaseProps(root, brand, comp) {
     }
     return p;
   }
+  const vertical = join(root, 'props', `${brand}-social-vertical.json`);
+  if (portrait && existsSync(vertical)) return vertical;
   const direct = join(root, 'props', `${brand}-social-launch.json`);
   if (existsSync(direct)) return direct;
   const match = readdirSync(join(root, 'props')).find(
@@ -41,13 +46,16 @@ export function resolveBaseProps(root, brand, comp) {
   return join(root, 'props', match);
 }
 
-// Per-composition base props cache, keyed by comp, so repeated platform rows for
-// the same comp don't re-read the file from disk.
+// Per-composition base props cache, keyed by comp + orientation, so repeated
+// platform rows for the same comp don't re-read the file from disk.
 export function makeBaseLoader(root, brand) {
   const cache = new Map();
-  return (comp) => {
-    if (!cache.has(comp)) cache.set(comp, JSON.parse(readFileSync(resolveBaseProps(root, brand, comp), 'utf8')));
-    return cache.get(comp);
+  return (comp, {portrait = false} = {}) => {
+    const key = `${comp}:${portrait ? 'portrait' : 'landscape'}`;
+    if (!cache.has(key)) {
+      cache.set(key, JSON.parse(readFileSync(resolveBaseProps(root, brand, comp, {portrait}), 'utf8')));
+    }
+    return cache.get(key);
   };
 }
 

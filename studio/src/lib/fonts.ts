@@ -24,7 +24,11 @@ const families: Record<string, string> = {
     weights: ['400', '600', '800'],
     subsets: ['latin'],
   }).fontFamily,
-  Archivo: loadArchivo('normal', {weights: ['500', '600', '700', '900'], subsets: ['latin']})
+  // The loader registers one discrete FontFace per weight, so an unrequested face is
+  // not inert: with 500/600/700 loaded, the 11 `fontWeight: 800` sites fall back to
+  // 700; add a 900 face and CSS matching jumps them to 900 (costclaw's headings
+  // re-weighted and re-broke lines in 2026-09-01's review). fonts.test.ts guards it.
+  Archivo: loadArchivo('normal', {weights: ['500', '600', '700'], subsets: ['latin']})
     .fontFamily,
   'Source Sans 3': loadSourceSans3('normal', {weights: ['400', '600'], subsets: ['latin']})
     .fontFamily,

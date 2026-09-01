@@ -203,7 +203,7 @@ async function main() {
   const written = [];
   for (const p of platforms) {
     const aspect = aspectOf(p.id);
-    const base = loadBase(p.comp);
+    const base = loadBase(p.comp, {portrait: p.height > p.width});
     const props = withFormat(base, p.width, p.height);
     const propsPath = join(propsDir, `${p.id}.json`);
     writeFileSync(propsPath, JSON.stringify(props));

@@ -79,7 +79,7 @@ execSync(
   {cwd: studioDir, stdio: 'inherit'},
 );
 
-const README_GIF_BUDGET_BYTES = 10 * 1024 * 1024; // PLAYBOOK: keep README gifs under ~10MB
+const README_GIF_BUDGET_BYTES = 5 * 1024 * 1024; // scripts/check-budgets.mjs hard gate
 const readmeGifBytes = statSync(join(outDir, 'readme.gif')).size;
 console.log(`readme.gif: ${(readmeGifBytes / 1024 / 1024).toFixed(2)}MB (budget ${README_GIF_BUDGET_BYTES / 1024 / 1024}MB)`);
 if (readmeGifBytes > README_GIF_BUDGET_BYTES) {

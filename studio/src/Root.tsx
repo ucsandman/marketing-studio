@@ -54,8 +54,10 @@ export const RemotionRoot: React.FC = () => {
           command: null,
           video: null,
           videoStartFrame: null,
+          videoCropRegion: null,
           burnCaptions: false,
           voLines: null,
+          headlineOverVideo: false,
         }}
         calculateMetadata={({props}) => ({
           width: props.formatWidth ?? 1920,

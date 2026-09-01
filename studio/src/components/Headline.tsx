@@ -69,7 +69,9 @@ export const Headline: React.FC<{
         justifyContent: topAlign ? 'flex-start' : 'center',
         alignItems: 'center',
         gap: Math.round(36 * scale),
-        ...(topAlign ? {paddingTop: Math.round(height * 0.08)} : null),
+        // Never inside the platform-chrome band: 9:16 reserves 10% top, 8% would sit
+        // under a Reels/Shorts caption rail.
+        ...(topAlign ? {paddingTop: Math.max(Math.round(height * 0.08), safe.top)} : null),
       }}
     >
       {hideKicker ? null : (

@@ -121,6 +121,13 @@ placeholder so smoke stays green on a clean clone.
   $?; tail log` reports `tail`'s status, so a failed render looks like a clean run. The
   same day, that made a zero-file matrix read as "completed, exit 0". Count the
   artifacts, not the exit code.
+- Font faces are discrete: the google-fonts loader registers one FontFace per weight
+  in `lib/fonts.ts`, and a `fontWeight` with no face falls back to the nearest loaded
+  one. Adding a face nobody requests is not inert (Archivo 900 moved every 800 heading
+  from 700 to 900). `scripts/fonts-faces.test.mjs` holds loaded ⊆ requested.
+- Capture plates are 16:10 (1440x900 / 1600x1000), never 16:9: a full-bleed plate is
+  `cover` on landscape and square and `contain` only on portrait (`plateFit` in
+  `lib/layout.ts`); `contain` on landscape pillarboxes it.
 - PNG sequences: `frame_%04d.png`, 1-indexed. `PngSequence` clamp holds the last
   frame; loop is `(frame % frameCount) + 1`.
 - Seamless loops: every animated value must satisfy f(0) == f(duration); use

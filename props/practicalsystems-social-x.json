@@ -10,5 +10,6 @@
   "screenshot": "practicalsystems/feature-proof.png",
   "cta": "Watch it run live at practicalsystems.io",
   "video": "practicalsystems/demo-final.mp4",
+  "headlineOverVideo": true,
   "videoStartFrame": 840
 }
