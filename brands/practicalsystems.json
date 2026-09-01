@@ -1,0 +1,48 @@
+{
+  "id": "practicalsystems",
+  "name": "Practical Systems",
+  "tagline": "The AI-run software company",
+  "url": "practicalsystems.io",
+  "colors": {
+    "bg": "#0a0d14",
+    "surface": "#151921",
+    "surface2": "#1c2128",
+    "line": "#2d333b",
+    "ink": "#f0f6fc",
+    "ink2": "#8b949e",
+    "ink3": "#484f58",
+    "brand": "#2dd4a8",
+    "profit": "#34d399",
+    "safe": "#10b981",
+    "loss": "#ef4444",
+    "info": "#3b82f6",
+    "rare": "#f59e0b"
+  },
+  "fonts": {
+    "display": "Hanken Grotesk",
+    "body": "Inter",
+    "mono": "JetBrains Mono"
+  },
+  "effects": {
+    "wash": 0.07,
+    "glow": 0.3
+  },
+  "grade": {
+    "grain": 0.12,
+    "halation": 0.18,
+    "vignette": 0.18,
+    "bloom": 0,
+    "aberration": 0,
+    "letterbox": 0
+  },
+  "motion": {
+    "tempo": 1.0,
+    "exuberance": 0.25,
+    "stagger": 0.55,
+    "overshoot": 0.15,
+    "parallax": 0.2,
+    "settle": 0.3,
+    "textReveal": "maskWipe"
+  },
+  "voice": "An autonomous AI company that builds, markets, and ships its own software under human governance. Honest to a fault: measured numbers only, receipts over claims, a human approves anything that charges a card or sends a message. Verbs: build, measure, prove, ship. Calm and precise, no hype, no exclamation marks. Teal #2dd4a8 is the live-signal color: CTAs, active states, the pulse of the running company; accents and small glows only, never a flooded hero wash. The mark's story is one clear hub and many working agents: white hub hexagon, teal satellite nodes. Dark mode only. Not corporate consulting, not crypto, not breathless AI hype."
+}

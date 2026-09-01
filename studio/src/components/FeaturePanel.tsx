@@ -24,6 +24,13 @@ export const FeaturePanel: React.FC<{
   const frame = useCurrentFrame();
   const {fps, width, height} = useVideoConfig();
   const isPortrait = height > width;
+  // `ctaStyle: 'block'` is a brand declaring its accent is only ever a filled block
+  // carrying ink text (see EndCard). For such a brand the bullet marker cannot be an
+  // accent-coloured dot, and on a paper ground a small dot in a bright accent is also
+  // near-invisible; it becomes a square ink marker, and the plate loses its radius
+  // and drop shadow, which those brands forbid too. Defaults to 'text', so every
+  // other brand's panel is byte-identical.
+  const block = brand.ctaStyle === 'block';
   const fonts = loadBrandFonts(brand);
   const panelIn = brandSpring(frame, fps, brand.motion);
   const zoomNow = interpolate(frame, [0, 170], [zoom.from, zoom.to]);
@@ -46,7 +53,7 @@ export const FeaturePanel: React.FC<{
           flex: isPortrait ? 'none' : 1.4,
           width: isPortrait ? '100%' : undefined,
           aspectRatio: isPortrait ? '7/5' : undefined,
-          borderRadius: 16,
+          borderRadius: block ? 0 : 16,
           border: `1px solid ${brand.colors.line}`,
           background: brand.colors.surface,
           overflow: 'hidden',
@@ -54,7 +61,7 @@ export const FeaturePanel: React.FC<{
           transform: isPortrait
             ? `translateY(${(1 - panelIn) * 60}px) scale(${zoomNow})`
             : `translateY(${(1 - panelIn) * 60}px)`,
-          boxShadow: `0 40px 120px ${brand.colors.bg}`,
+          ...(block ? null : {boxShadow: `0 40px 120px ${brand.colors.bg}`}),
         }}
       >
         {screenshot ? (
@@ -98,8 +105,8 @@ export const FeaturePanel: React.FC<{
                 style={{
                   width: isPortrait ? 12 : 10,
                   height: isPortrait ? 12 : 10,
-                  borderRadius: isPortrait ? 6 : 5,
-                  background: brand.colors.brand,
+                  borderRadius: block ? 0 : isPortrait ? 6 : 5,
+                  background: block ? brand.colors.ink : brand.colors.brand,
                   marginTop: isPortrait ? 26 : 22,
                 }}
               />

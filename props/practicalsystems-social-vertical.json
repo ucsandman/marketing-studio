@@ -1,0 +1,17 @@
+{
+  "brandId": "practicalsystems",
+  "kicker": "practicalsystems.io",
+  "headline": "The AI company that runs in public.",
+  "lines": [
+    "This company's CEO is an AI. A human holds the keys. Watch a real cycle close.",
+    "Cold outreach never sends without a human",
+    "No agent charges a card on its own"
+  ],
+  "screenshot": "practicalsystems/feature-loop.png",
+  "cta": "Watch it run live at practicalsystems.io",
+  "video": "practicalsystems/demo-final.mp4",
+  "videoStartFrame": 840,
+  "videoCropRegion": {"x": 300, "y": 400, "w": 1350, "h": 620, "sourceWidth": 1920, "sourceHeight": 1080},
+  "formatWidth": 1080,
+  "formatHeight": 1920
+}

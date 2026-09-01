@@ -69,17 +69,33 @@ export const LogoReveal: React.FC<Props> = ({brandId, sequence, frameCount, cta,
         >
           {brand.name}
         </div>
-        <div
-          style={{
-            fontFamily: fonts.mono,
-            fontSize: 32,
-            letterSpacing: '0.22em',
-            color: brand.colors[brand.textAccent],
-            opacity: ctaIn,
-          }}
-        >
-          {cta.toUpperCase()}
-        </div>
+        {brand.ctaStyle === 'block' ? (
+          <div
+            style={{
+              fontFamily: fonts.mono,
+              fontSize: 32,
+              letterSpacing: '0.22em',
+              backgroundColor: brand.colors.brand,
+              color: brand.colors.ink,
+              padding: '10px 24px',
+              opacity: ctaIn,
+            }}
+          >
+            {cta.toUpperCase()}
+          </div>
+        ) : (
+          <div
+            style={{
+              fontFamily: fonts.mono,
+              fontSize: 32,
+              letterSpacing: '0.22em',
+              color: brand.colors[brand.textAccent],
+              opacity: ctaIn,
+            }}
+          >
+            {cta.toUpperCase()}
+          </div>
+        )}
       </AbsoluteFill>
       <FilmGrade grade={brand.grade} accent={brand.colors.brand} />
     </AbsoluteFill>

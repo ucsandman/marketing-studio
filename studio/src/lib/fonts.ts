@@ -24,7 +24,7 @@ const families: Record<string, string> = {
     weights: ['400', '600', '800'],
     subsets: ['latin'],
   }).fontFamily,
-  Archivo: loadArchivo('normal', {weights: ['500', '600', '700'], subsets: ['latin']})
+  Archivo: loadArchivo('normal', {weights: ['500', '600', '700', '900'], subsets: ['latin']})
     .fontFamily,
   'Source Sans 3': loadSourceSans3('normal', {weights: ['400', '600'], subsets: ['latin']})
     .fontFamily,

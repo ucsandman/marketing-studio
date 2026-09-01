@@ -22,11 +22,13 @@ export const DemoStage: React.FC<{
       style={{
         width: vp.width,
         height: vp.height,
-        borderRadius: 14,
+        // `ctaStyle: 'block'` brands forbid radius and shadows on their plates (see
+        // FeaturePanel); every other brand keeps the rounded, shadowed stage.
+        borderRadius: brand.ctaStyle === 'block' ? 0 : 14,
         border: `1px solid ${brand.colors.line}`,
         background: brand.colors.surface,
         overflow: 'hidden',
-        boxShadow: `0 40px 120px ${brand.colors.bg}`,
+        ...(brand.ctaStyle === 'block' ? null : {boxShadow: `0 40px 120px ${brand.colors.bg}`}),
         position: 'relative',
       }}
     >
@@ -59,7 +61,7 @@ export const DemoStage: React.FC<{
         {/* No clicks means nothing to point at (a CLI capture): rendering the
             cursor anyway parks it at the origin, in frame, forever. */}
         {clickList.length > 0 ? (
-          <DemoCursor clickList={clickList} timeMs={timeMs} brand={brand} />
+          <DemoCursor clickList={clickList} timeMs={timeMs} brand={brand} viewport={vp} />
         ) : null}
       </div>
     </div>

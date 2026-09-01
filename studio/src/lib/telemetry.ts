@@ -51,21 +51,37 @@ const easeInOutQuad = (t: number): number =>
 
 const APPROACH_MS = 700; // cursor travel time into a click
 const PRESS_MS = 180; // press indicator duration after a click
+const DWELL_MS = 600; // beat left on the target after a click before leaving
 
 export const cursorAt = (
   clickList: ClickEvent[],
   tMs: number,
+  viewport: {width: number; height: number},
 ): {x: number; y: number; press: number} => {
   if (clickList.length === 0) return {x: 0, y: 0, press: 0};
   const press = clickList.some((c) => tMs >= c.t && tMs - c.t < PRESS_MS) ? 1 : 0;
+
+  // Off-stage park. camera.clampOrigin never lets the frame see past the
+  // viewport, so a point below it is out of shot at every scale. The cursor
+  // waits there instead of squatting on the copy through the beats it has
+  // nothing to do with — a pointer parked on a word during a static hold reads
+  // as a rendering fault, not as a resting cursor. Offset in x so it arcs in
+  // rather than rising on a dead vertical line.
+  const rest = {t: 0, x: clickList[0].x - 140, y: viewport.height + 80};
 
   // index of the last click at or before tMs (-1 if before all clicks)
   let i = -1;
   while (i + 1 < clickList.length && clickList[i + 1].t <= tMs) i++;
 
-  const from = clickList[Math.max(i, 0)];
+  const from = i < 0 ? rest : clickList[i];
   const next = clickList[i + 1];
-  if (!next) return {x: from.x, y: from.y, press};
+  if (!next) {
+    // past the last click: dwell on it, then ease back off stage
+    const t = (tMs - from.t - DWELL_MS) / APPROACH_MS;
+    if (t <= 0) return {x: from.x, y: from.y, press};
+    const p = easeInOutCubic(Math.min(1, t));
+    return {x: from.x + (rest.x - from.x) * p, y: from.y + (rest.y - from.y) * p, press};
+  }
 
   const approachStart = Math.max(next.t - APPROACH_MS, from.t);
   if (tMs < approachStart) return {x: from.x, y: from.y, press};
