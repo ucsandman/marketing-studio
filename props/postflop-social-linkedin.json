@@ -1,0 +1,12 @@
+{
+  "brandId": "postflop",
+  "kicker": "postflop.vercel.app",
+  "headline": "Convergence is measured, never asserted.",
+  "lines": [
+    "Freeze any node: villain never bluffs this river",
+    "The solver computes the equilibrium around the lock",
+    "Exploitability is measured against the locked profile"
+  ],
+  "screenshot": "postflop/feature-lock.png",
+  "cta": "Solve your first spot in the browser. Nothing to install."
+}
