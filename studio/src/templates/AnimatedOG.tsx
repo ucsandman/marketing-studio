@@ -1,7 +1,7 @@
 import React from 'react';
 import {AbsoluteFill, Img, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
 import {z} from 'zod';
-import {alphaHex, getBrand} from '../lib/brand';
+import {alphaHex, brandSchema, getBrand} from '../lib/brand';
 import {loadBrandFonts} from '../lib/fonts';
 import {getMark} from '../brands/marks';
 import {FloatBar} from '../components/FloatBar';
@@ -21,6 +21,12 @@ export const animatedOgSchema = z.object({
   loopSequence: z.string().nullable(),
   loopFrames: z.number().int().positive(),
   showFloatBar: z.boolean().optional(),
+  // Teaser lane (2026-09-01): a company with no registry entry supplies its brand
+  // inline and a logo image stands in for a registered mark component. All three
+  // default so every existing render stays byte-identical.
+  brandOverride: brandSchema.nullable().default(null),
+  logoImage: z.string().nullable().default(null),
+  showName: z.boolean().default(true),
 });
 
 type Props = z.infer<typeof animatedOgSchema>;
@@ -34,12 +40,18 @@ export const AnimatedOG: React.FC<Props> = ({
   loopSequence,
   loopFrames,
   showFloatBar,
+  brandOverride,
+  logoImage,
+  showName,
 }) => {
   const frame = useCurrentFrame();
   const {durationInFrames} = useVideoConfig();
-  const brand = getBrand(brandId);
+  // Parse the override here as well: CLI props do not pass through zod defaults.
+  const brand = brandOverride ? brandSchema.parse(brandOverride) : getBrand(brandId);
   const fonts = loadBrandFonts(brand);
-  const Mark = getMark(brand.id);
+  const logo = logoImage ?? null;
+  const nameShown = showName !== false;
+  const Mark = logo ? null : getMark(brand.id);
   // `ctaStyle: 'block'` is a brand declaring that its accent is only ever a
   // filled block carrying ink text -- never accent-coloured type or a
   // coloured glyph (same contract EndCard/LogoReveal already read). Every
@@ -74,10 +86,23 @@ export const AnimatedOG: React.FC<Props> = ({
       />
       <AbsoluteFill style={{justifyContent: 'center', alignItems: 'center', gap: 18}}>
         <div style={{display: 'flex', alignItems: 'center', gap: 24}}>
-          <Mark size={84} color={block ? brand.colors.ink : brand.colors.brand} />
-          <div style={{fontFamily: fonts.display, fontWeight: 800, fontSize: 88, color: brand.colors.ink}}>
-            {brand.name}
-          </div>
+          {logo ? (
+            <Img
+              src={staticFile(logo)}
+              style={{
+                height: nameShown ? 84 : 132,
+                maxWidth: nameShown ? 320 : 640,
+                objectFit: 'contain',
+              }}
+            />
+          ) : Mark ? (
+            <Mark size={84} color={block ? brand.colors.ink : brand.colors.brand} />
+          ) : null}
+          {nameShown ? (
+            <div style={{fontFamily: fonts.display, fontWeight: 800, fontSize: 88, color: brand.colors.ink}}>
+              {brand.name}
+            </div>
+          ) : null}
         </div>
         <div style={{fontFamily: fonts.body, fontSize: 30, color: brand.colors.ink2}}>{tagline}</div>
         <div
