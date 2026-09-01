@@ -1,0 +1,57 @@
+name: verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: npm ci
+        working-directory: studio
+      - run: npm test
+        working-directory: studio
+      - run: npm run lint
+        working-directory: studio
+      - run: npm ci
+        working-directory: feeders/capture
+      - name: script-side tests
+        run: |
+          set -e
+          files=(scripts/*.test.mjs feeders/capture/*.test.mjs feeders/audio/*.test.mjs feeders/comfy/*.test.mjs)
+          node --test "${files[@]}"
+          echo "verify: ran ${#files[@]} test files"
+
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: npm ci
+        working-directory: studio
+      - name: render smoke stills
+        run: node scripts/smoke.mjs
+      - name: count rendered stills
+        run: |
+          echo "verify: rendered $(ls out/smoke/*.png | wc -l) stills"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smoke-stills
+          path: out/smoke/*.png

@@ -16,6 +16,7 @@ import {
   checkEstimatedWords,
   checkCueDiscipline,
   checkSfxTickDrift,
+  checkHookOnset,
 } from './judge-av-sync.mjs';
 
 // A hand-built timing table (no dependency on launchTiming.ts internals).
@@ -232,4 +233,13 @@ test('every word check is a no-op on manifests with no word timings', () => {
   assert.deepEqual(checkWordText(plainLines), []);
   assert.deepEqual(checkWordFit(plainLines, timing), []);
   assert.deepEqual(checkEstimatedWords(plainLines), []);
+});
+
+test('checkHookOnset: a 150-frame logo act reports 5.0s at 30fps, no threshold', () => {
+  // timing fixture above: logo.len = 150, 2 features -> logo+hook+demo+2+end = 6 acts.
+  const onset = checkHookOnset(timing);
+  assert.equal(onset.frame, 150);
+  assert.equal(onset.seconds, 5.0);
+  assert.equal(onset.actsResolved, 6);
+  assert.equal(onset.message, 'hook copy on screen at frame 150 (5.0s); 6 acts resolved.');
 });

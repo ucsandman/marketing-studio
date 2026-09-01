@@ -4,11 +4,14 @@
  * NON-LOAD-BEARING: missing key exits 2 with guidance; videos render silent.
  *
  * Usage:
- *   node feeders/audio/client.mjs vo --script <script.json> --out <dir> [--timestamps]
+ *   node feeders/audio/client.mjs vo --script <script.json> --out <dir> [--timestamps] [--brand <id>]
  *   node feeders/audio/client.mjs music --prompt "<text>" --length-ms <n> --out <file>
  *   node feeders/audio/client.mjs sfx --prompt "<text>" --duration-sec <n> --out <file>
  *   node feeders/audio/client.mjs probe --file <mp3>
  *   node feeders/audio/client.mjs words --file <mp3> --text "<spoken text>" --out <words.json>
+ *
+ * --brand <id> (vo only) selects ELEVENLABS_VOICE_ID_<BRAND> (id uppercased,
+ * dashes -> underscores) over the global ELEVENLABS_VOICE_ID/default voice.
  */
 import {mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {basename, dirname, join, resolve} from 'node:path';
@@ -194,6 +197,21 @@ const generateJson = async (url, body, key, timeout) => {
   return res.json();
 };
 
+// Per-brand voice override: ELEVENLABS_VOICE_ID_<BRAND> (brand id uppercased,
+// dashes -> underscores) beats the global ELEVENLABS_VOICE_ID, which beats
+// DEFAULT_VOICE. `brand` is optional; omitting it reproduces the old
+// global-only lookup exactly.
+export const resolveVoiceId = (env, brand) => {
+  if (brand) {
+    const key = `ELEVENLABS_VOICE_ID_${brand.toUpperCase().replaceAll('-', '_')}`;
+    if (env[key]) return {voice: env[key], source: `brand env (${key})`};
+  }
+  if (env.ELEVENLABS_VOICE_ID) {
+    return {voice: env.ELEVENLABS_VOICE_ID, source: 'global env (ELEVENLABS_VOICE_ID)'};
+  }
+  return {voice: DEFAULT_VOICE, source: 'default'};
+};
+
 const argValue = (args, flag) => {
   const i = args.indexOf(flag);
   if (i < 0 || i === args.length - 1) return null;
@@ -267,7 +285,9 @@ const main = async () => {
     );
     process.exit(2);
   }
-  const voice = env.ELEVENLABS_VOICE_ID || DEFAULT_VOICE;
+  const brand = argValue(args, '--brand');
+  const {voice, source} = resolveVoiceId(env, brand);
+  console.log(`voice source: ${source}`);
 
   try {
     if (mode === 'vo') {
@@ -355,7 +375,7 @@ const main = async () => {
       if (!ms) throw new Error(`could not measure duration of ${outFile}`);
       console.log(`sfx OK: ${resolve(outFile)} ${ms}ms`);
     } else {
-      throw new Error('usage: client.mjs vo --script <json> --out <dir> [--timestamps] | music --prompt <p> --length-ms <n> --out <file> | sfx --prompt <p> --duration-sec <n> --out <file> | probe --file <mp3> | words --file <mp3> --text "<spoken text>" --out <words.json>');
+      throw new Error('usage: client.mjs vo --script <json> --out <dir> [--timestamps] [--brand <id>] | music --prompt <p> --length-ms <n> --out <file> | sfx --prompt <p> --duration-sec <n> --out <file> | probe --file <mp3> | words --file <mp3> --text "<spoken text>" --out <words.json>');
     }
   } catch (err) {
     console.error(redact(err?.message ?? String(err), key));

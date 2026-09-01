@@ -241,6 +241,86 @@ test('stats in non-brief files do not fire unsourced-stat', () => {
   assert.equal(violationsFor('unsourced-stat', violations).length, 0);
 });
 
+// --- Voiceover-only rules (WARN, audio-shaped files only) ---
+
+function audioShaped(text) {
+  return {lines: [{act: 'hook', text}]};
+}
+
+function briefShaped(text) {
+  return {brandId: 'noban', hook: {headline: text}};
+}
+
+test('URL/domain in spoken text fires WARN speech-url', () => {
+  for (const text of ['Go check out noban.gg for pricing', 'Visit https://noban.gg now']) {
+    const hits = violationsFor('speech-url', lintJson(audioShaped(text)));
+    assert.equal(hits.length, 1, `expected speech-url hit for: ${text}`);
+    assert.equal(hits[0].level, 'WARN');
+    assert.equal(hits[0].path, 'lines[0].text');
+  }
+});
+
+test('URL/domain in brief-shaped copy does not fire speech-url', () => {
+  const hits = violationsFor('speech-url', lintJson(briefShaped('Go check out noban.gg for pricing')));
+  assert.equal(hits.length, 0);
+});
+
+test('npx and shell-looking fragments in spoken text fire WARN speech-shell', () => {
+  for (const text of ['Run npx create-app to start', 'Then pass --strict to the build']) {
+    const hits = violationsFor('speech-shell', lintJson(audioShaped(text)));
+    assert.equal(hits.length, 1, `expected speech-shell hit for: ${text}`);
+    assert.equal(hits[0].level, 'WARN');
+  }
+});
+
+test('npx in brief-shaped copy does not fire speech-shell', () => {
+  const hits = violationsFor('speech-shell', lintJson(briefShaped('Run npx create-app to start')));
+  assert.equal(hits.length, 0);
+});
+
+test('bare multi-digit number in spoken text fires WARN speech-bare-number', () => {
+  const hits = violationsFor('speech-bare-number', lintJson(audioShaped('The counter reads 2424 on the display')));
+  assert.equal(hits.length, 1);
+  assert.equal(hits[0].level, 'WARN');
+  assert.equal(hits[0].text, '2424');
+});
+
+test('number with a spoken form ("24 hundred") does not fire speech-bare-number', () => {
+  const hits = violationsFor('speech-bare-number', lintJson(audioShaped('Revenue crossed 24 hundred dollars')));
+  assert.equal(hits.length, 0);
+});
+
+test('number with a glued unit (24ms, 58%, 3x) does not fire speech-bare-number', () => {
+  const hits = violationsFor(
+    'speech-bare-number',
+    lintJson(audioShaped('It settles in 24ms, cuts losses by 58%, and runs 3x faster'))
+  );
+  assert.equal(hits.length, 0);
+});
+
+test('bare number in brief-shaped copy does not fire speech-bare-number', () => {
+  const hits = violationsFor('speech-bare-number', lintJson(briefShaped('The counter reads 2424 on the display')));
+  assert.equal(hits.length, 0);
+});
+
+test('ampersand in spoken text fires WARN speech-ampersand', () => {
+  const hits = violationsFor('speech-ampersand', lintJson(audioShaped('Trade fast & simulate safely')));
+  assert.equal(hits.length, 1);
+  assert.equal(hits[0].level, 'WARN');
+});
+
+test('ampersand in brief-shaped copy does not fire speech-ampersand', () => {
+  const hits = violationsFor('speech-ampersand', lintJson(briefShaped('Trade fast & simulate safely')));
+  assert.equal(hits.length, 0);
+});
+
+test('clean spoken line triggers no voiceover-only rules', () => {
+  const violations = lintJson(audioShaped('Not a demo. A live operating log.'));
+  for (const rule of ['speech-url', 'speech-shell', 'speech-bare-number', 'speech-ampersand']) {
+    assert.equal(violationsFor(rule, violations).length, 0, `unexpected ${rule} hit`);
+  }
+});
+
 // --- Skip rules: should NOT fire ---
 
 test('path-like values (forward slash) are skipped', () => {

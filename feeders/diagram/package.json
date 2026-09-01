@@ -1,0 +1,12 @@
+{
+  "name": "diagram-feeder",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@d2lang/d2": "^0.1.33",
+    "@resvg/resvg-js": "^2.6.2"
+  }
+}

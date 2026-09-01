@@ -2,12 +2,17 @@
 // Results feedback loop: turns published posts into engagement numbers so the
 // hook A/B pick can learn from reality instead of taste.
 //
-// Input:  out/<brand>/marketing/posts.json — written by the operator or the
-//         launch-engine after publishing. Shape (array or {posts: [...]}):
-//           [{platform: 'x', url: 'https://x.com/u/status/123', variant: 'hook-2'},
+// Input:  out/<brand>/marketing/posts.json — seeded by build-postkit.mjs
+//         (one unpublished row per platform: {platform, url: null, variant: null,
+//         published: false}), then filled in by the operator or the launch-engine
+//         after publishing. Shape (array or {posts: [...]}):
+//           [{platform: 'x', url: 'https://x.com/u/status/123', variant: 'hook-2',
+//             published: true},
 //            {platform: 'linkedin', url: '...', variant: 'hook-1',
 //             metrics: {impressions: 1200, likes: 40}}]   // manual entry
 //         `variant` ties a post to run.json variants[] (hook A/B strategies).
+//         A row with `published: false` or `url: null` (the seeded default, or
+//         one that just hasn't gone out yet) is a clean skip, not an error.
 //
 // Fetching: X posts get public_metrics from the X API v2 (X_BEARER_TOKEN in the
 // repo .env — value is never printed). Other platforms (LinkedIn's stats API is
@@ -17,8 +22,10 @@
 // Output: out/<brand>/marketing/results.json — Mission Control renders it next
 // to the matching variants.
 //
-// Exit codes: 0 = all posts resolved; 1 = bad input; 2 = wrote what it could
-// but at least one post is unavailable (missing token / API error) — the same
+// Exit codes: 0 = all non-skipped posts resolved (a missing posts.json, or one
+// with nothing published yet, is a clean 0 too); 1 = bad input (posts.json exists
+// but isn't valid, or holds no posts); 2 = wrote what it could but at least one
+// published post is unavailable (missing token / API error) — the same
 // graceful-degradation contract as the audio/comfy feeders.
 //
 // Usage: node scripts/fetch-results.mjs <brand> [--json]
@@ -86,12 +93,8 @@ async function main() {
   const marketingDir = join(root, 'out', brand, 'marketing');
   const postsPath = join(marketingDir, 'posts.json');
   if (!existsSync(postsPath)) {
-    console.error(
-      `fetch-results: ${postsPath} not found.\n` +
-        `Write it after publishing (array of {platform, url, variant?, metrics?}) — ` +
-        `the launch-engine or the operator records which post carried which variant.`,
-    );
-    process.exit(1);
+    console.log(`fetch-results [${brand}]: no out/${brand}/marketing/posts.json yet (run build-postkit.mjs) — 0 of 0 rows published, skipping.`);
+    process.exit(0);
   }
 
   let postsRaw;
@@ -113,10 +116,12 @@ async function main() {
     id: tweetIdFromUrl(p.url) ?? p.id ?? null,
     variant: p.variant ?? null,
     metrics: p.metrics && typeof p.metrics === 'object' ? p.metrics : null,
-    source: p.metrics ? 'manual' : null,
+    // A seeded, not-yet-published row (build-postkit.mjs writes published:false,
+    // url:null) is a clean skip, not a failed fetch — it just hasn't gone out.
+    source: p.metrics ? 'manual' : p.published === false || p.url == null ? 'skipped' : null,
   }));
 
-  const xPending = posts.filter((p) => p.platform === 'x' && !p.metrics && p.id);
+  const xPending = posts.filter((p) => p.platform === 'x' && !p.metrics && p.id && p.source !== 'skipped');
   let degraded = false;
   if (xPending.length > 0) {
     const bearer = readEnvVar('X_BEARER_TOKEN');
@@ -166,7 +171,8 @@ async function main() {
   if (asJson) {
     console.log(JSON.stringify(report, null, 2));
   } else {
-    console.log(`fetch-results [${brand}]: ${posts.length} post(s) -> out/${brand}/marketing/results.json`);
+    const publishedCount = posts.filter((p) => p.source !== 'skipped').length;
+    console.log(`fetch-results [${brand}]: ${publishedCount} of ${posts.length} rows published -> out/${brand}/marketing/results.json`);
     for (const p of posts) {
       const m = p.metrics;
       const stats = m

@@ -21,6 +21,10 @@ is a source clone or an installed plugin.
 | Playwright capture feeder | `feeders/capture/record-noban-demo.mjs` | needs the product's app running |
 | Blender feeder | `feeders/blender/render.py <scene> --out <dir> --frame N \| --animation` | Blender via `BLENDER_PATH` in `.env` |
 | ComfyUI feeder | `feeders/comfy/client.mjs hero [--seed N]` | non-load-bearing; exit 2 = fallback |
+| Diagram feeder | `feeders/diagram/render.mjs <brand> <spec.d2> [--out DIR] [--width N]` | D2 (WASM) + resvg; brand-colored SVG+PNG+source -> out/<brand>/marketing/diagrams/; own npm install (MPL-2.0 deps, consumed unmodified) |
+| Infographic style bridge | `scripts/build-infographic-style.mjs <brand>` | brand tokens -> out/<brand>/marketing/infographic-style.md, a design-language file for the installed /epic-infographics skill (copy it into that skill's references/design-languages/) |
+| Cards | `scripts/build-cards.mjs <brand> [--brief path] [--out dir] [--dry-run]` | one stat card per brief proofPoint + a quote card from hook.headline, rendered as Card stills at 1080x1080 and 1080x1350 -> out/<brand>/marketing/cards/; clean skip when there is no brief |
+| Link-preview wiring check | `scripts/verify-og-wired.mjs <brand> [url] [--strict]` | fetches the LIVE page, compares its og:image against the delivered og asset; advisory, skips clean without a url |
 | Stage Blender output | `scripts/stage-blender-assets.mjs [brandId]` | assets/<brand>/ -> studio/public/<brand>/ |
 | Launch props builder | `scripts/build-launch-props.mjs` | copy source of truth (JSON is generated) |
 | Static presets | `scripts/render-statics.mjs` (noban), `scripts/render-<brand>-statics.mjs` per brand | og.png / og.mp4 / og.gif / readme.gif |
@@ -30,7 +34,7 @@ is a source clone or an installed plugin.
 | Copy voice-linter | `scripts/lint-copy.mjs <file.json> [--json]` | gates any props/brief JSON: em dashes, slop lexicon, hype, weak qualifiers, announcement openers, generic CTAs, unsourced stats in briefs; exit 1 on ERROR violations |
 | Storyboard board | `scripts/build-storyboard.mjs <brand>` | brief.json -> out/<brand>/marketing/storyboard.html (content approval before any render) |
 | Mission Control | `scripts/mission-control.mjs <brand> [--port 4600]` | live run console over run.json; Approve/Redo buttons write manifest + review.json atomically; advisory bar surfaces judge-*.json verdicts, footage staleness (cache meta vs product git HEAD), and results.json engagement per variant |
-| Results loop | `scripts/fetch-results.mjs <brand>` | posts.json ({platform, url, variant, metrics?}) -> results.json; X metrics via X_BEARER_TOKEN in .env (exit 2 fallback), LinkedIn manual; closes the hook A/B loop with real engagement |
+| Results loop | `scripts/fetch-results.mjs <brand>` | posts.json ({platform, url, variant, metrics?}) -> results.json; X metrics via X_BEARER_TOKEN in .env (exit 2 fallback), LinkedIn manual; closes the hook A/B loop with real engagement. posts.json is seeded by build-postkit (one row per platform, published:false) and rows are written by Mission Control's Mark posted button as well as by hand; fetch-results prints N of M rows published beside its verdict |
 | Export matrix | `scripts/render-matrix.mjs <brand> [--comp] [--stills-only]` + `scripts/platforms.json` | fans LaunchVideo/SocialClip into 16:9/9:16/1:1/4:5 via calculateMetadata props (no --width CLI flag in Remotion 4.0.486); captioned variants for muted-autoplay rows when audio props exist |
 | Caption sidecars | `scripts/build-captions.mjs <brand> [--check]` | props/<brand>-audio.json -> out/<brand>/captions/launch.srt + .vtt |
 | Thumbnails | `scripts/extract-thumbs.mjs <brand> [--comp] [--frame <n>] [--frame-<aspect> <n>]` | poster JPG per aspect -> out/<brand>/thumbs/; the poster frame is CHOSEN, never defaulted (precedence: `--frame-<aspect>` > `--frame` > a dormant `posterFrame` in props/<brand>-launch.json > the script default). Never mid-motion, half-typed, or cursor-visible; test it at 200px wide |
@@ -44,6 +48,8 @@ is a source clone or an installed plugin.
 | Hero takes | `scripts/render-variants.mjs <brand> <logo-reveal\|launch-hook> [--takes N]` | brand-safe motion-knob takes via nullable `motionOverride` prop (exuberant take floors at 0.65 — below ~0.55 the spring is overdamped and deltas render invisible); registers variants[] |
 
 Compositions: SocialClip, ProductDemo, LogoReveal, LaunchVideo, AnimatedOG,
+Card (still, 1080x1080 default, 1080x1350 via formatWidth/formatHeight; stat and
+quote cards from brief proof points via scripts/build-cards.mjs),
 WrapClip, ComponentGallery + StagedGallery (test benches). All schemas carry
 `brandId`; templates resolve
 `getBrand(brandId)` and pass `brand` down. Every asset prop is nullable with a
@@ -103,33 +109,6 @@ placeholder so smoke stays green on a clean clone.
   reads as sizzle.
   `transformOrigin: cx cy` does NOT center the region (it pins it) — this mismatch
   silently crops edges.
-- Staged native UI scenes (`components/StagedScene.tsx` + `lib/staged.ts`, proven in
-  the `StagedGallery` composition): three data-driven constructions, `results`
-  (skeleton waterfall resolving one row at a time, the highlighted row last),
-  `composer` (deterministic typed query, cursor clicks submit, run panel whose LAST
-  step is deliberately still running at the cut) and `status` (tracker with a real
-  subject, states completing in sequence, optional counter). A launch-video feature
-  entry sets `staged` to render one INSTEAD of its screenshot panel; `staged` is
-  nullable and defaults to null, so every existing feature renders byte-identically.
-  Rules that are already paid for, do not re-derive them: everything is authored in
-  a fixed 1600x900 stage box and geometry comes from `lib/staged` layout functions,
-  never from `getBoundingClientRect` (it lies under the rig's scale and rotation);
-  the fit-to-frame scale is a STATIC third node above CameraRig so it never shares a
-  matrix with the dolly or the turn; the dolly origin is the center of the control
-  the cursor clicks, taken from the same layout function that places it; the push
-  settles before the cursor arrives, holds dead still through the click, and
-  releases after the state resolves; beats are declared in nominal seconds and
-  scaled to the act length by k = clamp(window / nominal, 0.85, 1.4), so every shot
-  ends with a still tail of at least 15 frames; typing is one interpolate over an
-  integer index plus slice(), so a seek reproduces the frame exactly. A staged
-  feature act reveals no benefit lines, so LaunchVideo passes 0 for its
-  `featureLineCounts` entry, otherwise sfxCues ticks against nothing. Two traps found
-  by rendered proof, do not undo them: a skeleton bar uses `colors.line` (a surface2
-  bar on a surface2 plate is invisible), and the SpecularSweep is clipped to the
-  shot's card rect (across the bare stage box it reads as a grey slab floating on
-  the brand ground).
-  Suggested act lengths: results 180-210, composer 195-225, status 140-165 frames
-  (minimum viable 150/165/120).
 - PNG sequences: `frame_%04d.png`, 1-indexed. `PngSequence` clamp holds the last
   frame; loop is `(frame % frameCount) + 1`.
 - Seamless loops: every animated value must satisfy f(0) == f(duration); use
@@ -139,6 +118,17 @@ placeholder so smoke stays green on a clean clone.
   (full-size 8s 1200x630 ~= 30MB); prefer mp4 for social embeds; scale down for READMEs.
 - Rendered proof: inspect stills at act boundaries BEFORE full renders; a full render
   is never the first look at anything.
+- Export matrix: LaunchVideo rows read `out/<brand>/launch-audio-props.json` when it
+  exists (scripts/merge-launch-audio.mjs writes it), so they carry the merged audio AND
+  the same VO-derived act lengths as the launch video; SocialClip rows have no audio
+  track by design and are silent. Measured 2026-09-01 before the fix: dashclaw and
+  costclaw launch-16x9.mp4 were -70.0 LUFS (digital silence), tenwords -26.3 only because
+  it was the sole EMBED_AUDIO member. Already-rendered brands must be re-rendered one at
+  a time and re-approved in Mission Control.
+- Burned captions floor at 2.8% of frame height (`captionFontSize` in
+  studio/src/lib/captionTiming.ts): 52px at 1080p stays byte-identical, but the
+  1080-wide 9:16 and 1:1 rows used to render 29px captions, about 1.5% of a 1920-tall
+  frame, on the muted-autoplay rows platforms.json marks as the primary deliverable.
 
 ### Playwright capture (product demos)
 - The camera must zoom to MEASURED content regions (focus events), never to click
@@ -321,6 +311,11 @@ placeholder so smoke stays green on a clean clone.
   `POST https://api.elevenlabs.io/v1/music?output_format=mp3_44100_128` with body
   `{"prompt", "music_length_ms", "model_id": "music_v2"}`. Both take header
   `xi-api-key`, return binary mp3. `music_length_ms` covers the 3s-120s range we need.
+- Per-brand voice: `client.mjs vo --brand <id>` resolves `ELEVENLABS_VOICE_ID_<BRAND>` (id
+  uppercased, dashes -> underscores) over the global `ELEVENLABS_VOICE_ID` over the default
+  Rachel voice (`resolveVoiceId` in `feeders/audio/client.mjs`). The client prints which
+  source won (`voice source: ...`) once per run. Builders must pass `--brand <id>` to get
+  their own voice instead of all nine products narrating in the same one.
 - Ducking constants live in `studio/src/lib/audioMix.ts`: `BASE 0.35` (music level when
   no VO is playing) / `DUCKED 0.12` (music level under VO) / `RAMP 9` frames to cross-fade
   the duck / `VO_LEAD 12` frames of music-only lead-in before each line starts /
@@ -464,6 +459,13 @@ invisible until this existed. Spec:
 - Verify behavior-preserving refactors with SHA-256-compared stills, not eyeballs.
 - Exit criterion for any asset is the USER seeing the rendered artifact, not code
   compiling.
+- 2026-09-01: zero of 47 props files set a staged act across four brand runs since
+  commit 440c6ab. Test: if no brand run sets a `staged` act by 2026-12-01, delete
+  `StagedScene.tsx`, `lib/staged.ts`, `staged.test.ts`, and `StagedGallery.tsx`
+  (~2,109 lines) and remove the `StagedGallery` entry from `scripts/smoke.mjs`.
+  `StageCursor.tsx` stays regardless — `DemoCursor.tsx` imports `CURSOR_TIP` and
+  `CursorGlyph` from it, and `ComponentGallery.tsx` imports `StageCursor` and
+  `controlPressScale` from it, both live outside the staged-scene system.
 
 #### Direction discipline (process, not code)
 - Write three one-page directions per `docs/templates/DIRECTION.md`, kill two by its

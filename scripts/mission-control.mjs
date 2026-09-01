@@ -15,6 +15,7 @@ import {
   readFileSync,
   readdirSync,
   writeFileSync,
+  mkdirSync,
   renameSync,
   statSync,
   createReadStream,
@@ -40,7 +41,8 @@ const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(imp
 // ---- args ------------------------------------------------------------------
 let brand = null;
 let port = 4600;
-let brandOut, marketingDir, runPath, reviewPath; // bound below once brand is known
+let snapshotOnly = false;
+let brandOut, marketingDir, runPath, reviewPath, postsPath; // bound below once brand is known
 
 if (isMain) {
   const argv = process.argv.slice(2);
@@ -48,10 +50,11 @@ if (isMain) {
     const a = argv[i];
     if (a === '--port') port = parseInt(argv[++i], 10);
     else if (a.startsWith('--port=')) port = parseInt(a.split('=')[1], 10);
+    else if (a === '--snapshot-approved') snapshotOnly = true;
     else if (!a.startsWith('-') && !brand) brand = a;
   }
   if (!brand) {
-    console.error('usage: node scripts/mission-control.mjs <brandId> [--port 4600]');
+    console.error('usage: node scripts/mission-control.mjs <brandId> [--port 4600] [--snapshot-approved]');
     process.exit(1);
   }
   if (!Number.isFinite(port)) {
@@ -63,6 +66,7 @@ if (isMain) {
   marketingDir = join(brandOut, 'marketing');
   runPath = join(marketingDir, 'run.json');
   reviewPath = join(marketingDir, 'review.json');
+  postsPath = join(marketingDir, 'posts.json');
 }
 
 // ---- manifest i/o ----------------------------------------------------------
@@ -81,6 +85,42 @@ function atomicWrite(target, data) {
   );
   writeFileSync(tmp, data);
   renameSync(tmp, target); // rename over target is atomic; a concurrent reader sees old-or-new, never partial
+}
+
+// ---- approved-set snapshot -------------------------------------------------
+// Approving an asset copies its artifact into out/<brand>/approved/<YYYY-MM-DD>/.
+// That directory is the calibration set judge-drift's --ref wants: pointed at it,
+// drift becomes "distance from what a human approved" instead of "distance from
+// the average of whatever is on disk". Nothing else in the run produces such a
+// set, and asking an operator to curate one by hand is how calibration never
+// happens.
+//
+// Dated because approval is a point in time: last quarter's approved look is not
+// this quarter's, and a flat directory would blend the two into a centroid
+// nobody ever approved. judge-drift skips out/<brand>/approved/ when it walks
+// the set (SKIP_DIRS), so a snapshot never re-enters the population it calibrates.
+//
+// Returns the destination path, or null when there is nothing to copy — a
+// missing artifact must not fail an approval the operator already made.
+export function snapshotApproved(brandOutDir, rel, {now = new Date()} = {}) {
+  if (!rel) return null;
+  const src = resolve(brandOutDir, rel);
+  const inside = relative(brandOutDir, src);
+  if (!inside || inside.startsWith('..') || isAbsolute(inside)) return null; // never copy in from outside the media root
+  try {
+    if (!statSync(src).isFile()) return null;
+  } catch {
+    return null; // not rendered yet
+  }
+  const destDir = join(brandOutDir, 'approved', now.toISOString().slice(0, 10));
+  mkdirSync(destDir, {recursive: true});
+  // Flattened, not basename: social/x/clip.mp4 and social/li/clip.mp4 both end
+  // in clip.mp4, and a collision would quietly drop one approved asset from the
+  // reference set — the exact silent-denominator failure judge-drift exists to
+  // catch. The flattened name stays traceable back to the source path.
+  const dest = join(destDir, inside.replaceAll('\\', '/').replaceAll('/', '-'));
+  atomicWrite(dest, readFileSync(src)); // same temp-file + rename as every other write here
+  return dest;
 }
 
 // ---- artifact resolution ---------------------------------------------------
@@ -326,6 +366,13 @@ async function handleAssetPost(req, res, id) {
     entry.status = 'approved';
     if (typeof payload.variant === 'string' && payload.variant) entry.selectedVariant = payload.variant;
     delete entry.redoNote;
+    // The click is the only moment the approval exists as an event; capture the
+    // artifact now, while it is still the file the human looked at.
+    try {
+      snapshotApproved(brandOut, artifactRel(primaryRaw(entry)));
+    } catch (err) {
+      console.error(`mission-control: could not snapshot ${id} into approved/:`, err.message);
+    }
   } else {
     const note = typeof payload.note === 'string' ? payload.note : '';
     // review.json is the correction log the skill polls. Re-read fresh so we
@@ -349,6 +396,79 @@ async function handleAssetPost(req, res, id) {
   atomicWrite(runPath, JSON.stringify(run, null, 2) + '\n');
   res.writeHead(200, {'content-type': 'application/json'});
   res.end(JSON.stringify({ok: true, id, status: entry.status}));
+}
+
+// ---- POST /posted ----------------------------------------------------------
+// Records where a variant actually went live. posts.json is not a new format —
+// it is the input scripts/fetch-results.mjs already reads (array of {platform,
+// url, variant, metrics?}), so marking a post here closes the hook A/B loop
+// without the operator hand-editing JSON next to a browser tab.
+//
+// One row per platform, last write wins: a corrected URL must REPLACE the typo,
+// never sit beside it, because fetch-results counts rows and a duplicate would
+// double that platform's weight in the variant stats. Other platforms' rows and
+// any metrics already recorded for this one survive the overwrite.
+//
+// Pure and path-injected so the test drives the real write path against a temp
+// dir rather than a mock.
+export function applyPosted(path, payload, {now = new Date()} = {}) {
+  const platform = typeof payload?.platform === 'string' ? payload.platform.trim() : '';
+  if (!platform) return {status: 400, body: {error: 'platform is required'}};
+  // A URL is the whole point of the row — fetch-results derives the post id from
+  // it. Anything that is not a real http(s) link (a bare handle, "todo", a
+  // file:// path) is rejected here rather than silently producing a row that
+  // metric fetching can never resolve.
+  let parsed = null;
+  try {
+    parsed = new URL(String(payload?.url ?? ''));
+  } catch {
+    parsed = null;
+  }
+  if (!parsed || (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')) {
+    return {status: 400, body: {error: 'url must be an http or https link'}};
+  }
+
+  const rows = readPosts(path);
+  const row = {
+    platform,
+    url: String(payload.url),
+    variant: typeof payload.variant === 'string' && payload.variant ? payload.variant : null,
+    postedAt: now.toISOString(),
+  };
+  const i = rows.findIndex((r) => r && r.platform === platform);
+  if (i >= 0) rows[i] = {...rows[i], ...row}; // spread keeps metrics already recorded for this platform
+  else rows.push(row);
+
+  mkdirSync(dirname(path), {recursive: true});
+  atomicWrite(path, JSON.stringify(rows, null, 2) + '\n');
+  return {status: 200, body: {ok: true, platform, posted: rows.length}};
+}
+
+// Absent, unreadable, or {posts: [...]} — all three become a plain array. An
+// unreadable file starts a fresh log rather than throwing: the operator is
+// mid-launch and the alternative is losing the URL they just pasted.
+function readPosts(path) {
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf8'));
+    const rows = Array.isArray(parsed) ? parsed : parsed?.posts;
+    return Array.isArray(rows) ? rows : [];
+  } catch {
+    return [];
+  }
+}
+
+async function handlePostedPost(req, res) {
+  let payload;
+  try {
+    payload = JSON.parse((await readBody(req)) || '{}');
+  } catch {
+    res.writeHead(400, {'content-type': 'application/json'});
+    res.end(JSON.stringify({error: 'invalid json body'}));
+    return;
+  }
+  const {status, body} = applyPosted(postsPath, payload);
+  res.writeHead(status, {'content-type': 'application/json'});
+  res.end(JSON.stringify(body));
 }
 
 // ---- POST /review-in-magnetic, POST /pull-verdicts -------------------------
@@ -408,32 +528,80 @@ function handlePullVerdicts(res) {
 // mutates them. They ride on /state so the operator approves with the machine
 // verdicts, engagement numbers, and footage freshness in view.
 
-// Quality-judge verdict summaries from out/<brand>/marketing/judge-*.json.
-function readJudges() {
-  let files = [];
-  try {
-    files = readdirSync(marketingDir).filter((f) => /^judge-.+\.json$/.test(f));
-  } catch {
-    return [];
+// The gates a complete run puts the set through (CLAUDE.md). Six write a JSON
+// report next to run.json; check-budgets is exit-code only and writes none, so
+// it can never produce a row from disk.
+//
+// Listing all seven, rather than only the files that happen to exist, is the
+// whole point: a judge that NEVER RAN is invisible in a directory listing, and
+// an advisory bar showing four green chips looks identical whether the other
+// three passed, were skipped, or crashed. The denominator has to be declared to
+// be missed (agnostic-rules L2 — a verdict carries the volume it processed).
+export const EXPECTED_JUDGES = [
+  {judge: 'av-sync', file: 'judge-av-sync.json'},
+  {judge: 'demo-pacing', file: 'judge-demo-pacing.json'},
+  {judge: 'palette', file: 'judge-palette.json'},
+  {judge: 'motion', file: 'judge-motion.json'},
+  {judge: 'audio', file: 'judge-audio.json'},
+  {judge: 'drift', file: 'judge-drift.json'},
+  {judge: 'check-budgets', file: null}, // exit code only, writes no report
+];
+
+// Every judge already records how much it looked at, in its own report: drift in
+// input.scored, motion in input.sourceFiles, av-sync / audio / demo-pacing in
+// summary. Read those back instead of dropping the fields — a PASS over 0 assets
+// and a PASS over 40 render the same chip otherwise.
+const VOLUME_KEYS = ['scored', 'sourceFiles', 'frames', 'voLines', 'linesInManifest', 'activityEvents'];
+function judgeVolume(r) {
+  for (const src of [r.input, r.summary]) {
+    if (!src || typeof src !== 'object') continue;
+    for (const k of VOLUME_KEYS) {
+      const v = src[k];
+      const n = typeof v === 'number' ? v : Array.isArray(v) ? v.length : null;
+      if (n === null) continue;
+      return `${n} ${k.replace(/([A-Z])/g, ' $1').toLowerCase()}`;
+    }
   }
-  const judges = [];
-  for (const f of files) {
+  return null;
+}
+
+// Quality-judge verdict summaries from out/<brand>/marketing/judge-*.json, one
+// row per EXPECTED_JUDGES entry plus any judge report on disk the list does not
+// name yet (a new judge must not vanish just because nobody updated this file).
+export function readJudges(dir = marketingDir) {
+  let onDisk = [];
+  try {
+    onDisk = readdirSync(dir).filter((f) => /^judge-.+\.json$/.test(f));
+  } catch {
+    onDisk = [];
+  }
+  const named = new Set(EXPECTED_JUDGES.map((e) => e.file));
+  const rows = [
+    ...EXPECTED_JUDGES,
+    ...onDisk.filter((f) => !named.has(f)).map((f) => ({judge: f.replace(/^judge-|\.json$/g, ''), file: f})),
+  ];
+
+  const blank = {ran: false, warns: 0, fails: 0, generatedAt: null, volume: null, messages: []};
+  return rows.map(({judge, file}) => {
+    if (!file) return {...blank, judge, verdict: 'NOT REPORTED', volume: 'exit code only, writes no report'};
+    if (!onDisk.includes(file)) return {...blank, judge, verdict: 'NEVER RAN'};
     try {
-      const r = JSON.parse(readFileSync(join(marketingDir, f), 'utf8'));
+      const r = JSON.parse(readFileSync(join(dir, file), 'utf8'));
       const findings = Array.isArray(r.findings) ? r.findings : [];
-      judges.push({
-        judge: r.judge ?? f.replace(/^judge-|\.json$/g, ''),
+      return {
+        judge: r.judge ?? judge,
         verdict: r.verdict ?? 'UNKNOWN',
+        ran: true,
         warns: findings.filter((x) => x.level === 'WARN').length,
         fails: findings.filter((x) => x.level === 'FAIL' || x.level === 'ERROR').length,
         generatedAt: r.generatedAt ?? null,
+        volume: judgeVolume(r),
         messages: findings.slice(0, 6).map((x) => `[${x.level}] ${x.message ?? x.check ?? ''}`),
-      });
+      };
     } catch {
-      judges.push({judge: f, verdict: 'UNREADABLE', warns: 0, fails: 0, generatedAt: null, messages: []});
+      return {...blank, judge, verdict: 'UNREADABLE', ran: true};
     }
-  }
-  return judges;
+  });
 }
 
 // Engagement results (scripts/fetch-results.mjs) aggregated per variant id so
@@ -534,6 +702,7 @@ function serveState(res) {
     assets: Array.isArray(run.assets) ? run.assets.map((a) => enrichAsset(a, verdictsByAsset)) : [],
     _judges: readJudges(),
     _results: readResults(),
+    _posted: readPosts(postsPath),
     _staleness: readStaleness(),
   };
   res.writeHead(200, {'content-type': 'application/json', 'cache-control': 'no-store'});
@@ -583,6 +752,10 @@ header .started{color:#8a929b;font-size:13px;}
 .judge .v-pass{color:#8ce6a5;}
 .judge .v-warn{color:#e6b45a;}
 .judge .v-fail{color:#ff8a8a;}
+.judge .v-missing{color:#8a929b;font-weight:600;letter-spacing:.3px;}
+.judge summary.missing{border-style:dashed;color:#8a929b;}
+.jvol,.jage{color:#6b7480;font-size:11px;font-variant-numeric:tabular-nums;}
+.jage.age-stale{color:#e6b45a;}
 .judge .findings{position:absolute;z-index:20;top:calc(100% + 6px);left:0;min-width:320px;max-width:520px;background:#181c21;border:1px solid #2b3138;border-radius:10px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,.5);}
 .judge .findings li{margin:4px 0 4px 16px;color:#c9d1d9;}
 .stale{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;border:1px solid #6b4f1f;background:#332612;color:#e6b45a;}
@@ -627,6 +800,7 @@ header .started{color:#8a929b;font-size:13px;}
 .btn:active{filter:brightness(.9);}
 .btn.approve{background:#1c8a4c;border-color:#25a35b;color:#fff;flex:1;}
 .btn.redo{background:#2a2f36;border-color:#3a424c;color:#e6e8eb;}
+.btn.posted{background:#1b2b46;border-color:#284876;color:#cfe0ff;}
 textarea{width:100%;background:#0d0f12;color:#e6e8eb;border:1px solid #2b3138;border-radius:8px;padding:8px 10px;font:inherit;font-size:13px;resize:vertical;min-height:48px;}
 textarea::placeholder{color:#5a636d;}
 .empty{max-width:520px;margin:12vh auto;text-align:center;padding:0 20px;}
@@ -658,6 +832,13 @@ const lastRender = {}; // assetId -> serialized entry, so we only rebuild change
 
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function fmtSize(b){if(b==null)return null;if(b<1024)return b+' B';if(b<1048576)return (b/1024).toFixed(0)+' KB';return (b/1048576).toFixed(1)+' MB';}
+function ageMs(iso){const t=Date.parse(iso);return isFinite(t)?Date.now()-t:0;}
+function fmtAge(iso){
+  const ms=ageMs(iso);
+  if(ms<3600000)return Math.max(0,Math.round(ms/60000))+'m ago';
+  if(ms<172800000)return Math.round(ms/3600000)+'h ago';
+  return Math.round(ms/86400000)+'d ago';
+}
 function fmtDur(e){
   let ms=null;
   if(typeof e.durationMs==='number')ms=e.durationMs;
@@ -728,7 +909,8 @@ function cardHtml(e){
     +'<div class="media">'+media+'</div>'
     +meta+redo+verdictHtml(e)+stillsHtml(e)+variants
     +'<div class="controls">'
-      +'<div class="row"><button class="btn approve" data-act="approve">Approve</button></div>'
+      +'<div class="row"><button class="btn approve" data-act="approve">Approve</button>'
+        +'<button class="btn posted" data-act="posted">Mark posted</button></div>'
       +'<textarea placeholder="Redo note: what should change"></textarea>'
       +'<div class="row"><button class="btn redo" data-act="redo">Request redo</button></div>'
     +'</div>';
@@ -754,9 +936,30 @@ async function act(id,action,cardEl){
   refresh(); // pull fresh state immediately
 }
 
+// Records the live URL for the variant this card is showing, so the operator
+// never leaves the console to hand-edit posts.json. window.prompt is the whole
+// UI on purpose: pasting one URL does not need a form.
+async function markPosted(id,cardEl){
+  const platform=cardEl.dataset.platform||id;
+  const url=window.prompt('Live post URL for '+platform,'https://');
+  if(!url)return;
+  const body={platform:platform,url:url};
+  const variant=selectedVariant(cardEl);
+  if(variant!==undefined)body.variant=variant;
+  const btns=cardEl.querySelectorAll('button');btns.forEach(b=>b.disabled=true);
+  try{
+    const r=await fetch('/posted',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok)alert('Mark posted failed: '+(j.error||('HTTP '+r.status)));
+  }catch(err){alert('Mark posted failed: '+err.message);}
+  finally{btns.forEach(b=>b.disabled=false);}
+  refresh();
+}
+
 cardsEl.addEventListener('click',ev=>{
   const btn=ev.target.closest('button[data-act]');if(!btn)return;
   const card=btn.closest('.card');if(!card)return;
+  if(btn.dataset.act==='posted'){markPosted(card.dataset.id,card);return;}
   act(card.dataset.id,btn.dataset.act,card);
 });
 
@@ -801,12 +1004,17 @@ let lastAdvisories='';
 function renderAdvisories(run){
   const bits=[];
   (run._judges||[]).forEach(j=>{
-    const cls=j.verdict==='PASS'?(j.warns?'v-warn':'v-pass'):'v-fail';
-    const label=j.verdict+(j.fails?' ('+j.fails+')':j.warns?' ('+j.warns+' warn)':'');
+    const cls=!j.ran?'v-missing':j.verdict==='PASS'?(j.warns?'v-warn':'v-pass'):'v-fail';
+    const label=!j.ran?j.verdict:j.verdict+(j.fails?' ('+j.fails+')':j.warns?' ('+j.warns+' warn)':'');
+    // Volume and age travel with the verdict: PASS over 0 files and PASS over
+    // 40 must not render the same chip, and a July report sitting beside an
+    // August one has to READ stale rather than green.
+    const vol=j.volume?' <span class="jvol">'+esc(j.volume)+'</span>':'';
+    const age=j.generatedAt?' <span class="jage'+(ageMs(j.generatedAt)>=864e5?' age-stale':'')+'">'+esc(fmtAge(j.generatedAt))+'</span>':'';
     const list=j.messages&&j.messages.length
       ?'<div class="findings"><ul>'+j.messages.map(m=>'<li>'+esc(m)+'</li>').join('')+'</ul></div>'
       :'';
-    bits.push('<details class="judge"><summary>judge:'+esc(j.judge)+' <span class="verdict '+cls+'">'+esc(label)+'</span></summary>'+list+'</details>');
+    bits.push('<details class="judge"><summary'+(j.ran?'':' class="missing"')+'>judge:'+esc(j.judge)+' <span class="verdict '+cls+'">'+esc(label)+'</span>'+vol+age+'</summary>'+list+'</details>');
   });
   (run._staleness||[]).forEach(s=>{
     const what=s.commitsBehind==null
@@ -814,8 +1022,14 @@ function renderAdvisories(run){
       :esc(s.stage)+' footage: '+(s.commitsBehind?s.commitsBehind+' commit(s) behind':'')+(s.commitsBehind&&s.dirty?', ':'')+(s.dirty?'dirty tree':'');
     bits.push('<span class="stale">&#9888; '+what+'</span>');
   });
+  // Engagement chip, inverted: the interesting state is posts that went live and
+  // were never measured. Hiding the chip when results.json is absent made the
+  // un-fetched case look exactly like the nothing-posted case, which is how a
+  // launch's numbers go uncollected for a week without anyone noticing.
   if(run._results&&run._results.postCount){
     bits.push('<span class="results-chip">results: '+run._results.postCount+' post(s), fetched '+esc((run._results.fetchedAt||'').slice(0,16).replace('T',' '))+'</span>');
+  }else if((run._posted||[]).length){
+    bits.push('<span class="results-chip">engagement: never fetched ('+run._posted.length+' posted)</span>');
   }
   const html=bits.join('');
   if(html!==lastAdvisories){lastAdvisories=html;document.getElementById('advisories').innerHTML=html;}
@@ -838,6 +1052,7 @@ function render(run){
     lastRender[e.id]=key;
     let card=cardsEl.querySelector('.card[data-id="'+CSS.escape(e.id)+'"]');
     if(!card){card=document.createElement('div');card.className='card';card.dataset.id=e.id;cardsEl.appendChild(card);}
+    card.dataset.platform=e.platform||e.id;
     card.innerHTML=cardHtml(e);
   });
   // drop cards for assets no longer in the manifest
@@ -862,6 +1077,26 @@ setInterval(refresh,2000);
 // Only bound when run directly (see the isMain guard at the top of the
 // file) — importing this module for its pure helpers must never open a port.
 if (isMain) {
+  // Full-auto runs never click Approve — the main-loop judge writes run.json
+  // directly (skills/marketing/SKILL.md Phase 4), which would leave
+  // out/<brand>/approved/ empty and judge-drift with nothing to calibrate
+  // against. This flag replays the SAME snapshot copy over every asset the
+  // manifest already marks approved, so both approval paths produce one
+  // identical reference set instead of two half-truths.
+  if (snapshotOnly) {
+    const run = readRun();
+    const approved = (run?.assets ?? []).filter((a) => a.status === 'approved');
+    let copied = 0;
+    for (const entry of approved) {
+      if (snapshotApproved(brandOut, artifactRel(primaryRaw(entry)))) copied++;
+    }
+    const day = new Date().toISOString().slice(0, 10);
+    console.log(
+      `mission-control: snapshotted ${copied} of ${approved.length} approved asset(s) -> out/${brand}/approved/${day}/`,
+    );
+    process.exit(0);
+  }
+
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://localhost');
     const path = url.pathname;
@@ -870,6 +1105,17 @@ if (isMain) {
       const id = decodeURIComponent(path.slice('/asset/'.length));
       handleAssetPost(req, res, id).catch((err) => {
         console.error('mission-control: POST error', err);
+        if (!res.headersSent) {
+          res.writeHead(500, {'content-type': 'application/json'});
+          res.end(JSON.stringify({error: 'internal error'}));
+        }
+      });
+      return;
+    }
+
+    if (req.method === 'POST' && path === '/posted') {
+      handlePostedPost(req, res).catch((err) => {
+        console.error('mission-control: POST /posted error', err);
         if (!res.headersSent) {
           res.writeHead(500, {'content-type': 'application/json'});
           res.end(JSON.stringify({error: 'internal error'}));

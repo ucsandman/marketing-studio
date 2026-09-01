@@ -1,6 +1,12 @@
 import {describe, expect, it} from 'vitest';
 import {launchTiming} from './launchTiming';
-import {captionCues, sequentialCues, splitDisplayLines, cueAt} from './captionTiming';
+import {
+  captionCues,
+  captionFontSize,
+  sequentialCues,
+  splitDisplayLines,
+  cueAt,
+} from './captionTiming';
 
 const FPS = 30;
 const VO_LEAD = 12; // mirrors audioMix.ts
@@ -77,5 +83,16 @@ describe('cueAt', () => {
     expect(cueAt(cues, 20)?.text).toBe('b'); // half-open window
     expect(cueAt(cues, 5)).toBeNull();
     expect(cueAt(cues, 30)).toBeNull();
+  });
+});
+
+describe('captionFontSize', () => {
+  it('stays byte-identical at the 1920x1080 master (52 * scale wins)', () => {
+    expect(captionFontSize(1, 1080)).toBe(52);
+  });
+
+  it('floors the portrait/square export rows instead of shrinking to 29px', () => {
+    // 1080x1920: scale 0.5625 -> 52*scale rounds to 29, ~1.5% of frame height.
+    expect(captionFontSize(0.5625, 1920)).toBe(54);
   });
 });

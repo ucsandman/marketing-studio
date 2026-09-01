@@ -33,11 +33,49 @@ test('normalizeXMetrics maps public_metrics and merges quotes into reposts', () 
   assert.equal(normalizeXMetrics(null), null);
 });
 
-test('CLI exits 1 with guidance when posts.json is missing', () => {
+test('CLI cleanly skips (exit 0) when posts.json does not exist yet', () => {
   rmSync(join(root, 'out', BRAND), {recursive: true, force: true});
-  const {status, stderr} = runCli([BRAND]);
-  assert.equal(status, 1);
-  assert.match(stderr, /posts\.json/);
+  const {status, stdout} = runCli([BRAND]);
+  assert.equal(status, 0);
+  assert.match(stdout, /0 of 0 rows published/);
+});
+
+test('a seeded, all-unpublished posts.json prints 0 of N rows published and exits 0', () => {
+  const dir = join(root, 'out', BRAND, 'marketing');
+  mkdirSync(dir, {recursive: true});
+  try {
+    writeFileSync(
+      join(dir, 'posts.json'),
+      JSON.stringify([
+        {platform: 'x', url: null, variant: null, published: false},
+        {platform: 'linkedin', url: null, variant: null, published: false},
+      ]),
+    );
+    const {status, stdout} = runCli([BRAND]);
+    assert.equal(status, 0);
+    assert.match(stdout, /0 of 2 rows published/);
+    const results = JSON.parse(readFileSync(join(dir, 'results.json'), 'utf8'));
+    assert.deepEqual(results.posts.map((p) => p.source), ['skipped', 'skipped']);
+  } finally {
+    rmSync(join(root, 'out', BRAND), {recursive: true, force: true});
+  }
+});
+
+test('a row with published:false is skipped even when it carries a url', () => {
+  const dir = join(root, 'out', BRAND, 'marketing');
+  mkdirSync(dir, {recursive: true});
+  try {
+    writeFileSync(
+      join(dir, 'posts.json'),
+      JSON.stringify([{platform: 'x', url: 'https://x.com/u/status/1', variant: 'hook-1', published: false}]),
+    );
+    const {status} = runCli([BRAND]);
+    assert.equal(status, 0);
+    const results = JSON.parse(readFileSync(join(dir, 'results.json'), 'utf8'));
+    assert.equal(results.posts[0].source, 'skipped');
+  } finally {
+    rmSync(join(root, 'out', BRAND), {recursive: true, force: true});
+  }
 });
 
 test('manual metrics pass through and exit 0; unresolvable posts degrade to exit 2', () => {

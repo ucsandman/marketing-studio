@@ -9,6 +9,7 @@ import { LogoReveal, logoRevealSchema } from "./templates/LogoReveal";
 import { LaunchVideo, launchVideoSchema } from "./templates/LaunchVideo";
 import { AnimatedOG, animatedOgSchema } from "./templates/AnimatedOG";
 import { StoreTile, storeTileSchema } from "./templates/StoreTile";
+import { Card, cardSchema } from "./templates/Card";
 import { WrapClip, wrapClipSchema, wrapDurationInFrames } from "./templates/WrapClip";
 import { launchTiming, voTimingFrom } from "./lib/launchTiming";
 
@@ -172,6 +173,28 @@ export const RemotionRoot: React.FC = () => {
         calculateMetadata={({props}) => ({
           width: props.formatWidth ?? 1400,
           height: props.formatHeight ?? 560,
+        })}
+      />
+      <Composition
+        id="Card"
+        component={Card}
+        durationInFrames={1}
+        fps={30}
+        width={1080}
+        height={1080}
+        schema={cardSchema}
+        defaultProps={{
+          brandId: "sidetap",
+          kind: "quote" as const,
+          value: "Your iPhone, driven from Windows",
+          label: "The agent sees the screen and taps it",
+          source: "sidetap.io/docs",
+          kicker: "sidetap",
+          ctaUrl: null,
+        }}
+        calculateMetadata={({props}) => ({
+          width: props.formatWidth ?? 1080,
+          height: props.formatHeight ?? 1080,
         })}
       />
       <Composition

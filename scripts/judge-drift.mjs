@@ -40,6 +40,9 @@
 //                 instead of the set's own centre. This is how you calibrate:
 //                 point it at assets you have approved, and drift becomes
 //                 "distance from approved" rather than "distance from average".
+//                 Mission Control fills that directory for you: every approve
+//                 snapshots the artifact into out/<brand>/approved/<YYYY-MM-DD>/,
+//                 so `--ref out/<brand>/approved/<latest>/` needs no curation.
 // Output: out/<brand>/marketing/judge-drift.json
 //         out/<brand>/marketing/drift-sheet.html   review page, worst first
 import {execFileSync} from 'node:child_process';
@@ -71,7 +74,14 @@ const VIDEO_EXT = new Set(['.mp4', '.webm', '.mov']);
 // Directories under out/<brand>/ that are this judge's own scratch or output,
 // or another tool's temp frames — scoring them would feed the judge its own
 // exhaust.
-const SKIP_DIRS = new Set(['palette-frames', 'drift-frames']);
+//
+// `approved` is here for a sharper reason than scratch: out/<brand>/approved/
+// holds COPIES of assets that are already in the set (Mission Control snapshots
+// each artifact there on approve). Walking into it would count every approved
+// asset twice, pulling the centroid toward the approved subset and shrinking the
+// dispersion every z-score is measured in — the calibration reference silently
+// contaminating the population it calibrates.
+const SKIP_DIRS = new Set(['palette-frames', 'drift-frames', 'approved']);
 
 // Files that live under out/<brand>/ but are TOOLING output rather than brand
 // assets. Measured: judge-audio writes a waveform diagnostic PNG next to its
@@ -91,7 +101,7 @@ export function isToolingArtifact(fileName) {
   return SKIP_FILE_RE.some((re) => re.test(fileName));
 }
 
-function collectAssets(dir, {includeVideo}) {
+export function collectAssets(dir, {includeVideo}) {
   const found = [];
   const excluded = [];
   const walk = (d) => {
@@ -173,6 +183,17 @@ function describeAll(assets, tokens, framesDir) {
 
 const relToRoot = (p) => relative(root, p).replaceAll('\\', '/');
 
+/**
+ * What the z-scores were measured against, in words. Never omitted: a z-score
+ * quoted without its basis is a number with no meaning, and "2.1 sd from the
+ * average of whatever happened to be on disk" and "2.1 sd from 14 assets a human
+ * approved" are different claims. With --ref the count comes along too, because
+ * a reference set of 3 is not a reference set.
+ */
+export function calibrationBasis(refInfo) {
+  return refInfo ? `${refInfo.assets} approved asset(s) in ${refInfo.dir}` : "the set's own centroid";
+}
+
 // ---- review page -------------------------------------------------------------
 
 const escapeHtml = (s) =>
@@ -208,8 +229,8 @@ function writeSheet(sheetDir, brand, report) {
   const attention = report.assets.slice(0, ATTENTION_BAND);
   const rest = report.assets.slice(ATTENTION_BAND);
   const basis = report.calibration.trustworthy
-    ? `n=${report.calibration.n}, mean ${report.calibration.mean.toFixed(4)}, sd ${report.calibration.stdev.toFixed(4)}`
-    : `n=${report.calibration.n} — below the ${MIN_SET}-asset floor or zero dispersion, so no z-scores were computed`;
+    ? `${report.calibration.basis} — n=${report.calibration.n}, mean ${report.calibration.mean.toFixed(4)}, sd ${report.calibration.stdev.toFixed(4)}`
+    : `${report.calibration.basis} — n=${report.calibration.n}, below the ${MIN_SET}-asset floor or zero dispersion, so no z-scores were computed`;
 
   const html = `<!doctype html>
 <meta charset="utf-8">
@@ -398,7 +419,7 @@ function main() {
       mean: Number(mean.toFixed(5)),
       stdev: Number(stdev.toFixed(5)),
       trustworthy: Boolean(trustworthy),
-      basis: refInfo ? 'curated reference centroid (--ref)' : "the set's own centroid",
+      basis: calibrationBasis(refInfo),
       note: trustworthy
         ? null
         : `dispersion not meaningful (n < ${MIN_SET} or stdev 0); distances reported, z-scores withheld`,
@@ -419,6 +440,7 @@ function main() {
   } else {
     console.log(
       `judge-drift [${brand}]: ${verdict} — ${items.length} asset(s) as a set, ` +
+        `basis: ${report.calibration.basis}, ` +
         `cohesion mean ${mean.toFixed(4)} sd ${stdev.toFixed(4)}${trustworthy ? '' : ' (dispersion not meaningful)'}`,
     );
     for (const f of findings) console.log(`  [${f.level}] ${f.check} ${f.file}: ${f.message}`);

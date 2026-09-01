@@ -76,3 +76,12 @@ export const sequentialCues = (
 // The active cue at a frame, or null (cues never overlap within a comp).
 export const cueAt = (cues: Cue[], frame: number): Cue | null =>
   cues.find((c) => frame >= c.fromFrame && frame < c.toFrame) ?? null;
+
+// Burned caption font size in px. `52 * scale` alone floors out on the portrait
+// and square export rows (scale 0.5625 at 1080-wide -> 29px, ~1.5% of frame
+// height) because scale is derived from BOTH width and height (see
+// formatFor() in layout.ts) and picks the smaller axis. Floor it against a
+// fraction of frame height so tall/narrow formats stay readable; at the
+// 1920x1080 master this floor is always below 52, so landscape is unchanged.
+export const captionFontSize = (scale: number, frameHeight: number): number =>
+  Math.round(Math.max(52 * scale, frameHeight * 0.028));

@@ -1,5 +1,7 @@
 # Marketing Studio
 
+[![verify](https://github.com/ucsandman/marketing-studio/actions/workflows/verify.yml/badge.svg)](https://github.com/ucsandman/marketing-studio/actions/workflows/verify.yml)
+
 An agent-driven marketing studio for Claude Code. You type `/marketing` in your product's repo; the agent onboards your brand, films your app, renders a full marketing asset suite in this engine, and copies the finished files back to you.
 
 ![Animated OG loop rendered by the studio](examples/sidetap/readme.gif)
@@ -34,7 +36,6 @@ Around those assets, the pipeline adds:
 - **Mission Control.** A local click-to-approve gallery: watch assets land, review act-boundary contact sheets before the expensive render, approve or request a redo with a note, and the run reacts — no terminal required.
 - **Designed sound.** Whooshes on act cuts, ticks on feature reveals, and a riser into the CTA, generated once as a shared SFX library and mixed under the voiceover automatically.
 - **Word-locked sync.** Voiceover lines carry word-level timestamps; when they do, act lengths derive from the measured voice and reveals land on the words that name them, with `judge-av-sync` verifying every cue against the timings. Wordless manifests render exactly as before.
-- **Staged product scenes.** A feature act can swap its screenshot for rebuilt native UI (a results list that resolves row by row, a composer that types its own query, a status tracker) filmed by a two-node camera rig with a stage-prop cursor that visibly clicks.
 - **A mastered mix.** Final renders pass a two-pass loudness master to -14 LUFS with a true-peak ceiling, measured in the delivered file rather than trusted from the filter graph, plus SFX asset leveling and per-cue audibility proof.
 - **A direction pass.** Before a launch film is built, three genuinely different visual directions are written and two are killed (`docs/templates/DIRECTION.md`), and iteration renders are versioned v1, v2, ... so a fix can be proven and an earlier cut recovered.
 - **A set judge, not just file judges.** Six mechanical gates run before any human looks: motion craft, palette, A/V sync, demo dead air, size budgets, and `judge-drift`, which scores the whole output directory *as a set*. That last one catches the failure no per-file gate can see — assets that are each individually on-brand but collectively fragment into three or four different-looking brands. It emits a worst-first review grid, because attention is reliable over about six tiles, not twenty.
@@ -70,7 +71,7 @@ Everything below was produced by one `/marketing` run against a real product, un
 
 ## Requirements
 
-Required: [Claude Code](https://claude.com/claude-code), Node 20+, Python 3.10+, and **ffmpeg on your PATH** (26 scripts shell out to `ffmpeg`/`ffprobe` directly).
+Required: [Claude Code](https://claude.com/claude-code), Node 22+ (the version CI exercises), Python 3.10+, and **ffmpeg on your PATH** (26 scripts shell out to `ffmpeg`/`ffprobe` directly).
 
 Optional, each degrading cleanly when absent: Blender for 3D logo reveals, an ElevenLabs API key for voiceover and music, ComfyUI for AI backdrops.
 
@@ -215,7 +216,7 @@ python launch.py --check   # toolchain health
 node scripts/smoke.mjs     # renders frame 0 of every composition; must stay green
 cd studio && npm test      # brand schema, motion standards, timing libs
 cd studio && npm run lint  # eslint + tsc
-node --test "scripts/**/*.test.mjs"  # script-side gates (judges, postkit, drift descriptors)
+node --test scripts/*.test.mjs feeders/capture/*.test.mjs feeders/audio/*.test.mjs feeders/comfy/*.test.mjs  # script-side gates (judges, postkit, drift descriptors); same command CI runs
 ```
 
 Every asset prop is nullable with a placeholder, so the smoke test passes on a clean clone with no captures, no Blender, and no API keys.

@@ -1,6 +1,26 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {trimToBudget, buildCaption, buildAlt, buildWrapAlt, manifestEntry, buildManifest, wrapSegmentIds, wrapKitEntry, PLATFORM_MAP} from './build-postkit.mjs';
+import {execFileSync} from 'node:child_process';
+import {mkdirSync, rmSync, writeFileSync, readFileSync} from 'node:fs';
+import {join, dirname} from 'node:path';
+import {fileURLToPath} from 'node:url';
+import {
+  trimToBudget,
+  buildCaption,
+  buildAlt,
+  buildWrapAlt,
+  manifestEntry,
+  buildManifest,
+  wrapSegmentIds,
+  wrapKitEntry,
+  postMd,
+  seedPostsRows,
+  PLATFORM_MAP,
+} from './build-postkit.mjs';
+
+const here = dirname(fileURLToPath(import.meta.url));
+const root = join(here, '..');
+const cli = join(here, 'build-postkit.mjs');
 
 // --- trimToBudget ---
 
@@ -201,4 +221,67 @@ test('buildWrapAlt falls back to brand tagline when brief is null', () => {
   const alt = buildWrapAlt(null, brand);
   assert.match(alt, new RegExp(brand.tagline));
   assert.doesNotMatch(alt, /launch video/);
+});
+
+// --- posts.json seeding ---
+
+test('seedPostsRows returns one unpublished row per PLATFORM_MAP key', () => {
+  const rows = seedPostsRows();
+  assert.deepEqual(rows.map((r) => r.platform), Object.keys(PLATFORM_MAP));
+  for (const row of rows) {
+    assert.deepEqual(row, {platform: row.platform, url: null, variant: null, published: false});
+  }
+});
+
+test('CLI seeds out/<brand>/marketing/posts.json once and never overwrites it on rebuild', () => {
+  const outDir = join(root, 'out', 'noban');
+  rmSync(outDir, {recursive: true, force: true});
+  try {
+    execFileSync('node', [cli, 'noban'], {encoding: 'utf8'});
+    const postsPath = join(outDir, 'marketing', 'posts.json');
+    const seeded = JSON.parse(readFileSync(postsPath, 'utf8'));
+    assert.deepEqual(seeded.map((r) => r.platform), Object.keys(PLATFORM_MAP));
+    assert.ok(seeded.every((r) => r.url === null && r.variant === null && r.published === false));
+
+    // Simulate a real publish, then rebuild — the seed must not clobber it.
+    seeded[0].url = 'https://x.com/noban/status/123';
+    seeded[0].published = true;
+    writeFileSync(postsPath, JSON.stringify(seeded, null, 2));
+    execFileSync('node', [cli, 'noban'], {encoding: 'utf8'});
+    const after = JSON.parse(readFileSync(postsPath, 'utf8'));
+    assert.equal(after[0].url, 'https://x.com/noban/status/123');
+    assert.equal(after[0].published, true);
+  } finally {
+    rmSync(outDir, {recursive: true, force: true});
+  }
+});
+
+// --- postMd: destination link + posts.json step ---
+
+const bareHostBrand = {id: 'noban', name: 'noban.gg', url: 'noban.gg'};
+const repoBrand = {id: 'magnetic', name: 'Magnetic', url: 'github.com/ucsandman/magnetic'};
+
+test('postMd names the posts.json path and the field to paste the live URL into', () => {
+  const md = postMd(bareHostBrand.name, 'linkedin', PLATFORM_MAP.linkedin, 'video.mp4', 'thumb.jpg', null, '', bareHostBrand.id, bareHostBrand.url);
+  assert.match(md, /out\/noban\/marketing\/posts\.json/);
+  assert.match(md, /`url` field/);
+  assert.match(md, /`published`/);
+});
+
+test('postMd builds a campaign-tagged destination link for a bare-host brand, with no utm_content', () => {
+  const md = postMd(bareHostBrand.name, 'linkedin', PLATFORM_MAP.linkedin, 'video.mp4', 'thumb.jpg', null, '', bareHostBrand.id, bareHostBrand.url);
+  assert.match(md, /https:\/\/noban\.gg\?utm_source=linkedin&utm_medium=video&utm_campaign=noban/);
+  assert.doesNotMatch(md, /utm_content/);
+});
+
+test('postMd phrases the x row as pasting the link in the first reply', () => {
+  const md = postMd(bareHostBrand.name, 'x', PLATFORM_MAP.x, 'video.mp4', 'thumb.jpg', null, '', bareHostBrand.id, bareHostBrand.url);
+  assert.match(md, /first reply/);
+  assert.match(md, /utm_source=x/);
+});
+
+test('postMd prints a bare destination link with no utm tags for a github.com brand', () => {
+  const md = postMd(repoBrand.name, 'linkedin', PLATFORM_MAP.linkedin, 'video.mp4', 'thumb.jpg', null, '', repoBrand.id, repoBrand.url);
+  assert.match(md, /Destination link: https:\/\/github\.com\/ucsandman\/magnetic\b/);
+  assert.doesNotMatch(md, /utm_/);
 });

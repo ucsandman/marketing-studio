@@ -79,7 +79,116 @@ const SUGGESTIONS = {
   'announcement-opener': 'Open with a hook (the surprising number, the before/after), not the announcement.',
   'weak-cta': 'Use [Action Verb] + [What They Get], e.g. "Start Free Trial", not a generic label.',
   'unsourced-stat': 'Add a proofPoints entry (claim + source) for the number, or cut it.',
+  'speech-url': 'Cut the URL/domain from spoken text; the voice will spell it out letter by letter.',
+  'speech-shell': 'Rewrite the shell fragment as plain spoken language.',
+  'speech-bare-number': 'Add a unit ("24 seconds") or a spoken form ("24 hundred") so the number reads naturally aloud.',
+  'speech-ampersand': 'Replace "&" with "and" so it reads naturally aloud.',
 };
+
+// --- Voiceover-only rules (WARN) -------------------------------------------
+// These fire only on the `text` field of lines[] items in an audio-shaped
+// props file (props/*-audio.json: {music, lines: [{act, src, durationMs,
+// text, words?}]}) — the words a TTS engine will actually speak. They must
+// never fire on brief/caption/other copy, so they run as a separate pass
+// over root.lines[].text rather than through the general walk().
+
+function isAudioShaped(root) {
+  return (
+    !!root &&
+    typeof root === 'object' &&
+    !Array.isArray(root) &&
+    Array.isArray(root.lines) &&
+    root.lines.some((l) => l && typeof l === 'object' && typeof l.text === 'string' && typeof l.act === 'string')
+  );
+}
+
+// Bare domain heuristic: a short, common-TLD allowlist rather than a full
+// public-suffix match. Good enough to catch "noban.gg" / "example.com" in
+// spoken copy without chasing every TLD in existence.
+const DOMAIN_RE = /\bhttps?:\/\/\S+|\b[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.(com|net|org|io|ai|gg|co|app|dev|me|so|xyz)\b/i;
+
+const SHELL_FRAGMENT_RE = /\bnpx\b|--[a-zA-Z][\w-]*|`[^`]+`|\$\s+\S/;
+
+// Numbers a TTS voice will misread if said bare. A word right after the
+// number (unit, or a spoken multiplier like "hundred"/"thousand") makes it
+// safe; a symbol glued to the digits (24ms, 58%, 3x) is also safe. Anything
+// else 2+ digits long is flagged. Deliberately simple: no locale handling,
+// no attempt to parse "twenty-four".
+const SPOKEN_UNIT_WORDS = new Set([
+  'percent', 'second', 'seconds', 'minute', 'minutes', 'hour', 'hours',
+  'ms', 'millisecond', 'milliseconds', 'day', 'days', 'week', 'weeks',
+  'month', 'months', 'year', 'years', 'times', 'x', 'hundred', 'thousand',
+  'million', 'billion', 'dollar', 'dollars', 'trades', 'cycles', 'users',
+  'venues', 'degrees', 'points',
+]);
+
+function findBareNumbers(str) {
+  const hits = [];
+  const re = /\b\d{2,}\b/g;
+  let m;
+  while ((m = re.exec(str))) {
+    const after = str.slice(m.index + m[0].length);
+    if (/^(ms\b|x\b|%)/i.test(after)) continue; // glued unit: 24ms, 58%, 3x
+    const nextWord = /^\s+([a-zA-Z]+)/.exec(after);
+    const word = nextWord ? nextWord[1].toLowerCase().replace(/[.,!?]+$/, '') : '';
+    if (SPOKEN_UNIT_WORDS.has(word)) continue;
+    hits.push(m[0]);
+  }
+  return hits;
+}
+
+function lintSpeechText(str, path, out) {
+  const urlMatch = DOMAIN_RE.exec(str);
+  if (urlMatch) {
+    out.push({
+      rule: 'speech-url',
+      level: 'WARN',
+      path,
+      text: urlMatch[0],
+      message: `Spoken line contains a URL/domain "${urlMatch[0]}" the voice will spell out.`,
+    });
+  }
+
+  const shellMatch = SHELL_FRAGMENT_RE.exec(str);
+  if (shellMatch) {
+    out.push({
+      rule: 'speech-shell',
+      level: 'WARN',
+      path,
+      text: shellMatch[0],
+      message: `Spoken line contains a shell-looking fragment "${shellMatch[0]}".`,
+    });
+  }
+
+  for (const num of findBareNumbers(str)) {
+    out.push({
+      rule: 'speech-bare-number',
+      level: 'WARN',
+      path,
+      text: num,
+      message: `Bare number "${num}" has no unit or spoken form; a TTS voice will misread it.`,
+    });
+  }
+
+  if (str.includes('&')) {
+    out.push({
+      rule: 'speech-ampersand',
+      level: 'WARN',
+      path,
+      text: '&',
+      message: 'Ampersand in spoken line; spell out "and".',
+    });
+  }
+}
+
+function lintSpeechRules(root, out) {
+  if (!isAudioShaped(root)) return;
+  root.lines.forEach((line, i) => {
+    if (line && typeof line.text === 'string') {
+      lintSpeechText(line.text, `lines[${i}].text`, out);
+    }
+  });
+}
 
 function isSkippableKey(key) {
   if (!key) return false;
@@ -287,6 +396,7 @@ export function lintJson(root) {
   const violations = [];
   walk(root, '', null, null, violations);
   lintUnsourcedStats(root, violations);
+  lintSpeechRules(root, violations);
   return violations;
 }
 

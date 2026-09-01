@@ -10,6 +10,7 @@ import {
   resolveWordsArgs,
   aggregateWords,
   estimateWords,
+  resolveVoiceId,
 } from './client.mjs';
 
 test('buildTtsUrl embeds the voice id and mp3 output format', () => {
@@ -127,4 +128,40 @@ test('resolveWordsArgs throws when --out is missing', () => {
     () => resolveWordsArgs(['words', '--file', 'x.mp3', '--text', 'hi']),
     /words requires --file, --text, --out/,
   );
+});
+
+test('resolveVoiceId prefers the brand override over global over default', (t) => {
+  const savedGlobal = process.env.ELEVENLABS_VOICE_ID;
+  const savedBrand = process.env.ELEVENLABS_VOICE_ID_PRACTICAL_SYSTEMS;
+  t.after(() => {
+    if (savedGlobal === undefined) delete process.env.ELEVENLABS_VOICE_ID;
+    else process.env.ELEVENLABS_VOICE_ID = savedGlobal;
+    if (savedBrand === undefined) delete process.env.ELEVENLABS_VOICE_ID_PRACTICAL_SYSTEMS;
+    else process.env.ELEVENLABS_VOICE_ID_PRACTICAL_SYSTEMS = savedBrand;
+  });
+  delete process.env.ELEVENLABS_VOICE_ID;
+  delete process.env.ELEVENLABS_VOICE_ID_PRACTICAL_SYSTEMS;
+
+  assert.deepEqual(resolveVoiceId(process.env, 'practical-systems'), {
+    voice: '21m00Tcm4TlvDq8ikWAM',
+    source: 'default',
+  });
+
+  process.env.ELEVENLABS_VOICE_ID = 'global-voice';
+  assert.deepEqual(resolveVoiceId(process.env, 'practical-systems'), {
+    voice: 'global-voice',
+    source: 'global env (ELEVENLABS_VOICE_ID)',
+  });
+
+  process.env.ELEVENLABS_VOICE_ID_PRACTICAL_SYSTEMS = 'brand-voice';
+  assert.deepEqual(resolveVoiceId(process.env, 'practical-systems'), {
+    voice: 'brand-voice',
+    source: 'brand env (ELEVENLABS_VOICE_ID_PRACTICAL_SYSTEMS)',
+  });
+
+  // No brand id: global still applies, brand override is never consulted.
+  assert.deepEqual(resolveVoiceId(process.env, undefined), {
+    voice: 'global-voice',
+    source: 'global env (ELEVENLABS_VOICE_ID)',
+  });
 });

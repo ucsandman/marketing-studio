@@ -316,6 +316,24 @@ export function checkSfxTickDrift(sfxEnabled, cues) {
   ];
 }
 
+// Report only — no FAIL/WARN, no absolute threshold (judge-drift's rule: don't
+// invent a constant nobody has calibrated). Frame/seconds at which the first
+// claim-carrying copy (the hook act) can land on screen, driven entirely by the
+// logo act length launchTiming resolved, plus how many acts it resolved in
+// total. Override: actLengths.logo (LaunchVideo schema; unset by every brand
+// today, so this always reports the LOGO_LEN default until one sets it).
+export function checkHookOnset(timing, fps = FPS) {
+  const frame = timing.logo.len;
+  const seconds = Math.round((frame / fps) * 10) / 10;
+  const actsResolved = 4 + timing.features.length; // logo, hook, demo, end + features
+  return {
+    frame,
+    seconds,
+    actsResolved,
+    message: `hook copy on screen at frame ${frame} (${seconds.toFixed(1)}s); ${actsResolved} acts resolved.`,
+  };
+}
+
 export function runAvSync({
   timing,
   lines,
@@ -416,6 +434,8 @@ async function main() {
     }
   });
 
+  const hookOnset = checkHookOnset(timing);
+
   const {findings, verdict} = runAvSync({
     timing,
     lines,
@@ -448,6 +468,7 @@ async function main() {
       end: timing.end,
       total: timing.total,
     },
+    hookOnset,
     summary: {
       voLines: lines.length,
       wordLines: lines.filter((l) => l.words).length,
@@ -470,6 +491,7 @@ async function main() {
   } else {
     console.log(`judge-av-sync [${brand}]: ${verdict} (${findings.length} finding(s))`);
     for (const f of findings) console.log(`  [${f.level}] ${f.check}: ${f.message}`);
+    console.log(`  ${hookOnset.message}`);
     console.log(`  report -> out/${brand}/marketing/judge-av-sync.json`);
   }
 

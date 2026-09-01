@@ -5,7 +5,7 @@ import {alphaHex} from '../lib/brand';
 import {loadBrandFonts} from '../lib/fonts';
 import {useFormat} from '../lib/layout';
 import type {Cue} from '../lib/captionTiming';
-import {cueAt, splitDisplayLines} from '../lib/captionTiming';
+import {captionFontSize, cueAt, splitDisplayLines} from '../lib/captionTiming';
 
 const FADE = 6; // frames of fade in/out at each cue edge
 
@@ -14,7 +14,7 @@ const FADE = 6; // frames of fade in/out at each cue edge
 // progress bar. No active cue -> renders nothing.
 export const CaptionTrack: React.FC<{cues: Cue[]; brand: Brand}> = ({cues, brand}) => {
   const frame = useCurrentFrame();
-  const {scale, safe} = useFormat();
+  const {scale, safe, height} = useFormat();
   const cue = cueAt(cues, frame);
   if (!cue) return null;
 
@@ -37,7 +37,7 @@ export const CaptionTrack: React.FC<{cues: Cue[]; brand: Brand}> = ({cues, brand
 
   const fonts = loadBrandFonts(brand);
   const lines = splitDisplayLines(cue.text);
-  const fontSize = Math.round(52 * scale);
+  const fontSize = captionFontSize(scale, height);
 
   return (
     <div

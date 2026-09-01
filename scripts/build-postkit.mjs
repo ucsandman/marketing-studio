@@ -230,7 +230,14 @@ export function wrapKitEntry(segmentId, platformKey, cfg, hasVideo) {
   };
 }
 
-function postMd(brandLabel, platformKey, cfg, videoStatus, thumbStatus, silentStatus, captionFilesLine) {
+// Campaign-level destination link for the Before-you-publish block. brandUrl is
+// the bare host (or, for magnetic, a github.com repo path) from brands/<id>.json;
+// https:// is prepended here since the brand file stores it bare. A github.com
+// repo link prints bare with no UTM tags — a repo isn't a marketing landing page,
+// and tagging it would just pollute the URL any visitor copies out. Everything
+// else gets campaign-level tags only (source/medium/campaign, no utm_content —
+// this pipeline doesn't produce enough creative variants per platform to need it).
+export function postMd(brandLabel, platformKey, cfg, videoStatus, thumbStatus, silentStatus, captionFilesLine, brandSlug, brandUrl) {
   const label = PLATFORM_LABELS[platformKey];
   const silentLine = silentStatus ? `\n- Silent cut: ${silentStatus} (muted-autoplay embeds)` : '';
   // Disclosure is a numbered upload step, not a footnote: declaring synthetic
@@ -241,6 +248,16 @@ function postMd(brandLabel, platformKey, cfg, videoStatus, thumbStatus, silentSt
   const disclosureStep = cfg.aiDisclosure
     ? `Set ${cfg.aiDisclosure} before publishing if this cut has synthetic voiceover or music (see DISCLOSURE.md at the kit root).`
     : `No mandatory AI toggle on ${label} today — if the voiceover is synthetic, say so in the copy (see DISCLOSURE.md at the kit root).`;
+
+  const dest = `https://${brandUrl}`;
+  const link = /^https:\/\/github\.com\//.test(dest)
+    ? dest
+    : `${dest}?utm_source=${platformKey}&utm_medium=video&utm_campaign=${brandSlug}`;
+  const linkStep = platformKey === 'x'
+    ? `Paste ${link} in the first reply, not the post body — external links in the body cut reach (see skills/launch/SKILL.md).`
+    : `Destination link: ${link}`;
+  const postsStep = `After publishing, paste the live post URL into out/${brandSlug}/marketing/posts.json's \`url\` field for this platform (and set \`published\` to true).`;
+
   return `# ${brandLabel} — ${label} post kit
 
 ## Files
@@ -252,10 +269,20 @@ ${captionFilesLine}
 
 ## Before you publish
 1. ${disclosureStep}
+2. ${linkStep}
+3. ${postsStep}
 
 ## Notes
 ${cfg.note}
 `;
+}
+
+// Seed rows for out/<brand>/marketing/posts.json — one per PLATFORM_MAP key, all
+// unpublished. fetch-results.mjs treats a `published: false` or `url: null` row
+// as a skip, not an error, so a freshly-built kit with nothing posted yet reports
+// cleanly instead of looking like a failure.
+export function seedPostsRows() {
+  return Object.keys(PLATFORM_MAP).map((platform) => ({platform, url: null, variant: null, published: false}));
 }
 
 // LICENCES.md content for the postkit root (see the header comment). Assets not
@@ -537,7 +564,10 @@ function main() {
     }
 
     const silentStatus = silentFile ?? (existsSync(videoSrc) ? 'NOT INCLUDED (ffmpeg unavailable — see console output above)' : null);
-    writeFileSync(join(dir, 'POST.md'), postMd(brandData.name ?? brand, platformKey, cfg, videoStatus, thumbStatus, silentStatus, captionFilesLine));
+    writeFileSync(
+      join(dir, 'POST.md'),
+      postMd(brandData.name ?? brand, platformKey, cfg, videoStatus, thumbStatus, silentStatus, captionFilesLine, brand, brandData.url),
+    );
     assembledCount += 1;
 
     manifestPlatforms[platformKey] = {
@@ -551,6 +581,18 @@ function main() {
     };
 
     console.log(`postkit: wrote out/${brand}/postkit/${platformKey}/ (video: ${existsSync(videoSrc) ? 'yes' : 'skipped'}, thumb: ${thumbStatus.startsWith('NOT') ? 'skipped' : 'yes'})`);
+  }
+
+  // Seed out/<brand>/marketing/posts.json, once — the operator (or launch-engine)
+  // fills in url/published after actually posting, so a rebuild must never
+  // clobber that. Only write it when it doesn't exist yet.
+  const postsPath = join(root, 'out', brand, 'marketing', 'posts.json');
+  if (existsSync(postsPath)) {
+    console.log(`postkit: out/${brand}/marketing/posts.json already exists, left unchanged`);
+  } else {
+    mkdirSync(dirname(postsPath), {recursive: true});
+    writeFileSync(postsPath, JSON.stringify(seedPostsRows(), null, 2) + '\n');
+    console.log(`postkit: wrote out/${brand}/marketing/posts.json (seed, ${Object.keys(PLATFORM_MAP).length} platform rows)`);
   }
 
   // WrapClip segment kits: one kit per out/<brand>/matrix/wrap-<segmentId>/ dir
@@ -608,7 +650,17 @@ function main() {
       const wrapSilentStatus = wrapSilentFile ?? (hasVideo ? 'NOT INCLUDED (ffmpeg unavailable — see console output above)' : null);
       writeFileSync(
         join(dir, 'POST.md'),
-        postMd(brandData.name ?? brand, platformKey, cfg, videoStatus, 'NOT INCLUDED (segment kits omit the brand launch thumbnail)', wrapSilentStatus, ''),
+        postMd(
+          brandData.name ?? brand,
+          platformKey,
+          cfg,
+          videoStatus,
+          'NOT INCLUDED (segment kits omit the brand launch thumbnail)',
+          wrapSilentStatus,
+          '',
+          brand,
+          brandData.url,
+        ),
       );
       assembledCount += 1;
 

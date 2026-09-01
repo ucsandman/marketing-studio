@@ -228,7 +228,9 @@ function main() {
   if (asJson) {
     console.log(JSON.stringify(report, null, 2));
   } else {
-    console.log(`judge-palette [${brand}]: ${verdict} — forbidden=[${forbiddenColors.join(', ') || 'none'}], ${frameImgs.length} frame(s)`);
+    console.log(
+      `judge-palette [${brand}]: ${verdict} — ${forbiddenColors.length} forbidden-color rule(s) parsed from voice [${forbiddenColors.join(', ') || 'none'}]; ${findings.length} violation(s) checked across ${frameImgs.length} frame(s)`,
+    );
     for (const f of findings) console.log(`  [${f.level}] ${f.check}: ${f.message}`);
     if (findings.length === 0) console.log('  no forbidden-color findings');
     console.log(`  report -> out/${brand}/marketing/judge-palette.json`);
