@@ -184,7 +184,8 @@ node scripts/judge-motion.mjs <brand>                  # motion-craft + motion/g
 node scripts/judge-drift.mjs <brand>                   # scores out/<brand>/ as a SET; writes a worst-first review grid
 node scripts/build-postkit.mjs <brand>                 # per-platform kits + LICENCES.md + DISCLOSURE.md
 node scripts/publish-bluesky.mjs <brand> --dry-run     # post the Bluesky kit (drop --dry-run; needs BLUESKY_* in .env)
-node scripts/fetch-results.mjs <brand>                 # engagement per hook variant from X + Bluesky into results.json
+node scripts/publish-youtube.mjs <brand> --dry-run     # upload the launch video, private by default (YOUTUBE_* in .env, --auth once)
+node scripts/fetch-results.mjs <brand>                 # engagement per hook variant from X, Bluesky and YouTube into results.json
 ```
 
 `docs/PLAYBOOK.md` has the full engine map: every feeder, builder script, and render command, plus the verified gotchas.

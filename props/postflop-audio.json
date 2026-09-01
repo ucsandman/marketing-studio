@@ -1,0 +1,724 @@
+{
+  "music": {
+    "src": "postflop/audio/music.mp3",
+    "durationMs": 76930
+  },
+  "lines": [
+    {
+      "act": "logo",
+      "src": "postflop/audio/logo.mp3",
+      "durationMs": 3580,
+      "text": "postflop. An open source solver for heads up no limit hold'em.",
+      "words": [
+        {
+          "w": "postflop.",
+          "startMs": 0,
+          "endMs": 731
+        },
+        {
+          "w": "An",
+          "startMs": 1010,
+          "endMs": 1149
+        },
+        {
+          "w": "open",
+          "startMs": 1207,
+          "endMs": 1416
+        },
+        {
+          "w": "source",
+          "startMs": 1463,
+          "endMs": 1695
+        },
+        {
+          "w": "solver",
+          "startMs": 1718,
+          "endMs": 1997
+        },
+        {
+          "w": "for",
+          "startMs": 2043,
+          "endMs": 2125
+        },
+        {
+          "w": "heads",
+          "startMs": 2171,
+          "endMs": 2345
+        },
+        {
+          "w": "up",
+          "startMs": 2380,
+          "endMs": 2473
+        },
+        {
+          "w": "no",
+          "startMs": 2531,
+          "endMs": 2601
+        },
+        {
+          "w": "limit",
+          "startMs": 2670,
+          "endMs": 2856
+        },
+        {
+          "w": "hold'em.",
+          "startMs": 2891,
+          "endMs": 3529
+        }
+      ]
+    },
+    {
+      "act": "hook",
+      "src": "postflop/audio/hook.mp3",
+      "durationMs": 10340,
+      "text": "A solver that grades its own homework can be confidently wrong. This one measures convergence instead: a separate best response calculator, at every report.",
+      "words": [
+        {
+          "w": "A",
+          "startMs": 0,
+          "endMs": 93
+        },
+        {
+          "w": "solver",
+          "startMs": 209,
+          "endMs": 615
+        },
+        {
+          "w": "that",
+          "startMs": 662,
+          "endMs": 778
+        },
+        {
+          "w": "grades",
+          "startMs": 836,
+          "endMs": 1173
+        },
+        {
+          "w": "its",
+          "startMs": 1219,
+          "endMs": 1347
+        },
+        {
+          "w": "own",
+          "startMs": 1405,
+          "endMs": 1602
+        },
+        {
+          "w": "homework",
+          "startMs": 1672,
+          "endMs": 2136
+        },
+        {
+          "w": "can",
+          "startMs": 2252,
+          "endMs": 2403
+        },
+        {
+          "w": "be",
+          "startMs": 2461,
+          "endMs": 2566
+        },
+        {
+          "w": "confidently",
+          "startMs": 2635,
+          "endMs": 3286
+        },
+        {
+          "w": "wrong.",
+          "startMs": 3332,
+          "endMs": 3762
+        },
+        {
+          "w": "This",
+          "startMs": 4087,
+          "endMs": 4307
+        },
+        {
+          "w": "one",
+          "startMs": 4377,
+          "endMs": 4540
+        },
+        {
+          "w": "measures",
+          "startMs": 4586,
+          "endMs": 4899
+        },
+        {
+          "w": "convergence",
+          "startMs": 4957,
+          "endMs": 5526
+        },
+        {
+          "w": "instead:",
+          "startMs": 5573,
+          "endMs": 6165
+        },
+        {
+          "w": "a",
+          "startMs": 6490,
+          "endMs": 6548
+        },
+        {
+          "w": "separate",
+          "startMs": 6676,
+          "endMs": 7129
+        },
+        {
+          "w": "best",
+          "startMs": 7175,
+          "endMs": 7396
+        },
+        {
+          "w": "response",
+          "startMs": 7454,
+          "endMs": 7860
+        },
+        {
+          "w": "calculator,",
+          "startMs": 7906,
+          "endMs": 8673
+        },
+        {
+          "w": "at",
+          "startMs": 8847,
+          "endMs": 9009
+        },
+        {
+          "w": "every",
+          "startMs": 9102,
+          "endMs": 9404
+        },
+        {
+          "w": "report.",
+          "startMs": 9485,
+          "endMs": 10310
+        }
+      ]
+    },
+    {
+      "act": "demo",
+      "src": "postflop/audio/demo.mp3",
+      "durationMs": 10580,
+      "text": "Give it a board, both ranges, stacks, pot and sizings. Then walk the whole tree: per hand strategies, E Vs, blockers, every runout.",
+      "words": [
+        {
+          "w": "Give",
+          "startMs": 0,
+          "endMs": 232
+        },
+        {
+          "w": "it",
+          "startMs": 255,
+          "endMs": 313
+        },
+        {
+          "w": "a",
+          "startMs": 348,
+          "endMs": 372
+        },
+        {
+          "w": "board,",
+          "startMs": 418,
+          "endMs": 882
+        },
+        {
+          "w": "both",
+          "startMs": 998,
+          "endMs": 1219
+        },
+        {
+          "w": "ranges,",
+          "startMs": 1277,
+          "endMs": 1834
+        },
+        {
+          "w": "stacks,",
+          "startMs": 1881,
+          "endMs": 2473
+        },
+        {
+          "w": "pot",
+          "startMs": 2531,
+          "endMs": 2902
+        },
+        {
+          "w": "and",
+          "startMs": 3019,
+          "endMs": 3181
+        },
+        {
+          "w": "sizings.",
+          "startMs": 3251,
+          "endMs": 3971
+        },
+        {
+          "w": "Then",
+          "startMs": 4481,
+          "endMs": 4679
+        },
+        {
+          "w": "walk",
+          "startMs": 4748,
+          "endMs": 4946
+        },
+        {
+          "w": "the",
+          "startMs": 4992,
+          "endMs": 5062
+        },
+        {
+          "w": "whole",
+          "startMs": 5097,
+          "endMs": 5271
+        },
+        {
+          "w": "tree:",
+          "startMs": 5306,
+          "endMs": 5782
+        },
+        {
+          "w": "per",
+          "startMs": 6107,
+          "endMs": 6351
+        },
+        {
+          "w": "hand",
+          "startMs": 6420,
+          "endMs": 6664
+        },
+        {
+          "w": "strategies,",
+          "startMs": 6722,
+          "endMs": 7535
+        },
+        {
+          "w": "E",
+          "startMs": 7709,
+          "endMs": 7825
+        },
+        {
+          "w": "Vs,",
+          "startMs": 7953,
+          "endMs": 8475
+        },
+        {
+          "w": "blockers,",
+          "startMs": 8591,
+          "endMs": 9288
+        },
+        {
+          "w": "every",
+          "startMs": 9462,
+          "endMs": 9741
+        },
+        {
+          "w": "runout.",
+          "startMs": 9787,
+          "endMs": 10542
+        }
+      ]
+    },
+    {
+      "act": "feature-0",
+      "src": "postflop/audio/feature-0.mp3",
+      "durationMs": 5020,
+      "text": "Exploitability is printed in chips and percent of pot, tagged measured.",
+      "words": [
+        {
+          "w": "Exploitability",
+          "startMs": 0,
+          "endMs": 789
+        },
+        {
+          "w": "prints",
+          "startMs": 848,
+          "endMs": 1068
+        },
+        {
+          "w": "in",
+          "startMs": 1103,
+          "endMs": 1161
+        },
+        {
+          "w": "chips",
+          "startMs": 1219,
+          "endMs": 1533
+        },
+        {
+          "w": "and",
+          "startMs": 1579,
+          "endMs": 1683
+        },
+        {
+          "w": "percent",
+          "startMs": 1730,
+          "endMs": 1974
+        },
+        {
+          "w": "of",
+          "startMs": 1997,
+          "endMs": 2043
+        },
+        {
+          "w": "pot,",
+          "startMs": 2101,
+          "endMs": 2566
+        },
+        {
+          "w": "tagged",
+          "startMs": 2810,
+          "endMs": 3216
+        },
+        {
+          "w": "measured,",
+          "startMs": 3274,
+          "endMs": 3715
+        },
+        {
+          "w": "every",
+          "startMs": 3889,
+          "endMs": 4180
+        },
+        {
+          "w": "interval.",
+          "startMs": 4238,
+          "endMs": 4969
+        }
+      ]
+    },
+    {
+      "act": "feature-1",
+      "src": "postflop/audio/feature-1.mp3",
+      "durationMs": 6350,
+      "text": "The same Rust engine runs in your browser as WebAssembly. Solve a spot on the page, nothing to install.",
+      "words": [
+        {
+          "w": "The",
+          "startMs": 0,
+          "endMs": 163
+        },
+        {
+          "w": "same",
+          "startMs": 221,
+          "endMs": 476
+        },
+        {
+          "w": "Rust",
+          "startMs": 522,
+          "endMs": 766
+        },
+        {
+          "w": "engine",
+          "startMs": 836,
+          "endMs": 1126
+        },
+        {
+          "w": "runs",
+          "startMs": 1161,
+          "endMs": 1370
+        },
+        {
+          "w": "in",
+          "startMs": 1416,
+          "endMs": 1474
+        },
+        {
+          "w": "your",
+          "startMs": 1509,
+          "endMs": 1614
+        },
+        {
+          "w": "browser",
+          "startMs": 1660,
+          "endMs": 2067
+        },
+        {
+          "w": "as",
+          "startMs": 2136,
+          "endMs": 2241
+        },
+        {
+          "w": "WebAssembly.",
+          "startMs": 2322,
+          "endMs": 3135
+        },
+        {
+          "w": "Solve",
+          "startMs": 3413,
+          "endMs": 3727
+        },
+        {
+          "w": "a",
+          "startMs": 3750,
+          "endMs": 3773
+        },
+        {
+          "w": "spot",
+          "startMs": 3820,
+          "endMs": 4075
+        },
+        {
+          "w": "on",
+          "startMs": 4122,
+          "endMs": 4180
+        },
+        {
+          "w": "the",
+          "startMs": 4214,
+          "endMs": 4284
+        },
+        {
+          "w": "page,",
+          "startMs": 4331,
+          "endMs": 4830
+        },
+        {
+          "w": "nothing",
+          "startMs": 5004,
+          "endMs": 5306
+        },
+        {
+          "w": "to",
+          "startMs": 5364,
+          "endMs": 5433
+        },
+        {
+          "w": "install.",
+          "startMs": 5515,
+          "endMs": 6316
+        }
+      ]
+    },
+    {
+      "act": "feature-2",
+      "src": "postflop/audio/feature-2.mp3",
+      "durationMs": 7290,
+      "text": "Lock any node. Villain never bluffs this river. The solver answers the question you actually asked.",
+      "words": [
+        {
+          "w": "Lock",
+          "startMs": 0,
+          "endMs": 325
+        },
+        {
+          "w": "any",
+          "startMs": 418,
+          "endMs": 627
+        },
+        {
+          "w": "node.",
+          "startMs": 708,
+          "endMs": 1265
+        },
+        {
+          "w": "Villain",
+          "startMs": 1707,
+          "endMs": 2067
+        },
+        {
+          "w": "never",
+          "startMs": 2159,
+          "endMs": 2403
+        },
+        {
+          "w": "bluffs",
+          "startMs": 2450,
+          "endMs": 2740
+        },
+        {
+          "w": "this",
+          "startMs": 2786,
+          "endMs": 2949
+        },
+        {
+          "w": "river.",
+          "startMs": 3019,
+          "endMs": 3529
+        },
+        {
+          "w": "The",
+          "startMs": 3913,
+          "endMs": 4040
+        },
+        {
+          "w": "solver",
+          "startMs": 4098,
+          "endMs": 4505
+        },
+        {
+          "w": "answers",
+          "startMs": 4586,
+          "endMs": 4969
+        },
+        {
+          "w": "the",
+          "startMs": 5016,
+          "endMs": 5085
+        },
+        {
+          "w": "question",
+          "startMs": 5132,
+          "endMs": 5515
+        },
+        {
+          "w": "you",
+          "startMs": 5584,
+          "endMs": 5677
+        },
+        {
+          "w": "actually",
+          "startMs": 5770,
+          "endMs": 6281
+        },
+        {
+          "w": "asked.",
+          "startMs": 6362,
+          "endMs": 7245
+        }
+      ]
+    },
+    {
+      "act": "end",
+      "src": "postflop/audio/end.mp3",
+      "durationMs": 9560,
+      "text": "Never take its word for it. M I T licensed: read the source, run the benchmarks. Solve your first spot in the browser.",
+      "words": [
+        {
+          "w": "So",
+          "startMs": 0,
+          "endMs": 174
+        },
+        {
+          "w": "you",
+          "startMs": 244,
+          "endMs": 325
+        },
+        {
+          "w": "never",
+          "startMs": 441,
+          "endMs": 662
+        },
+        {
+          "w": "have",
+          "startMs": 720,
+          "endMs": 871
+        },
+        {
+          "w": "to",
+          "startMs": 894,
+          "endMs": 940
+        },
+        {
+          "w": "take",
+          "startMs": 987,
+          "endMs": 1149
+        },
+        {
+          "w": "its",
+          "startMs": 1184,
+          "endMs": 1289
+        },
+        {
+          "w": "word",
+          "startMs": 1335,
+          "endMs": 1533
+        },
+        {
+          "w": "for",
+          "startMs": 1591,
+          "endMs": 1753
+        },
+        {
+          "w": "it.",
+          "startMs": 1823,
+          "endMs": 2067
+        },
+        {
+          "w": "M",
+          "startMs": 2392,
+          "endMs": 2601
+        },
+        {
+          "w": "I",
+          "startMs": 2728,
+          "endMs": 2902
+        },
+        {
+          "w": "T",
+          "startMs": 3019,
+          "endMs": 3193
+        },
+        {
+          "w": "licensed:",
+          "startMs": 3518,
+          "endMs": 4214
+        },
+        {
+          "w": "read",
+          "startMs": 4423,
+          "endMs": 4632
+        },
+        {
+          "w": "the",
+          "startMs": 4667,
+          "endMs": 4737
+        },
+        {
+          "w": "source,",
+          "startMs": 4783,
+          "endMs": 5259
+        },
+        {
+          "w": "run",
+          "startMs": 5468,
+          "endMs": 5712
+        },
+        {
+          "w": "the",
+          "startMs": 5770,
+          "endMs": 5840
+        },
+        {
+          "w": "benchmarks.",
+          "startMs": 5875,
+          "endMs": 6618
+        },
+        {
+          "w": "Solve",
+          "startMs": 6943,
+          "endMs": 7384
+        },
+        {
+          "w": "your",
+          "startMs": 7419,
+          "endMs": 7546
+        },
+        {
+          "w": "first",
+          "startMs": 7616,
+          "endMs": 7860
+        },
+        {
+          "w": "spot",
+          "startMs": 7895,
+          "endMs": 8301
+        },
+        {
+          "w": "in",
+          "startMs": 8452,
+          "endMs": 8591
+        },
+        {
+          "w": "the",
+          "startMs": 8626,
+          "endMs": 8696
+        },
+        {
+          "w": "browser.",
+          "startMs": 8731,
+          "endMs": 9520
+        }
+      ]
+    }
+  ]
+}

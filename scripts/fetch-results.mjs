@@ -16,7 +16,9 @@
 //
 // Fetching: X posts get public_metrics from the X API v2 (X_BEARER_TOKEN in the
 // repo .env — value is never printed). Bluesky posts get like/repost/reply counts
-// from the public AppView (no token: public.api.bsky.app). Other platforms
+// from the public AppView (no token: public.api.bsky.app). YouTube rows get
+// videos.list statistics through the same OAuth token publish-youtube.mjs stored
+// (private uploads are only visible to their owner). Other platforms
 // (LinkedIn's stats API is partner-gated) carry inline `metrics` entered manually. Posts that cannot be
 // resolved are written with source: 'unavailable', never dropped.
 //
@@ -35,6 +37,7 @@ import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
 import {readEnvVar} from './lib/env.mjs';
 import {normalizeBskyMetrics, parsePostUrl} from './publish-bluesky.mjs';
+import {accessToken as youtubeAccessToken, hasYoutubeToken, normalizeYtMetrics, videoIdFromUrl} from './publish-youtube.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -100,6 +103,18 @@ async function fetchBskyMetrics(urls) {
   const out = new Map();
   for (const post of body.posts ?? []) out.set(byUrl.get(post.uri), normalizeBskyMetrics(post));
   return out;
+}
+
+async function fetchYtMetrics(ids) {
+  const token = await youtubeAccessToken(readEnvVar('YOUTUBE_CLIENT_ID'), readEnvVar('YOUTUBE_CLIENT_SECRET'));
+  const res = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${ids.join(',')}`, {
+    headers: {authorization: `Bearer ${token}`},
+  });
+  if (!res.ok) throw new Error(`YouTube API ${res.status} ${res.statusText}`);
+  const body = await res.json();
+  const byId = new Map();
+  for (const v of body.items ?? []) byId.set(v.id, normalizeYtMetrics(v.statistics));
+  return byId;
 }
 
 async function main() {
@@ -170,6 +185,32 @@ async function main() {
         console.error(`fetch-results: X fetch failed: ${err.message} — X posts marked unavailable.`);
         degraded = true;
         for (const p of xPending) p.source = 'unavailable';
+      }
+    }
+  }
+  const ytPending = posts.filter((p) => p.platform === 'youtube' && !p.metrics && videoIdFromUrl(p.url) && p.source !== 'skipped');
+  if (ytPending.length > 0) {
+    if (!hasYoutubeToken() || !readEnvVar('YOUTUBE_CLIENT_ID')) {
+      console.error('fetch-results: no YouTube token (node scripts/publish-youtube.mjs --auth) — YouTube posts marked unavailable.');
+      degraded = true;
+      for (const p of ytPending) p.source = 'unavailable';
+    } else {
+      try {
+        const byId = await fetchYtMetrics(ytPending.map((p) => videoIdFromUrl(p.url)));
+        for (const p of ytPending) {
+          const m = byId.get(videoIdFromUrl(p.url));
+          if (m) {
+            p.metrics = m;
+            p.source = 'youtube-api';
+          } else {
+            p.source = 'unavailable';
+            degraded = true;
+          }
+        }
+      } catch (err) {
+        console.error(`fetch-results: YouTube fetch failed: ${err.message} — YouTube posts marked unavailable.`);
+        degraded = true;
+        for (const p of ytPending) p.source = 'unavailable';
       }
     }
   }

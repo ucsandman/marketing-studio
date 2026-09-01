@@ -433,6 +433,9 @@ export function applyPosted(path, payload, {now = new Date()} = {}) {
     platform,
     url: String(payload.url),
     variant: typeof payload.variant === 'string' && payload.variant ? payload.variant : null,
+    // build-postkit seeds every row with published:false; without this the spread
+    // below kept that flag and fetch-results skipped the row as unpublished.
+    published: true,
     postedAt: now.toISOString(),
   };
   const i = rows.findIndex((r) => r && r.platform === platform);

@@ -12,3 +12,4 @@ __pycache__/
 .offlocal/
 .context-handoffs/
 .handoff-notes-*.md
+.youtube-token.json

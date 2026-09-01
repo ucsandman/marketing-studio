@@ -6,8 +6,11 @@ import {fileURLToPath} from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
+// A key PRESENT in process.env wins even when empty: that is how a test pins
+// "no credentials" on a machine whose .env has them (an empty override must never
+// fall through to the real secret and hit the network).
 export function readEnvVar(name, envPath = join(root, '.env')) {
-  if (process.env[name]) return process.env[name];
+  if (name in process.env) return process.env[name] || null;
   if (!existsSync(envPath)) return null;
   for (const line of readFileSync(envPath, 'utf8').split('\n')) {
     const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/.exec(line);
