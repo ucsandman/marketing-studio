@@ -1,0 +1,164 @@
+{
+  "brandId": "practicalsystems",
+  "kicker": "practicalsystems.io",
+  "headline": "The AI company that runs in public.",
+  "demo": {
+    "video": "practicalsystems/demo.webm",
+    "telemetry": {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "durationMs": 45788,
+      "events": [
+        {
+          "type": "step",
+          "t": 2875,
+          "label": "The homepage is the operating log. One real cycle, exactly as it closed."
+        },
+        {
+          "type": "focus",
+          "t": 3801,
+          "x": 720,
+          "y": 413,
+          "w": 1328,
+          "h": 495
+        },
+        {
+          "type": "step",
+          "t": 7808,
+          "label": "Real cycle id, timestamped rows: the CEO picks, QA passes, the books close."
+        },
+        {
+          "type": "focus",
+          "t": 8723,
+          "x": 720,
+          "y": 353,
+          "w": 1152,
+          "h": 447
+        },
+        {
+          "type": "step",
+          "t": 13930,
+          "label": "What the cycle cost, what it earned, and who still has to approve."
+        },
+        {
+          "type": "focus",
+          "t": 14834,
+          "x": 356,
+          "y": 498,
+          "w": 600,
+          "h": 209
+        },
+        {
+          "type": "step",
+          "t": 18848,
+          "label": "Eight agents with duties. The amber tags are where a human says yes."
+        },
+        {
+          "type": "focus",
+          "t": 19767,
+          "x": 720,
+          "y": 450,
+          "w": 910,
+          "h": 450
+        },
+        {
+          "type": "step",
+          "t": 23806,
+          "label": "Revenue reads live from Stripe. Giving is the committed ledger."
+        },
+        {
+          "type": "focus",
+          "t": 24715,
+          "x": 720,
+          "y": 450,
+          "w": 920,
+          "h": 247
+        },
+        {
+          "type": "step",
+          "t": 28731,
+          "label": "Zero. Four owner test charges excluded, because the owner is not a buyer."
+        },
+        {
+          "type": "focus",
+          "t": 29650,
+          "x": 720,
+          "y": 450,
+          "w": 547,
+          "h": 275
+        },
+        {
+          "type": "step",
+          "t": 34862,
+          "label": "What it has shipped, priced, each one linked to a working checkout."
+        },
+        {
+          "type": "focus",
+          "t": 35770,
+          "x": 720,
+          "y": 450,
+          "w": 910,
+          "h": 209
+        },
+        {
+          "type": "click",
+          "t": 39779,
+          "x": 359,
+          "y": 535
+        },
+        {
+          "type": "step",
+          "t": 40878,
+          "label": "The full shelf. Every row is a real build on its own live site."
+        },
+        {
+          "type": "focus",
+          "t": 41784,
+          "x": 720,
+          "y": 524,
+          "w": 974,
+          "h": 594
+        }
+      ]
+    }
+  },
+  "features": [
+    {
+      "screenshot": "practicalsystems/feature-loop.png",
+      "heading": "The loop that ships",
+      "lines": [
+        "An autonomous CEO decides what to build",
+        "Agents research, build, QA, and close the books",
+        "Last cycle: 30 cents of metered model spend"
+      ]
+    },
+    {
+      "screenshot": "practicalsystems/feature-governance.png",
+      "heading": "A human holds the keys",
+      "lines": [
+        "Cold outreach never sends without a human",
+        "No agent charges a card on its own",
+        "Every approval is a timestamped row in the public log"
+      ]
+    },
+    {
+      "screenshot": "practicalsystems/feature-proof.png",
+      "heading": "The honest scoreboard",
+      "lines": [
+        "Revenue reads live from Stripe",
+        "$0 MRR published, not hidden",
+        "Half of profit committed to giving, $0 given so far"
+      ]
+    }
+  ],
+  "cta": "Watch it run live",
+  "command": "practicalsystems.io",
+  "assets": {
+    "logoSequence": "practicalsystems/logo-reveal",
+    "logoFrames": 90,
+    "loopSequence": null,
+    "loopFrames": 1
+  }
+}

@@ -25,6 +25,7 @@ const brand = process.argv.slice(2).find((a) => !a.startsWith('--')) ?? 'noban';
 // carry telemetry re-based to the cut. Absent brands read <brand>-demo.json.
 const DEMO_PROPS = {
   tenwords: 'tenwords-launch-demo.json',
+  postflop: 'postflop-launch-demo.json',
 };
 
 // Brands whose picture lock is derived from measured VO word times. Their launch
@@ -180,6 +181,74 @@ const BRANDS = {
     },
   }),
 
+  // Voice (brands/practicalsystems.json): calm, precise, receipts over claims. Teal is
+  // the live-signal color, accents and small glows only, never a flooded hero wash
+  // (effects.wash 0.07). Direction: The Operating Log
+  // (out/practicalsystems/marketing/direction.md) — the film IS the company's own live
+  // log, so every feature panel is a literal surface cropped from the approved capture
+  // (scripts/build-practicalsystems-feature-stills.mjs), never a staged construction:
+  // "nothing staged" is the claim, so a built prop would contradict the film.
+  //
+  // Copy is the brief's (out/practicalsystems/marketing/brief.json) and is overlaid
+  // below — headline from hook, headings + lines from features, cta from cta. The
+  // hardcoded strings here are the same text so a brief-less run renders identically.
+  // positioning.differentiator ("publishes its live operating log and its real numbers,
+  // wins or not") has no on-screen slot; it is distilled into the hook headline, which
+  // is the brief's own positioning sentence. NUMBERS ARE LOAD-BEARING HERE: $0.30 is
+  // METERED MODEL SPEND only (builds bill a flat Claude Code subscription seat), the
+  // approval gate covers cold outreach and agent-initiated charges (a licence mailer
+  // does send to paying buyers), and MRR is $0. Do not widen any of those claims.
+  practicalsystems: (demo) => ({
+    brandId: 'practicalsystems',
+    kicker: 'practicalsystems.io',
+    headline: 'The AI company that runs in public.',
+    demo: {video: demo.video, telemetry: demo.telemetry},
+    features: [
+      {
+        screenshot: 'practicalsystems/feature-loop.png',
+        heading: 'The loop that ships',
+        lines: [
+          'An autonomous CEO decides what to build',
+          'Agents research, build, QA, and close the books',
+          'Last cycle: 30 cents of metered model spend',
+        ],
+      },
+      {
+        screenshot: 'practicalsystems/feature-governance.png',
+        heading: 'A human holds the keys',
+        lines: [
+          'Cold outreach never sends without a human',
+          'No agent charges a card on its own',
+          'Every approval is a timestamped row in the public log',
+        ],
+      },
+      {
+        screenshot: 'practicalsystems/feature-proof.png',
+        heading: 'The honest scoreboard',
+        lines: [
+          'Revenue reads live from Stripe',
+          '$0 MRR published, not hidden',
+          'Half of profit committed to giving, $0 given so far',
+        ],
+      },
+    ],
+    cta: 'Watch it run live',
+    // The end card's mono chip carries the destination, because this CTA is the one
+    // thing a viewer acts on and the brand name alone does not say where to go.
+    command: 'practicalsystems.io',
+    // No actLengths override: the shared constants plus the 45.8s telemetry-derived
+    // demo act land at 2424 frames (80.8s), inside the 30-90s band with ~9s of
+    // headroom. The audio pass owns any VO-driven widening (launchTiming precedence:
+    // override > measured VO > constants), so pre-widening here would spend that
+    // headroom before the voice exists.
+    assets: {
+      logoSequence: 'practicalsystems/logo-reveal',
+      logoFrames: 90,
+      loopSequence: null,
+      loopFrames: 1,
+    },
+  }),
+
   // Voice (brands/tenwords.json): a printed page, not a screen. Paper-white ground,
   // serif for the argument, mono only where exactness is the point. THE PILCROW
   // RULE: accent red belongs to the pilcrow and small emphasis only, never a wash.
@@ -255,6 +324,84 @@ const BRANDS = {
     // the trimmed capture.
     assets: {
       logoSequence: 'tenwords/logo-reveal',
+      logoFrames: 90,
+      loopSequence: null,
+      loopFrames: 1,
+    },
+  }),
+
+  // Voice (brands/postflop.json): BONE & RULE. Bone paper, ink type, hard rules,
+  // zero radius and zero shadow. Yellow #ffe000 is ONLY ever a filled block carrying
+  // black text (ctaStyle 'block' declares that, and EndCard/FeaturePanel/DemoStage
+  // read it); magenta appears only inside real product footage as the product's own
+  // selection state. Direction: The Proof Sheet
+  // (out/postflop/marketing/direction.md) — the film is a measurement report being
+  // typeset, so every feature plate is a REAL region of the approved capture
+  // (scripts/build-postflop-feature-stills.mjs), never a staged construction: a
+  // solver whose whole claim is "measured, never asserted" cannot illustrate that
+  // claim with a mocked-up measurement.
+  //
+  // Copy is the brief's (out/postflop/marketing/brief.json) and is overlaid below —
+  // headline from hook, headings + lines from features, cta from cta. The hardcoded
+  // strings here are the same text so a brief-less run renders identically. The brief
+  // ranks FOUR features best-first and the template renders at most three, so
+  // `performance` (the benchmark table) is the one that does not get an act; its
+  // numbers are the audio pass's to place, not the picture's.
+  //
+  // The hook stamp carries NO figure on purpose. The direction's signature move is a
+  // yellow block landing on a measured number, and the product already performs it in
+  // every plate (its own sidebar stamps EXPLOITABILITY in exactly that block). Adding
+  // a comp-side number here would either duplicate the footage's figure or print a
+  // second, different exploitability, so the hook stamps the WORD and the product
+  // stamps the NUMBER.
+  postflop: (demo) => ({
+    brandId: 'postflop',
+    kicker: 'postflop.vercel.app',
+    headline: 'Your solver is grading its own homework.',
+    hookStamp: {label: 'Exploitability', tag: '[measured]', frame: null},
+    demo: {video: demo.video, telemetry: demo.telemetry},
+    features: [
+      {
+        screenshot: 'postflop/feature-convergence.png',
+        heading: 'Convergence, measured',
+        lines: [
+          'A separate best-response calculator reports exploitability at every interval',
+          'Printed in chips and % of pot, tagged [measured]',
+          'Convergence is a number you check, not a claim you trust',
+        ],
+      },
+      {
+        screenshot: 'postflop/feature-tree.png',
+        heading: 'The whole tree, in your browser',
+        lines: [
+          '13x13 grid, per-hand EVs, blockers, every runout',
+          'The Rust engine compiled to WebAssembly in a Web Worker',
+          'Solve with the CLI, open the same file anywhere',
+        ],
+      },
+      {
+        screenshot: 'postflop/feature-lock.png',
+        heading: 'Freeze a node, solve around it',
+        lines: [
+          'Freeze any node: villain never bluffs this river',
+          'The solver computes the equilibrium around the lock',
+          'Exploitability is measured against the locked profile',
+        ],
+      },
+    ],
+    cta: 'Solve your first spot in the browser. Nothing to install.',
+    // The end card's mono chip carries the destination: the CTA says to open the
+    // workbench and the brand name alone does not say where that is.
+    command: 'postflop.vercel.app',
+    // Act lengths sized so every approved narration line in the brief fits at ~150
+    // wpm plus VO_LEAD and VO_PAD (the audio pass scores this picture lock later).
+    // The shared constants would clip hook (25 words in 6.2s) and end (27 words in
+    // 5.0s). The demo act is telemetry-derived from the three-window launch cut
+    // (25.3s) and is not listed here: launchTiming has no demo override, and widening
+    // the recording rather than shortening it is the rule.
+    actLengths: {logo: 180, hook: 324, features: [192, 252, 252], end: 324},
+    assets: {
+      logoSequence: 'postflop/logo-reveal',
       logoFrames: 90,
       loopSequence: null,
       loopFrames: 1,

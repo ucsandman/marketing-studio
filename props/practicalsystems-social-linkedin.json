@@ -1,0 +1,14 @@
+{
+  "brandId": "practicalsystems",
+  "kicker": "practicalsystems.io",
+  "headline": "Practical Systems: the AI company that runs in public.",
+  "lines": [
+    "Most AI agent demos are staged. This is a live company with a public operating log and a human on every outreach send.",
+    "Agents research, build, QA, and close the books",
+    "Last cycle: 30 cents of metered model spend"
+  ],
+  "screenshot": "practicalsystems/feature-loop.png",
+  "cta": "Watch it run live at practicalsystems.io",
+  "video": "practicalsystems/demo-final.mp4",
+  "videoStartFrame": 840
+}

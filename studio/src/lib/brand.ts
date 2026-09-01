@@ -6,6 +6,8 @@ import magnetic from '../../../brands/magnetic.json';
 import costclaw from '../../../brands/costclaw.json';
 import sidetap from '../../../brands/sidetap.json';
 import tenwords from '../../../brands/tenwords.json';
+import practicalsystems from '../../../brands/practicalsystems.json';
+import postflop from '../../../brands/postflop.json';
 
 const hex = z.string().regex(/^#[0-9a-f]{6}$/i, 'expected #rrggbb hex color');
 
@@ -126,6 +128,12 @@ export const brandSchema = z.object({
   // forbids clay (colors.brand) from ever carrying text (graphic-only, and it
   // fails contrast on white), so colored text uses its umber tone instead.
   textAccent: z.enum(['brand', 'profit', 'safe', 'loss', 'info', 'rare']).default('brand'),
+  // LogoReveal's CTA line treatment. 'text' colors the CTA with
+  // colors[textAccent] (default, legacy behavior, byte-identical for every
+  // brand that omits this). 'block' renders it as a filled colors.brand block
+  // carrying colors.ink text -- postflop's voice forbids yellow (colors.brand)
+  // from ever being TEXT, only a filled block with black text.
+  ctaStyle: z.enum(['text', 'block']).default('text'),
   // Progress-fill gradient tokens for FloatBar. Defaults reproduce the legacy
   // hardcoded brand->profit gradient, so a brand that omits this renders
   // byte-identically. tenwords sets safe->ink: its accent budget forbids the
@@ -161,7 +169,7 @@ export const alphaHex = (a: number): string =>
 
 export type Brand = z.infer<typeof brandSchema>;
 
-const registry: Record<string, unknown> = {noban, dashclaw, paperroute, magnetic, costclaw, sidetap, tenwords};
+const registry: Record<string, unknown> = {noban, dashclaw, paperroute, magnetic, costclaw, sidetap, tenwords, practicalsystems, postflop};
 
 export const getBrand = (id: string): Brand => {
   const raw = registry[id];

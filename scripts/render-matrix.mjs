@@ -64,6 +64,11 @@ const studio = join(root, 'studio');
 const args = process.argv.slice(2);
 const brand = args.find((a) => !a.startsWith('--'));
 const stillsOnly = args.includes('--stills-only');
+// Headless-Chrome workers per render. Unset = Remotion's core-count default.
+const concurrency =
+  args.find((a) => a.startsWith('--concurrency='))?.split('=')[1] ||
+  process.env.REMOTION_CONCURRENCY ||
+  '';
 const webmFlag = args.includes('--webm');
 const compIdx = args.indexOf('--comp');
 const compFilter = compIdx >= 0 ? args[compIdx + 1] : null;
@@ -208,11 +213,34 @@ const renderVariant = (id, comp, width, height, props) => {
   writeFileSync(propsPath, JSON.stringify(props));
   const ext = stillsOnly ? 'png' : 'mp4';
   const outFile = join(outDir, `${id}.${ext}`);
+  // --concurrency caps how many headless Chrome instances render in parallel.
+  // Remotion's default scales with core count and each worker holds a browser,
+  // so on a busy workstation a full-length 1080p row OOMs mid-render — and the
+  // failure surfaces as a bare "Command failed" with NO Remotion error, which
+  // reads like a props bug. Measured 2026-08-17: died at frame 256/2424 with
+  // 2.6GB free of 32GB. Pass --concurrency=N (or REMOTION_CONCURRENCY) to fit
+  // the machine; omit for Remotion's default.
+  const conc = concurrency ? ` --concurrency=${concurrency}` : '';
   const cmd = stillsOnly
     ? `npx remotion still ${comp} "${outFile}" --props="${propsPath}" --frame=${stillFrame(comp)}`
-    : `npx remotion render ${comp} "${outFile}" --props="${propsPath}"`;
+    : `npx remotion render ${comp} "${outFile}" --props="${propsPath}"${conc}`;
   console.log(`matrix: ${id} (${width}x${height}) -> out/${brand}/${matrixRelDir}/${id}.${ext}`);
-  execSync(cmd, {cwd: studio, stdio: 'inherit'});
+  try {
+    execSync(cmd, {cwd: studio, stdio: 'inherit'});
+  } catch (e) {
+    // A mid-render death is nearly always the machine running out of memory for
+    // the Chrome workers, and it arrives as a bare "Command failed" with no
+    // Remotion diagnostic. Retry ONCE serially before giving up: one worker is
+    // slow but fits anywhere, and losing a whole matrix run to transient memory
+    // pressure costs far more than the extra minutes. A genuine props/comp bug
+    // fails identically the second time, so this cannot mask a real error.
+    if (stillsOnly || concurrency === '1') throw e;
+    console.error(`matrix: ${id} died mid-render; retrying once at --concurrency=1`);
+    execSync(`npx remotion render ${comp} "${outFile}" --props="${propsPath}" --concurrency=1`, {
+      cwd: studio,
+      stdio: 'inherit',
+    });
+  }
   if (!existsSync(outFile)) {
     console.error(`FAILED: ${outFile} was not produced`);
     process.exit(1);

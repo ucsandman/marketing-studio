@@ -109,6 +109,18 @@ placeholder so smoke stays green on a clean clone.
   reads as sizzle.
   `transformOrigin: cx cy` does NOT center the region (it pins it) — this mismatch
   silently crops edges.
+- **A render that dies mid-way with a bare `Command failed` and NO Remotion error is
+  out of memory, not a props bug.** Each parallel worker holds its own headless Chrome
+  and the default worker count scales with core count, so a full-length 1080p row can
+  exhaust a busy workstation. Measured 2026-08-17: the export matrix died at frame
+  256/2424 with 2.6GB free of 32GB, having produced zero files. `render-matrix.mjs`
+  now takes `--concurrency=N` (or `REMOTION_CONCURRENCY`) and retries once serially on
+  any mid-render death; `--concurrency=2` completed the same row fine. Check free RAM
+  before blaming the composition.
+- **Never gate on a compound shell command's exit code.** `node render.mjs > log; echo
+  $?; tail log` reports `tail`'s status, so a failed render looks like a clean run. The
+  same day, that made a zero-file matrix read as "completed, exit 0". Count the
+  artifacts, not the exit code.
 - PNG sequences: `frame_%04d.png`, 1-indexed. `PngSequence` clamp holds the last
   frame; loop is `(frame % frameCount) + 1`.
 - Seamless loops: every animated value must satisfy f(0) == f(duration); use
@@ -237,8 +249,18 @@ placeholder so smoke stays green on a clean clone.
   during the paperroute run: a red-tipped scrubber reads as decoration-red and violates
   brands whose red is error-only; noban's end color became its profit gold, on-identity).
 - FeaturePanel is orientation-aware (`height > width` switches row→column), so vertical
-  9:16 social clips render from the SAME SocialClip comp via
-  `npx remotion render SocialClip ... --width=1080 --height=1920`; no separate template.
+  9:16 social clips render from the SAME SocialClip comp; no separate template. Set the
+  dimensions with the optional `{formatWidth, formatHeight}` PROPS that `calculateMetadata`
+  reads (Root.tsx), the same mechanism `render-matrix.mjs` uses. **There are no
+  `--width`/`--height` CLI flags in Remotion 4.0.486** — this line used to prescribe them
+  and they silently do nothing (found the hard way on the practicalsystems run,
+  2026-08-17; the export-matrix row in the table above had it right all along).
+- A vertical export is a RESPONSIVE RELAYOUT, never a crop of the 16:9 master. Full-bleeding
+  16:9 footage into a 9:16 frame slices the source's own text mid-word at both edges, which
+  reads as a broken render rather than as background texture. Fit-to-width with the brand
+  ground filling the remainder, crop to a region containing no text, or blur/dim hard enough
+  that it is unmistakably texture. On screen, text is either legible or absent; half-legible
+  is the one option that is not allowed.
 - Fonts are per-brand: `loadBrandFonts(brand)` keyed off brand.fonts, loaders
   registered in fonts.ts. Subset new Google Fonts loaders to 'latin' — an unsubset
   family fans out to dozens of font requests per render.

@@ -10,8 +10,9 @@ export const DemoCursor: React.FC<{
   clickList: ClickEvent[];
   timeMs: number;
   brand: Brand;
-}> = ({clickList, timeMs, brand}) => {
-  const {x, y, press} = cursorAt(clickList, timeMs);
+  viewport: {width: number; height: number};
+}> = ({clickList, timeMs, brand, viewport}) => {
+  const {x, y, press} = cursorAt(clickList, timeMs, viewport);
   return (
     <div style={{position: 'absolute', inset: 0, pointerEvents: 'none'}}>
       {/* click ripples */}

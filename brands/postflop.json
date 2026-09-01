@@ -1,0 +1,53 @@
+{
+  "id": "postflop",
+  "name": "postflop",
+  "tagline": "Exploitability measured, never asserted",
+  "url": "postflop.vercel.app",
+  "colors": {
+    "bg": "#e9e5da",
+    "surface": "#f4f1e8",
+    "surface2": "#ddd8c9",
+    "line": "#101010",
+    "ink": "#101010",
+    "ink2": "#55524a",
+    "ink3": "#625e58",
+    "brand": "#ffe000",
+    "profit": "#0f763f",
+    "safe": "#0f763f",
+    "loss": "#c82027",
+    "info": "#ff2d9b",
+    "rare": "#c7ae00"
+  },
+  "fonts": {
+    "display": "Archivo",
+    "body": "Archivo",
+    "mono": "JetBrains Mono"
+  },
+  "effects": {
+    "wash": 0,
+    "glow": 0
+  },
+  "grade": {
+    "grain": 0.14,
+    "grainSize": 0.8,
+    "halation": 0,
+    "vignette": 0.08,
+    "bloom": 0,
+    "aberration": 0,
+    "letterbox": 0
+  },
+  "motion": {
+    "tempo": 1.0,
+    "exuberance": 0.2,
+    "stagger": 0.5,
+    "overshoot": 0.05,
+    "parallax": 0,
+    "settle": 0.3,
+    "textReveal": "maskWipe"
+  },
+  "progressFill": {"from": "line", "to": "ink"},
+  "speechHint": "postflop",
+  "textAccent": "rare",
+  "ctaStyle": "block",
+  "voice": "BONE & RULE: an open-source heads-up NLHE GTO solver whose whole identity is a printed spec sheet. Bone paper #e9e5da chrome, ink #101010 with hard 3px black rules, zero radius, zero shadows, zero gradients. Yellow #ffe000 appears ONLY as a filled block carrying black text: never as a glow, wash, outline, or yellow text on paper. Magenta #ff2d9b is selection/focus only, never decoration. Display type is Archivo 900 uppercase; every figure is JetBrains Mono tabular. Voice: measured, exacting, printed. Every number is a real benchmark with provenance; convergence is measured, never asserted. No hype, no hedging, no exclamation marks. Anti-references: GTO-training-site gloss (glassy purple gradients, poker-chip stock photos, crush-your-opponents copy), generic SaaS hero templates, neon-felt crypto-casino gold. The product is the imagery: real workbench screenshots and real CLI output."
+}

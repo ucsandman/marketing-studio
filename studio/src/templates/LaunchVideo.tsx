@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   AbsoluteFill,
+  Easing,
   Sequence,
   interpolate,
   useCurrentFrame,
@@ -10,7 +11,7 @@ import {z} from 'zod';
 import {alphaHex, getBrand, motionOverrideSchema} from '../lib/brand';
 import type {Brand} from '../lib/brand';
 import {loadBrandFonts} from '../lib/fonts';
-import {brandSpring} from '../lib/motion';
+import {brandSpring, entrance} from '../lib/motion';
 import type {Motion} from '../lib/motion';
 import {parallaxOffset, settleOn, offsetTransform, settleTransform} from '../lib/depth';
 import {useFormat} from '../lib/layout';
@@ -22,6 +23,7 @@ import {audioSchema} from '../lib/audioMix';
 import {BackgroundLoop} from '../components/BackgroundLoop';
 import {PngSequence} from '../components/PngSequence';
 import {Headline} from '../components/Headline';
+import {MeasuredStamp} from '../components/MeasuredStamp';
 import {GalleyFold} from '../components/GalleyFold';
 import {FeaturePanel} from '../components/FeaturePanel';
 import {StagedScene} from '../components/StagedScene';
@@ -116,6 +118,21 @@ export const launchVideoSchema = z.object({
     })
     .nullable()
     .default(null),
+  // Optional second beat under the hook headline: a mono label with a filled accent
+  // block stamped beside it (components/MeasuredStamp). It exists because a hook act
+  // long enough to carry a two-sentence narration line is too long to hold one static
+  // headline, and the stamp is the film's signature move. `frame` is the act-local
+  // frame the block lands on; null falls back to a fraction of the act, and a measured
+  // VO word time is not consulted here (the audio pass owns that). Nullable, defaults
+  // null, so every other brand's hook act stays byte-identical.
+  hookStamp: z
+    .object({
+      label: z.string(),
+      tag: z.string(),
+      frame: z.number().int().nonnegative().nullable().default(null),
+    })
+    .nullable()
+    .default(null),
   // Optional force switch for VO-driven act lengths (lib/launchTiming's voTimingFrom
   // `force`): true pins act lengths to the measured VO even with no word timings,
   // false pins the shared constants. Nullable, defaults null = auto, which engages
@@ -187,7 +204,8 @@ const HookAct: React.FC<{
   fold?: Props['hookFold'];
   foldFrame?: number;
   headlineFrame?: number;
-}> = ({kicker, headline, len, brand, cueFrames, fold, foldFrame, headlineFrame}) => {
+  stamp?: Props['hookStamp'];
+}> = ({kicker, headline, len, brand, cueFrames, fold, foldFrame, headlineFrame, stamp}) => {
   const fade = useActFade(len);
   return (
     <AbsoluteFill style={{opacity: fade}}>
@@ -203,7 +221,22 @@ const HookAct: React.FC<{
           accentWord={fold.accentWord ?? undefined}
         />
       ) : (
-        <Headline kicker={kicker} headline={headline} brand={brand} cueFrames={cueFrames} />
+        <Headline
+          kicker={kicker}
+          headline={headline}
+          brand={brand}
+          cueFrames={cueFrames}
+          footer={
+            stamp ? (
+              <MeasuredStamp
+                label={stamp.label}
+                tag={stamp.tag}
+                brand={brand}
+                at={stamp.frame ?? Math.round(len * 0.62)}
+              />
+            ) : undefined
+          }
+        />
       )}
     </AbsoluteFill>
   );
@@ -244,6 +277,8 @@ const FeatureAct: React.FC<{
   const {fps} = useVideoConfig();
   const {scale, safe, orientation} = useFormat();
   const headIn = brandSpring(frame, fps, brand.motion);
+  const rule = brand.ctaStyle === 'block';
+  const ruleIn = entrance(frame, fps, brand.motion, {durFrames: 16, easing: Easing.out(Easing.cubic)});
   const headingFont = Math.round(56 * scale);
   const headingTop = Math.max(Math.round(64 * scale), safe.top);
   // Portrait only: FeaturePanel reserves 220px of its own top padding (tuned for
@@ -272,6 +307,30 @@ const FeatureAct: React.FC<{
       >
         {feature.heading}
       </div>
+      {rule ? (
+        // BONE & RULE: a `ctaStyle: 'block'` brand sets its figures UNDER a hard ink
+        // rule that draws across first, the way a spec sheet rules a table off from
+        // its caption. Width, not scaleX, so nothing shares a matrix with the panel's
+        // own entrance. Every other brand renders no rule at all -> byte-identical.
+        <div
+          style={{
+            position: 'absolute',
+            top: headingTop + Math.round(headingFont * 1.34),
+            left: safe.left,
+            right: safe.right,
+            height: Math.max(2, Math.round(3 * scale)),
+            overflow: 'hidden',
+          }}
+        >
+          <div
+            style={{
+              width: `${ruleIn * 100}%`,
+              height: '100%',
+              background: brand.colors.ink,
+            }}
+          />
+        </div>
+      ) : null}
       {feature.staged ? (
         // StagedScene sits OUTSIDE the panelTop wrapper on purpose: it does its own
         // safe-area band math from useFormat.
@@ -292,7 +351,7 @@ const FeatureAct: React.FC<{
   );
 };
 
-export const LaunchVideo: React.FC<Props> = ({brandId, kicker, headline, demo, features, cta, command, assets, audio, burnCaptions, motionOverride, actLengths, voTiming, hookFold}) => {
+export const LaunchVideo: React.FC<Props> = ({brandId, kicker, headline, demo, features, cta, command, assets, audio, burnCaptions, motionOverride, actLengths, voTiming, hookFold, hookStamp}) => {
   const frame = useCurrentFrame();
   const {durationInFrames, fps} = useVideoConfig();
   const {orientation, scale, safe} = useFormat();
@@ -374,6 +433,7 @@ export const LaunchVideo: React.FC<Props> = ({brandId, kicker, headline, demo, f
               fold={hookFold}
               foldFrame={foldBeats[0] ?? undefined}
               headlineFrame={foldBeats[1] ?? undefined}
+              stamp={hookStamp}
             />
           </ActContainer>
         </Sequence>

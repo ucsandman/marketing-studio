@@ -56,7 +56,9 @@ export const ComponentGallery: React.FC = () => {
           background: brand.colors.surface,
         }}
       >
-        <DemoCursor clickList={GALLERY_CLICKS} timeMs={timeMs} brand={brand} />
+        {/* viewport = this strip's own box, so cursorAt's off-stage park lands just
+            below it (the real DemoStage passes the capture's viewport). */}
+        <DemoCursor clickList={GALLERY_CLICKS} timeMs={timeMs} brand={brand} viewport={{width: 640, height: 160}} />
       </div>
       {/* staged shot: two-node camera rig + stage cursor click stack + rack focus + one sweep beat */}
       <div

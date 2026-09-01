@@ -6,6 +6,8 @@ import {MagneticMark} from './MagneticMark';
 import {CostClawMark} from './CostClawMark';
 import {SideTapMark} from './SideTapMark';
 import {TenwordsMark} from './TenwordsMark';
+import {PracticalSystemsMark} from './PracticalSystemsMark';
+import {PostflopMark} from './PostflopMark';
 
 export type MarkComponent = React.FC<{size: number; color: string}>;
 
@@ -17,6 +19,8 @@ const registry: Record<string, MarkComponent> = {
   costclaw: CostClawMark,
   sidetap: SideTapMark,
   tenwords: TenwordsMark,
+  practicalsystems: PracticalSystemsMark,
+  postflop: PostflopMark,
 };
 
 export const getMark = (id: string): MarkComponent => {

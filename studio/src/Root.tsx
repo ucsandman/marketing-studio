@@ -121,6 +121,7 @@ export const RemotionRoot: React.FC = () => {
           actLengths: null,
           voTiming: null,
           hookFold: null,
+          hookStamp: null,
         }}
         // VO-driven act lengths (Phase B): engages only when the audio manifest
         // carries word timings, so every existing render is byte-identical. The
