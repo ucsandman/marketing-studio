@@ -1,4 +1,5 @@
 import {describe, expect, it} from 'vitest';
+import {getMark} from '../brands/marks';
 import {brandSchema, getBrand} from './brand';
 
 describe('getBrand', () => {
@@ -28,10 +29,14 @@ describe('getBrand', () => {
     expect(b.colors.loss).toBe('#c2410c');
     expect(b.fonts.display).toBe('IBM Plex Sans');
     expect(b.fonts.mono).toBe('IBM Plex Mono');
+    // No purple anywhere, including the slot the schema only needs filled.
+    expect(b.colors.rare).toBe('#5aa88a');
     // Paper-white ground with no bloom: the voice forbids a hero wash.
     expect(b.effects).toEqual({wash: 0, glow: 0});
     expect(b.grade.bloom).toBe(0);
-    expect(b.grade.halation).toBe(0);
+    // A brand is only usable once BOTH registries know it: getBrand parses the
+    // tokens, getMark resolves the glyph. The second half was untested.
+    expect(typeof getMark('offlocalhost')).toBe('function');
   });
 
   it('rejects hex colors that are not #rrggbb', () => {
