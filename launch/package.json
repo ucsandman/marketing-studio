@@ -1,0 +1,41 @@
+{
+  "name": "@marketing-studio/launch",
+  "version": "0.1.0",
+  "description": "Reusable launch engine: takes a developed project end-to-end through domain, hosting, payments, comms, and multi-platform distribution.",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "bin": {
+    "launch": "dist/index.js"
+  },
+  "scripts": {
+    "build": "vite build ui && tsc",
+    "demo": "node scripts/demo.mjs",
+    "dev:ui": "vite ui",
+    "test": "vitest run",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "commander": "^14.0.0",
+    "google-auth-library": "^10.7.0",
+    "twitter-api-v2": "^1.29.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.28.0",
+    "@playwright/test": "^1.60.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.2.0",
+    "eslint": "^9.28.0",
+    "marked": "^18.0.5",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "typescript": "^5.8.0",
+    "typescript-eslint": "^8.33.0",
+    "vite": "^7.3.5",
+    "vitest": "^3.2.0"
+  }
+}

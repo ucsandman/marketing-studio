@@ -1,68 +1,127 @@
 ---
 name: launch
-description: Use when a product or feature is ready to go public — after shipping, when the user says "launch it", "announce it", "go live", or wants a release marketed end to end.
+description: Take a developed project end-to-end through launch — domain, hosting, payments, email infra, algorithm-researched copy, and multi-platform distribution — with zero copy-paste. Trigger on "launch <project>", "ship <project>", "take <project> live", or "/launch <dir>".
 ---
 
-# Launch: ship → announce → measure
+# /launch — full launch orchestration
 
-Chains existing capabilities into one launch pass. Draft everything, send nothing without approval — external comms are a CLAUDE.md Hard Stop.
+You are orchestrating a product launch using two layers:
 
-The announcement rules below are distilled from sharing research and current platform-algorithm behavior; the full notes (per-platform signal weights, HN/PH/Reddit norms, sources) are in `references/virality.md` — read it when drafting for a channel not covered here or when the user asks why a rule exists. For strategy above the per-post mechanics (ORB channel portfolio, five-phase rollout, relaunch cadence, measurement loop), read `references/strategy.md` — especially when planning a launch rather than executing one.
+- **CLI (`launch-engine`)** — everything deterministic: state, validation, posting providers, research fetchers, payload rendering. Run it as `node "${CLAUDE_SKILL_DIR}/../../../dist/index.js" <cmd>` (or `launch <cmd>` if linked) -- the CLI lives in this package, `${CLAUDE_SKILL_DIR}/../../..`.
+- **This session** — everything generative or credentialed-through-MCP: DashClaw infra calls, WebSearch synthesis, draft copywriting, and the approval gates. The CLI never holds DashClaw credentials and never sends email/SMS.
 
-## 1. Pre-flight (verify, don't assume)
+Honesty rule: each step below is labeled **[CLI]** or **[session]**. Don't do session work by shelling out, and don't reimplement CLI work inline.
 
-- Uncommitted work? Run `/ship` first.
-- Prod deploy live: check latest deployment status/logs (offlocal `get_latest_deployment_logs` / Vercel tools).
-- Domain resolves, HTTPS works, OG meta + title + favicon present: fetch the live page and look.
-- UI-facing? Run `/de-vibe` if it hasn't had a pass.
+Target `<dir>` is the project directory being launched (sibling of the engine repo).
 
-## 2. Assets
+Humans can drive the same engine visually with `launch ui` (local dashboard, same gates — see docs/ui-dashboard.md); this skill remains the autonomous path.
 
-- Changelog entry (one contiguous pasteable block).
-- Screenshot or demo GIF: chrome-devtools `take_screenshot` or claude-in-chrome `gif_creator` against the live site. This is not optional garnish — visual proof of the thing working is the single most shared element of an indie launch post, and image posts get ~150% more reposts than text-only on X.
-- Landing copy sanity: does the page pass the 10-second first-glance test?
+## Sequence
 
-## 3. Announcement drafts (draft only — approval gate before ANY send)
+### 1. Intake [CLI]
 
-Write all of these, then stop and present for approval.
+```
+launch init <dir> --domain <domain> --price <price> [--name --tagline --audience]
+```
 
-**What makes a draft spread (apply to every channel):**
+Pull flag values from the conversation. Read back `<dir>/.launch/launch.config.json` and confirm the summary with the user. Re-run with `--force` if they correct anything.
 
-- **Lead with a hook that opens a specific curiosity gap.** "I lost 40 hours to X before finding why" works; "here's a mistake to avoid" doesn't. Vague hooks get scrolled past; hooks the post doesn't deliver on burn trust and completion rate.
-- **Emotional charge over safe-and-informational.** Research on 7,000 viral articles: high-arousal emotion (awe, anger, surprise) drives sharing; flat announcement copy fails regardless of accuracy. Find the surprising angle — the number, the contrarian take, the before/after — not "we're excited to announce."
-- **Give the sharer social currency.** People share what makes them look in-the-know. Include one insider fact or usable takeaway that the reader can pass along as their own discovery.
-- **Receipts beat claims.** A screenshot of the thing actually working (or the real dashboard number) out-spreads polished marketing copy. "Fast" is a claim; a 3-second GIF is proof.
-- **No engagement bait** ("like if you agree", "comment YES") — every major platform now classifies and halves it.
+### 2. DashClaw setup [session]
 
-**Per-channel drafts:**
+1. `select_project` (or `create_project` if this product has no DashClaw project yet).
+2. `create_launch` with `declared_stack` from the config — typically `["domain", "vercel", "stripe", "resend"]`.
+3. `preflight_launch` — validates every provider token BEFORE any money is spent. If it fails, STOP and present a remediation table (provider → failing check → fix); do not proceed to spend steps.
 
-- **X/Twitter**: hook first, attach the image/GIF natively. Put the link in the first reply, not the post body — external links in the body cut reach 50-90%. Thread for depth (adds ~60% impressions), single post for speed.
-- **LinkedIn**: optimize for dwell time — a story with a real arc (problem → what broke → what shipped) that takes 15+ seconds to read gets a reach bonus. Post from the personal profile (~70% more reach than company pages). Link in comments, not the post.
-- **Show HN** (dev-facing products): title "Show HN: <name> – <plain one-liner>", no superlatives, link to the product or repo, never a marketing page. Body: who you are → what it is in one sentence → the problem → how it works technically → ask for feedback. Engineer-to-engineer, not pitch deck.
-- **Reddit** (only where the user has account history — 9:1 contribution ratio is tracked account-wide): frame as a story post (tech decision, pricing experiment, what went wrong) with the product as supporting detail. Standalone "check out my app" posts get auto-removed.
-- **Discord/Telegram announcement.**
-- **Email to list** (Resend) if one exists. If there's lead time, a 72-hour teaser → reminder → launch sequence converts 3-5x better than one cold send — offer it.
+### 3. Domain [session] — 💰 SPEND GATE #1
 
-Copy rules (from CLAUDE.md, non-negotiable): no em dashes, no "delve/elevate/seamless" AI slop, write like a person, pasteable blocks with no mid-sentence newlines.
+1. `check_domain_availability` for the config domain (and 2-3 alternatives if taken).
+2. Present price and alternatives to the user.
+3. **SPEND GATE: ask the user for explicit approval with AskUserQuestion and WAIT for their answer. Never call `purchase_domain` without a fresh approval in this conversation.** Record the approval decision via `dashclaw_guard` + `dashclaw_record` for the audit trail.
+4. On approval: `purchase_domain`. On decline: skip to step 4 using an already-owned domain or stop.
 
-## 4. Publish (only after explicit approval, channel by channel)
+### 4. Hosting [session]
 
-- X/LinkedIn: claude-in-chrome through the logged-in browser session.
-- Discord/Telegram: existing webhooks (curl).
-- Email: Resend via offlocal (governed — DashClaw guard applies).
+1. `create_vercel_project` (link the product repo).
+2. `create_vercel_deployment` and poll `get_vercel_deployment_status` until READY.
+3. `add_vercel_domain` for the purchased domain.
+4. `set_dns_records` per Vercel's required records (A/CNAME from the add-domain response); verify with `get_dns_records`.
+5. Set any product env vars with `set_vercel_env_var`.
 
-**The first hour decides distribution.** On X and LinkedIn, early replies weigh ~15-150x a like and visibility halves every ~6 hours; on HN, the comment thread IS the launch. So publishing is not the end of the step: tell the user to stay reachable for 1-2 hours, and monitor + draft substantive replies to early comments for their approval (sentence-length, technical, treat critics as allies). Never solicit upvotes or seed friendly comments — vote-ring detection on HN/PH kills the post.
+### 5. Payments [session] — 💰 SPEND GATE #2 (live mode)
 
-## 5. Post-launch loop
+Stripe best practices: create in TEST mode first, verify the full flow, then — and only then — recreate in live mode behind the gate.
 
-- Offer a next-day check: PostHog funnel/pageviews + Stripe events + Sentry errors for the new surface. `/schedule` a one-time run if the user wants it automated.
-- **A launch is a cadence, not a day.** One announcement is the weakest strategy; re-announcing the same product on milestones (new feature, revenue number, build-in-public moment) gives repeated shots at spread. Offer to draft a 2-4 week follow-up post plan from the roadmap/changelog.
+1. `create_stripe_product` + `create_stripe_price` (TEST mode) from config pricing.
+2. `create_stripe_webhook` pointing at the product's webhook endpoint; store the signing secret as a Vercel env var (`set_vercel_env_var`), never in the repo.
+3. Verify test checkout end-to-end.
+4. **SPEND GATE: live mode creates real billable objects. Ask the user for explicit approval with AskUserQuestion and WAIT for their answer before recreating product/price/webhook in live mode.** Audit via `dashclaw_guard` + `dashclaw_record`.
 
-## Failure modes
+### 6. Email infra [session]
 
-- Announcing before the deploy is verified live — pre-flight is not optional.
-- Sending anything without the per-channel approval gate.
-- Marketing copy that reads AI-generated — apply the copy rules to every draft, not just finals.
-- Putting the link in the X/LinkedIn post body — it's the most reliable way to kill reach.
-- Publishing and walking away — the unanswered first hour wastes the launch.
-- "We're excited to announce" openers — zero curiosity gap, zero social currency, scrolled past.
+1. `create_resend_domain` for the config domain.
+2. `set_dns_records` with the DKIM/SPF records from the response.
+3. `verify_resend_domain` (DNS propagation can take minutes — poll, don't fail fast).
+
+### 7. Research [CLI + session]
+
+1. **[CLI]** `launch research <dir>` (live mode — keyless fetchers: x-algorithm README, Algolia Show HN winners, hunted.space, per-sub Reddit rules).
+2. **[session]** WebSearch synthesis per platform (queries from THINKING.md: "X algorithm ranking signals <month year>", "<month year> LinkedIn algorithm what's working", PH featuring criteria). Write the synthesis into each brief's `## Session research` section — the CLI preserves that section on regeneration.
+3. **[CLI]** `launch research <dir> --check` must pass (all briefs fresh) before copy.
+
+### 8. Copy [CLI + session]
+
+1. **[CLI]** `launch copy <dir> --scaffold`.
+2. **[session]** Fill every draft in `<dir>/.launch/drafts/` with real copy written from the research briefs (hooks from Show HN winners, X thread structure, LinkedIn link-in-first-comment, per-sub Reddit angles, email/SMS from the announcement templates). Replace every `{{placeholder}}` including `{{unsubscribeUrl}}`.
+3. **[CLI]** `launch copy <dir> --validate` — loop fill→validate until exit 0.
+
+### 9. 🚦 PUBLISH GATE [session]
+
+Render EVERY draft (all platforms + the email HTML + SMS text) to the user in one review block. **Ask for explicit approval with AskUserQuestion (multiSelect per-platform opt-out) and WAIT for the user's answer. Nothing is published until the user approves; platforms they deselect are skipped.** Record the decision via `dashclaw_record`.
+
+### 10. Distribute [CLI + session]
+
+1. **[CLI]** `launch post <dir> --all --live` — posts X, Bluesky, Facebook, LinkedIn, YouTube, Reddit via API; submits sitemap + URL inspection to Google; skips blocked providers with a summary; the posted-ledger makes re-runs idempotent.
+2. **[CLI]** Assisted platforms at their recommended times (from the briefs):
+   - `launch post <dir> --platform hackernews --assist --live` — opens the prefilled Show HN submitlink, copies the maker comment. The HUMAN clicks submit.
+   - `launch post <dir> --platform producthunt --assist --live` — writes `.launch/out/producthunt-kit.md`, opens the submit page, copies the tagline. Schedule per the kit (12:01 AM PT, low-competition day).
+3. **[CLI]** `launch notify <dir> --channel email` and `--channel sms` — renders artifacts + `.launch/out/notify-payloads.json` (consent-filtered).
+4. **[session]** For each payload entry: `send_resend_email` / `send_twilio_sms` with the exact `input` object. The CLI never sends.
+
+### 11. Verify & report [CLI + session]
+
+1. **[session]** `verify_launch` + `get_launch_status` for the infra side.
+2. **[CLI]** `launch status <dir>` for the distribution side.
+3. Final report: live URL, posted links from the ledger, pending assisted steps, and the stats command (`launch stats <dir> --platform producthunt --slug <slug>`).
+
+## Failure handling
+
+- Any MCP failure: surface the error verbatim, consult `get_launch_status`, and fix forward.
+- NEVER re-run a spend step (domain purchase, live Stripe) after a failure without a fresh approval gate — check the launch plan state and the audit log first.
+- Posting failures: the ledger guarantees completed platforms are skipped on re-run; fix the failing provider (see `launch doctor`) and re-run `launch post <dir> --all --live`.
+- Credential problems: `launch doctor --json` gives provider → mode → fix hint; degrade blocked API platforms to assisted/manual instead of failing the launch.
+
+## Dry-run rehearsal (run this before any real launch)
+
+No money, no posts, no sends — end to end. `launch post` is DRY-RUN BY DEFAULT now,
+so `--dry-run` below is optional (kept for back-compat) and `--live` is what actually
+publishes. `--assist` is the one exception: it opens a prefilled page and copies text
+but submits nothing, so it runs for real without `--live`.
+
+
+```
+launch init <dir> --domain <domain> --price <price>
+launch research <dir> --offline
+launch copy <dir> --scaffold
+# fill drafts (session) …
+launch copy <dir> --validate
+launch post <dir> --all --dry-run        # prints exact request payloads, writes nothing
+launch notify <dir> --channel email --dry-run
+launch notify <dir> --channel sms --dry-run
+launch status <dir>
+```
+
+Skip every DashClaw spend step during rehearsal (no `purchase_domain`, no live Stripe). The rehearsal is green when every command exits 0 and the drafts pass validation.
+
+## Credentials
+
+Social API keys live in the engine repo's `.env` (template: `.env.example`, per-provider setup cost/time guides in `docs/setup-<provider>.md`, launch-day checklist in `docs/launch-runbook.md`). DashClaw infra credentials live with the DashClaw MCP server — this skill calls the tools, the CLI never sees those secrets.

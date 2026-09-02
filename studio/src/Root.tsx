@@ -176,6 +176,9 @@ export const RemotionRoot: React.FC = () => {
           heroImage: null,
           loopSequence: null,
           loopFrames: 240,
+          brandOverride: null,
+          logoImage: null,
+          showName: true,
         }}
       />
       <Composition

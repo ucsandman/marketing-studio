@@ -32,7 +32,10 @@ jobs:
       - name: script-side tests
         run: |
           set -e
-          files=(scripts/*.test.mjs feeders/capture/*.test.mjs feeders/audio/*.test.mjs feeders/comfy/*.test.mjs)
+          # scripts/lib/*.test.mjs was never in this glob, so every colocated lib
+          # test (cache, drift, png, matrix-props, wrap-contract, magnetic-sidecar,
+          # teaser-colors) was written and then never run by CI.
+          files=(scripts/*.test.mjs scripts/lib/*.test.mjs feeders/capture/*.test.mjs feeders/audio/*.test.mjs feeders/comfy/*.test.mjs)
           node --test "${files[@]}"
           echo "verify: ran ${#files[@]} test files"
 
@@ -55,3 +58,20 @@ jobs:
         with:
           name: smoke-stills
           path: out/smoke/*.png
+
+  launch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # 24, not 22 like the jobs above: launch/package.json declares engines >=24.
+          node-version: 24
+      - run: npm ci
+        working-directory: launch
+      - run: npm run build
+        working-directory: launch
+      - run: npm test
+        working-directory: launch
+      - run: npm run lint
+        working-directory: launch

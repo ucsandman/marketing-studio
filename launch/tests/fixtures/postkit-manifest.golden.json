@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "brand": "noban",
+  "generatedAt": "2026-07-11T04:16:35.237Z",
+  "platforms": {
+    "x": {
+      "video": "x/social-16x9.mp4",
+      "caption": "x/caption.txt",
+      "alt": "x/alt.txt",
+      "thumb": "x/thumb.jpg",
+      "srt": null,
+      "vtt": null,
+      "note": "Upload the video file directly to X. Do not link out to YouTube; X suppresses off-platform links in the feed."
+    },
+    "linkedin": {
+      "video": null,
+      "caption": "linkedin/caption.txt",
+      "alt": "linkedin/alt.txt",
+      "thumb": "linkedin/thumb.jpg",
+      "srt": "linkedin/launch.srt",
+      "vtt": "linkedin/launch.vtt",
+      "note": "Upload the video natively to LinkedIn (native video outperforms a link post). Paste caption.txt as the post body."
+    },
+    "tiktok": {
+      "video": null,
+      "caption": "tiktok/caption.txt",
+      "alt": "tiktok/alt.txt",
+      "thumb": "tiktok/thumb.jpg",
+      "srt": null,
+      "vtt": null,
+      "note": "Upload as a TikTok video post. The video already has burned-in captions; paste caption.txt as the on-app caption/hashtag line."
+    },
+    "shorts": {
+      "video": null,
+      "caption": "shorts/caption.txt",
+      "alt": "shorts/alt.txt",
+      "thumb": "shorts/thumb.jpg",
+      "srt": null,
+      "vtt": null,
+      "note": "Upload via YouTube Studio > Create > Upload video. Keep it vertical and under 60s so YouTube routes it to the Shorts shelf; paste caption.txt as the description."
+    },
+    "youtube": {
+      "video": null,
+      "caption": "youtube/caption.txt",
+      "alt": "youtube/alt.txt",
+      "thumb": "youtube/thumb.jpg",
+      "srt": "youtube/launch.srt",
+      "vtt": "youtube/launch.vtt",
+      "note": "Upload as a standard YouTube video. Paste caption.txt as the description, then upload launch.srt or launch.vtt as captions in YouTube Studio."
+    },
+    "instagram": {
+      "video": null,
+      "caption": "instagram/caption.txt",
+      "alt": "instagram/alt.txt",
+      "thumb": "instagram/thumb.jpg",
+      "srt": null,
+      "vtt": null,
+      "note": "Upload as an Instagram feed post or Reel. Paste caption.txt as the caption and alt.txt into Advanced settings > Accessibility > Alt text."
+    }
+  }
+}

@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {mkdirSync, rmSync, writeFileSync, readFileSync} from 'node:fs';
+import {mkdirSync, rmSync, writeFileSync, readFileSync, readdirSync, existsSync} from 'node:fs';
 import {join, dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {
@@ -284,4 +284,80 @@ test('postMd prints a bare destination link with no utm tags for a github.com br
   const md = postMd(repoBrand.name, 'linkedin', PLATFORM_MAP.linkedin, 'video.mp4', 'thumb.jpg', null, '', repoBrand.id, repoBrand.url);
   assert.match(md, /Destination link: https:\/\/github\.com\/ucsandman\/magnetic\b/);
   assert.doesNotMatch(md, /utm_/);
+});
+
+// --- studio-to-launch seam: no hardcoded absolute paths ---
+
+test('build-postkit.mjs has no hardcoded C:\\Projects path', () => {
+  const src = readFileSync(join(here, 'build-postkit.mjs'), 'utf8');
+  assert.doesNotMatch(src, /C:[\\/]Projects/);
+});
+
+// SEC-7: the guard used to read ONE hardcoded path -- the copy that was already
+// fixed -- so it could not detect the very defect it was written to prevent.
+// Every SKILL.md that ships in this repo gets scanned, wherever it lives.
+function everySkillFile() {
+  const found = [];
+  for (const dir of [join(root, 'skills'), join(root, 'launch', '.claude', 'skills')]) {
+    if (!existsSync(dir)) continue;
+    for (const rel of readdirSync(dir, {recursive: true})) {
+      const name = String(rel);
+      if (name.endsWith('SKILL.md')) found.push(join(dir, name));
+    }
+  }
+  return found;
+}
+
+test('every SKILL.md in the repo is scanned by this guard (and there is more than one)', () => {
+  const files = everySkillFile();
+  assert.ok(files.length > 1, `expected several SKILL.md files, scanned ${files.length}`);
+  assert.ok(
+    files.some((f) => f.includes(join('skills', 'ship-it'))),
+    `ship-it SKILL.md not among the ${files.length} scanned: ${files.join(', ')}`,
+  );
+});
+
+test('no SKILL.md hardcodes a C:\\Projects path (uses ${CLAUDE_SKILL_DIR} placeholder instead)', () => {
+  const files = everySkillFile();
+  const offenders = files.filter((f) => /C:[\\/]Projects/.test(readFileSync(f, 'utf8')));
+  assert.deepEqual(offenders, [], `hardcoded C:\\Projects in ${offenders.length} of ${files.length} SKILL.md files`);
+});
+
+// REG-5: two divergent ship-it skills in one repo. The copy under
+// launch/.claude/skills/ is project-scoped, so it silently WINS for any session
+// working inside launch/ -- and install-skills.mjs only globs the root skills/ dir,
+// so its --check drift report never sees it.
+test('ship-it exists exactly once in the repo', () => {
+  const shipIt = everySkillFile().filter((f) => f.includes('ship-it'));
+  assert.equal(shipIt.length, 1, `expected one ship-it SKILL.md, found ${shipIt.length}: ${shipIt.join(', ')}`);
+  assert.ok(shipIt[0].startsWith(join(root, 'skills', 'ship-it')));
+});
+
+// SEC-4: `launch post` is dry-run by DEFAULT now. A publish step written without
+// --live prints "dry run OK -- nothing sent" and the launch silently does not happen.
+test('every launch post publish step in a skill carries --live', () => {
+  for (const file of everySkillFile()) {
+    for (const line of readFileSync(file, 'utf8').split('\n')) {
+      if (!/`launch post /.test(line)) continue;
+      if (/--dry-run/.test(line)) continue; // an explicit rehearsal line is fine
+      assert.match(
+        line,
+        /--live/,
+        `${file}: a publish step without --live is a no-op under the dry-run default: ${line.trim()}`,
+      );
+    }
+  }
+});
+
+// SEC-5: YouTubeProvider is registered in launch/src/providers/index.ts, so youtube
+// is part of `launch post --all` and gets a live-post button. A skill still calling
+// it "manual by design" walks an operator into an unattended upload.
+test('no SKILL.md still calls YouTube a manual-by-design platform', () => {
+  for (const file of everySkillFile()) {
+    for (const line of readFileSync(file, 'utf8').split('\n')) {
+      if (/manual by design/.test(line)) {
+        assert.doesNotMatch(line, /YouTube/i, `${file}: YouTube posts via the CLI now -- ${line.trim()}`);
+      }
+    }
+  }
 });

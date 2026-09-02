@@ -138,7 +138,8 @@ The pipeline's supporting skills ship too, so nothing in the run dangles:
 | `/frontend-verify` | Headless route verification: console errors, failed requests, text assertions |
 | `/de-vibe` | Removes the AI-generated fingerprint (security tells, slop copy, generic defaults) before anything ships |
 | `/ship` | Verify, docs, secrets scan, commit, push ritual |
-| `/launch` | Announcement drafts per channel (X, LinkedIn, Show HN, email) with approval gates |
+| `/announce` | Announcement drafts per channel (X, LinkedIn, Show HN, email) with approval gates |
+| `/launch` | The launch engine end to end: domain, payments, comms, multi-platform posting (dry-run by default, `--live` to post) |
 
 Installing the plugin ships all of them, namespaced under `marketing-studio:`. For a source checkout, `scripts/install-skills.mjs` copies them into `~/.claude/skills` unnamespaced and rewrites the engine path to wherever you cloned this repo; it never overwrites a skill you have symlinked. Two optional plugins deepen the UI-polish phase if you have them (`impeccable` and `frontend-design`); without them the pipeline films your app as-is.
 
@@ -223,6 +224,11 @@ node --test scripts/*.test.mjs feeders/capture/*.test.mjs feeders/audio/*.test.m
 ```
 
 Every asset prop is nullable with a placeholder, so the smoke test passes on a clean clone with no captures, no Blender, and no API keys.
+
+## launch/ (distribution layer)
+
+`launch/` is the launch engine as a sub-package (`@marketing-studio/launch`): the CLI and dashboard that take a shipped product through domain, payments, comms, and multi-platform posting.
+It keeps its own toolchain (`cd launch && npm ci && npm test`), gated by the `launch` job in CI. Full docs: [launch/README.md](launch/README.md).
 
 ## License
 
