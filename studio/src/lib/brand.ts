@@ -8,6 +8,7 @@ import sidetap from '../../../brands/sidetap.json';
 import tenwords from '../../../brands/tenwords.json';
 import practicalsystems from '../../../brands/practicalsystems.json';
 import postflop from '../../../brands/postflop.json';
+import offlocalhost from '../../../brands/offlocalhost.json';
 
 const hex = z.string().regex(/^#[0-9a-f]{6}$/i, 'expected #rrggbb hex color');
 
@@ -169,7 +170,7 @@ export const alphaHex = (a: number): string =>
 
 export type Brand = z.infer<typeof brandSchema>;
 
-const registry: Record<string, unknown> = {noban, dashclaw, paperroute, magnetic, costclaw, sidetap, tenwords, practicalsystems, postflop};
+const registry: Record<string, unknown> = {noban, dashclaw, paperroute, magnetic, costclaw, sidetap, tenwords, practicalsystems, postflop, offlocalhost};
 
 export const getBrand = (id: string): Brand => {
   const raw = registry[id];

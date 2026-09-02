@@ -8,6 +8,7 @@ import {SideTapMark} from './SideTapMark';
 import {TenwordsMark} from './TenwordsMark';
 import {PracticalSystemsMark} from './PracticalSystemsMark';
 import {PostflopMark} from './PostflopMark';
+import {OffLocalhostMark} from './OffLocalhostMark';
 
 export type MarkComponent = React.FC<{size: number; color: string}>;
 
@@ -21,6 +22,7 @@ const registry: Record<string, MarkComponent> = {
   tenwords: TenwordsMark,
   practicalsystems: PracticalSystemsMark,
   postflop: PostflopMark,
+  offlocalhost: OffLocalhostMark,
 };
 
 export const getMark = (id: string): MarkComponent => {

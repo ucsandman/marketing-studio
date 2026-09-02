@@ -1,0 +1,47 @@
+{
+  "id": "offlocalhost",
+  "name": "Off Localhost",
+  "tagline": "Your repo works. Get it off localhost.",
+  "url": "https://offlocalhost.com",
+  "colors": {
+    "bg": "#f6f7f5",
+    "surface": "#eceeeb",
+    "surface2": "#e2e5e1",
+    "line": "#d7dcd8",
+    "ink": "#14181c",
+    "ink2": "#5b6470",
+    "ink3": "#7b8590",
+    "brand": "#0b7a4b",
+    "profit": "#0b7a4b",
+    "safe": "#0b7a4b",
+    "loss": "#c2410c",
+    "info": "#3c6e8f",
+    "rare": "#6b5b95"
+  },
+  "fonts": {
+    "display": "IBM Plex Sans",
+    "body": "IBM Plex Sans",
+    "mono": "IBM Plex Mono"
+  },
+  "effects": {
+    "wash": 0,
+    "glow": 0
+  },
+  "grade": {
+    "grain": 0.06,
+    "vignette": 0.08,
+    "bloom": 0,
+    "aberration": 0,
+    "letterbox": 0
+  },
+  "motion": {
+    "tempo": 1.1,
+    "exuberance": 0.2,
+    "stagger": 0.5,
+    "overshoot": 0.1,
+    "parallax": 0.1,
+    "settle": 0.2,
+    "textReveal": "charStagger"
+  },
+  "voice": "A developer tool that takes a finished repo the last mile. Plain, terse, honest about limits. Never hype, never exclamation marks, never em dashes, never claim Hacker News or Product Hunt automation (both are assisted: the post is staged, the human presses submit). Green #0b7a4b means live, done, or a passing gate, and nothing else. Orange #c2410c means a hoop the human still has to jump through, never decoration. No purple, no gradients, no emoji section markers. Paper-white ground, near-black ink, mono type for commands. Wordmark is lowercase 'off localhost' behind a green prompt caret."
+}

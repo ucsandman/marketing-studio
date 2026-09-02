@@ -18,6 +18,22 @@ describe('getBrand', () => {
     expect(b.fonts.mono).toBe('JetBrains Mono');
   });
 
+  it('loads the offlocalhost brand with validated tokens', () => {
+    const b = getBrand('offlocalhost');
+    expect(b.name).toBe('Off Localhost');
+    // Green is the only accent: brand, profit and safe are the same hex because
+    // the voice gives green exactly one meaning (live/done). Orange is the hoop.
+    expect(b.colors.brand).toBe('#0b7a4b');
+    expect(b.colors.safe).toBe('#0b7a4b');
+    expect(b.colors.loss).toBe('#c2410c');
+    expect(b.fonts.display).toBe('IBM Plex Sans');
+    expect(b.fonts.mono).toBe('IBM Plex Mono');
+    // Paper-white ground with no bloom: the voice forbids a hero wash.
+    expect(b.effects).toEqual({wash: 0, glow: 0});
+    expect(b.grade.bloom).toBe(0);
+    expect(b.grade.halation).toBe(0);
+  });
+
   it('rejects hex colors that are not #rrggbb', () => {
     // schema-level guarantee: every color token matches /^#[0-9a-f]{6}$/i
     const b = getBrand('noban');
