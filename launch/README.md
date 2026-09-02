@@ -1,8 +1,11 @@
-# launch-engine
+# launch (marketing-studio distribution layer)
 
-Reusable launch engine: a Claude Code skill plus a TypeScript CLI that takes a developed
-project end-to-end through domain, hosting, payments, comms, algorithm-researched
-marketing copy, and multi-platform distribution — with zero copy-paste.
+The launch engine, folded into marketing-studio as the `@marketing-studio/launch` sub-package
+on 2026-09-02 (formerly the standalone `launch-engine` repo). A Claude Code skill plus a
+TypeScript CLI that takes a developed project end-to-end through domain, hosting, payments,
+comms, algorithm-researched marketing copy, and multi-platform distribution: X, LinkedIn,
+Facebook, Reddit, Google Search Console, Bluesky and YouTube by API, Hacker News and Product
+Hunt assisted. Posting is dry-run unless `--live`.
 
 The CLI produces validated payloads and assisted-launch artifacts; the `/launch` skill
 (`../skills/launch/SKILL.md`) orchestrates DashClaw MCP tools (domain, Vercel,

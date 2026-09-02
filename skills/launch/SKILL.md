@@ -7,7 +7,7 @@ description: Take a developed project end-to-end through launch — domain, host
 
 You are orchestrating a product launch using two layers:
 
-- **CLI (`launch-engine`)** — everything deterministic: state, validation, posting providers, research fetchers, payload rendering. Run it as `node "${CLAUDE_SKILL_DIR}/../../../dist/index.js" <cmd>` (or `launch <cmd>` if linked) -- the CLI lives in this package, `${CLAUDE_SKILL_DIR}/../../..`.
+- **CLI (`launch/`, package `@marketing-studio/launch`)** — everything deterministic: state, validation, posting providers, research fetchers, payload rendering. Run it as `node "${CLAUDE_SKILL_DIR}/../../../dist/index.js" <cmd>` (or `launch <cmd>` if linked) -- the CLI lives in this package, `${CLAUDE_SKILL_DIR}/../../..`.
 - **This session** — everything generative or credentialed-through-MCP: DashClaw infra calls, WebSearch synthesis, draft copywriting, and the approval gates. The CLI never holds DashClaw credentials and never sends email/SMS.
 
 Honesty rule: each step below is labeled **[CLI]** or **[session]**. Don't do session work by shelling out, and don't reimplement CLI work inline.

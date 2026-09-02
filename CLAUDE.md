@@ -6,8 +6,15 @@ out to the product's repo at the end. brands/<id>.json holds per-product tokens
 templates resolve getBrand(brandId) and never hardcode brand values. Feeders:
 feeders/blender (headless bpy), feeders/capture (Playwright), feeders/comfy (ComfyUI,
 non-load-bearing). Spec: docs/superpowers/specs/2026-07-09-animation-studio-design.md.
-skills/ is the shareable mirror of the user-level asset skills (installed via
-scripts/install-skills.mjs); when a skill changes, update both copies.
+skills/ is the source of every skill this repo ships (installed to ~/.claude/skills via
+scripts/install-skills.mjs; `--check` reports drift). /launch is the gated launch CLI
+skill (skills/launch, tested by launch/tests/skill.test.ts); /announce is the studio's
+browser-driven announce flow; /ship-it chains /marketing then /launch.
+
+launch/ is the distribution layer, folded in from the launch-engine repo on 2026-09-02:
+its own package (Node 24, vitest, tsc, vite dashboard), its own conventions in
+launch/CLAUDE.md. Posting is dry-run unless --live; never make a test hit a live
+provider. Social keys live in launch/.env; infra credentials are MCP-only.
 
 **Read docs/PLAYBOOK.md before any asset or feeder work** — engine map, brand
 onboarding, and verified gotchas (Blender 5.1.2 API traps, camera math, seamless-loop

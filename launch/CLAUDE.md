@@ -1,6 +1,7 @@
-# launch-engine — project conventions
+# launch/ — project conventions (marketing-studio distribution layer)
 
 TypeScript CLI + Claude Code skill that launches developed projects across platforms.
+Lives inside marketing-studio as its own package; the `/launch` skill is `../skills/launch/SKILL.md`.
 
 ## Stack
 

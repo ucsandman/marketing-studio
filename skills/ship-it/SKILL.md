@@ -1,6 +1,6 @@
 ---
 name: ship-it
-description: Ship a product end to end — render marketing assets with the animations studio, then run the launch-engine flow with videos attached to X and LinkedIn posts. Run from the product's repo.
+description: Ship a product end to end — render marketing assets with the marketing studio (/marketing), then run the launch/ flow (/launch) with videos attached to X, LinkedIn, Bluesky and YouTube posts. Run from the product's repo.
 ---
 
 # /ship-it — develop → public, one command

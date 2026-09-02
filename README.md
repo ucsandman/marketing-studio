@@ -2,7 +2,7 @@
 
 [![verify](https://github.com/ucsandman/marketing-studio/actions/workflows/verify.yml/badge.svg)](https://github.com/ucsandman/marketing-studio/actions/workflows/verify.yml)
 
-An agent-driven marketing studio for Claude Code. You type `/marketing` in your product's repo; the agent onboards your brand, films your app, renders a full marketing asset suite in this engine, and copies the finished files back to you.
+An agent-driven marketing studio for Claude Code. You type `/marketing` in your product's repo; the agent onboards your brand, films your app, renders a full marketing asset suite in this engine, and copies the finished files back to you. Then `/launch` takes the product public: domain, payments, comms, and posting to X, LinkedIn, Facebook, Reddit, Bluesky and YouTube with the rendered videos attached, dry-run by default.
 
 ![Animated OG loop rendered by the studio](examples/sidetap/readme.gif)
 
@@ -39,9 +39,11 @@ Around those assets, the pipeline adds:
 - **A mastered mix.** Final renders pass a two-pass loudness master to -14 LUFS with a true-peak ceiling, measured in the delivered file rather than trusted from the filter graph, plus SFX asset leveling and per-cue audibility proof.
 - **A direction pass.** Before a launch film is built, three genuinely different visual directions are written and two are killed (`docs/templates/DIRECTION.md`), and iteration renders are versioned v1, v2, ... so a fix can be proven and an earlier cut recovered.
 - **A set judge, not just file judges.** Seven mechanical gates run before any human looks: motion craft, palette, A/V sync, demo dead air, size budgets, audio presence (`check-audio`: every delivered film carries a mastered track with narration), and `judge-drift`, which scores the whole output directory *as a set*. That last one catches the failure no per-file gate can see — assets that are each individually on-brand but collectively fragment into three or four different-looking brands. It emits a worst-first review grid, because attention is reliable over about six tiles, not twenty.
-- **Paste-ready post kits and a footage cache.** Every platform gets a folder with the right-aspect video, a lint-gated caption, alt text, and a posting checklist; the kit root also carries `manifest.json`, a machine-readable index that launch-engine reads to auto-attach videos to X and LinkedIn posts, plus `LICENCES.md` and `DISCLOSURE.md` — what is synthetic, which platform toggle to set at upload, and which obligations the kit does *not* yet cover. Unchanged product UIs are never re-filmed thanks to content-hash caching of capture and Blender staging.
+- **Paste-ready post kits and a footage cache.** Every platform gets a folder with the right-aspect video, a lint-gated caption, alt text, and a posting checklist; the kit root also carries `manifest.json`, a machine-readable index that the `launch/` CLI reads to auto-attach videos to X, LinkedIn, Bluesky and YouTube posts, plus `LICENCES.md` and `DISCLOSURE.md` — what is synthetic, which platform toggle to set at upload, and which obligations the kit does *not* yet cover. Unchanged product UIs are never re-filmed thanks to content-hash caching of capture and Blender staging.
 
 Each asset also works standalone: run `/logo-reveal`, `/product-demo`, `/launch-video`, `/audio-track`, `/social-clip`, or `/og-assets` on its own from any repo.
+
+`/ship-it` chains the two halves: `/marketing` renders the suite, then `/launch` posts it with the videos attached, through the same approval gates.
 
 ## Example output
 
@@ -71,7 +73,7 @@ Everything below was produced by one `/marketing` run against a real product, un
 
 ## Requirements
 
-Required: [Claude Code](https://claude.com/claude-code), Node 22+ (the version CI exercises), Python 3.10+, and **ffmpeg on your PATH** (26 scripts shell out to `ffmpeg`/`ffprobe` directly).
+Required: [Claude Code](https://claude.com/claude-code), Node 22+ for the studio and Node 24+ for `launch/` (the versions CI exercises), Python 3.10+, and **ffmpeg on your PATH** (26 scripts shell out to `ffmpeg`/`ffprobe` directly).
 
 Optional, each degrading cleanly when absent: Blender for 3D logo reveals, an ElevenLabs API key for voiceover and music, ComfyUI for AI backdrops.
 
@@ -138,6 +140,7 @@ The pipeline's supporting skills ship too, so nothing in the run dangles:
 | `/frontend-verify` | Headless route verification: console errors, failed requests, text assertions |
 | `/de-vibe` | Removes the AI-generated fingerprint (security tells, slop copy, generic defaults) before anything ships |
 | `/ship` | Verify, docs, secrets scan, commit, push ritual |
+| `/ship-it` | `/marketing` then `/launch` in one run: render the suite, post it with the videos attached |
 | `/announce` | Announcement drafts per channel (X, LinkedIn, Show HN, email) with approval gates |
 | `/launch` | The launch engine end to end: domain, payments, comms, multi-platform posting (dry-run by default, `--live` to post) |
 
@@ -153,7 +156,8 @@ feeders/blender/   headless bpy scenes (3D logo reveals)
 feeders/capture/   Playwright recorder (product demos)
 feeders/audio/     ElevenLabs client (voiceover + music)
 feeders/comfy/     ComfyUI client (optional AI backdrops)
-skills/            the Claude Code skills that drive all of this
+skills/            the Claude Code skills that drive all of this (rendering and launch)
+launch/            distribution layer: the launch CLI + guarded dashboard (own package)
 examples/          real output: the full asset suite for one shipped product
 scripts/           props builders, staging, statics, smoke, copy linter, brief
                    gatherer, storyboard board, export matrix, captions, thumbs,
@@ -161,6 +165,8 @@ scripts/           props builders, staging, statics, smoke, copy linter, brief
                    Mission Control review server
 props/             generated render props (edit via their builder scripts only)
 docs/PLAYBOOK.md   the operational reference: engine map, onboarding, gotchas
+docs/DECISIONS.md  durable architecture decisions, newest first
+reference/         read-only reference material carried in from retired repos
 launch.py          single-command health check + Remotion Studio
 ```
 
@@ -184,8 +190,10 @@ node scripts/verify-cue.mjs out/<brand>/launch.mp4 2 1.5  # prove a sound cue is
 node scripts/judge-motion.mjs <brand>                  # motion-craft + motion/grade token bands
 node scripts/judge-drift.mjs <brand>                   # scores out/<brand>/ as a SET; writes a worst-first review grid
 node scripts/build-postkit.mjs <brand>                 # per-platform kits + LICENCES.md + DISCLOSURE.md
-node scripts/publish-bluesky.mjs <brand> --dry-run     # post the Bluesky kit (drop --dry-run; needs BLUESKY_* in .env)
-node scripts/publish-youtube.mjs <brand> --dry-run     # upload the launch video, private by default (YOUTUBE_* in .env, --auth once)
+node launch/dist/index.js post <product-dir> --all      # preview every platform post with the kit attached (dry-run is the default)
+node launch/dist/index.js post <product-dir> --all --live   # publish for real, through the ledger and media pre-flight
+node scripts/publish-bluesky.mjs <brand> --dry-run     # Mission Control's Publish button still runs this; the same publisher is a launch/ provider
+node scripts/publish-youtube.mjs <brand> --dry-run     # same: private by default, --auth once; also a launch/ provider
 node scripts/fetch-results.mjs <brand>                 # engagement per hook variant from X, Bluesky and YouTube into results.json
 ```
 
@@ -227,8 +235,11 @@ Every asset prop is nullable with a placeholder, so the smoke test passes on a c
 
 ## launch/ (distribution layer)
 
-`launch/` is the launch engine as a sub-package (`@marketing-studio/launch`): the CLI and dashboard that take a shipped product through domain, payments, comms, and multi-platform posting.
-It keeps its own toolchain (`cd launch && npm ci && npm test`), gated by the `launch` job in CI. Full docs: [launch/README.md](launch/README.md).
+`launch/` is the launch engine as a sub-package (`@marketing-studio/launch`), folded in from the standalone launch-engine repo on 2026-09-02. It takes a shipped product the rest of the way: `launch init` scans the product repo into `<product>/.launch/`, `launch research` and `launch copy` write per-platform briefs and drafts validated against each platform's hard limits, and `launch post` publishes to X, LinkedIn, Facebook, Reddit, Google Search Console, Bluesky and YouTube, with assisted flows for Hacker News and Product Hunt.
+
+Safety is the default: `launch post` previews unless you pass `--live`, every post consults an idempotency ledger before any network call, videos are refused before upload when they exceed a platform's duration or size cap, and the local dashboard (`launch ui`) binds to 127.0.0.1 with a per-run token and a typed-domain confirmation for live publishing. Social keys come from `launch/.env` (template in `launch/.env.example`); infrastructure credentials (domain, Vercel, Stripe, Resend, Twilio, DNS) never enter this package and are reached only through the offlocal MCP server from the `/launch` skill.
+
+It keeps its own toolchain (`cd launch && npm ci && npm run build && npm test`, Node 24), gated by the `launch` job in CI. Full docs: [launch/README.md](launch/README.md); provider setup guides in [launch/docs/](launch/docs/).
 
 ## License
 

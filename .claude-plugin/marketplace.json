@@ -10,8 +10,8 @@
   "plugins": [
     {
       "name": "marketing-studio",
-      "description": "Turn a product into a full marketing asset suite: logo reveal, product demo, launch video with generated audio, social clips, and OG images. Rendered locally through Remotion.",
-      "version": "1.1.0",
+      "description": "Turn a product into a full marketing asset suite (logo reveal, product demo, launch video with generated audio, social clips, OG images) and then launch it: domain, payments, comms, and multi-platform posting with the videos attached, dry-run by default. Rendered locally through Remotion.",
+      "version": "1.2.0",
       "author": {
         "name": "Wes Sander",
         "url": "https://github.com/ucsandman"
@@ -23,7 +23,8 @@
         "marketing",
         "video",
         "remotion",
-        "branding"
+        "branding",
+        "launch"
       ]
     }
   ]

@@ -4,6 +4,35 @@ Durable architecture and product decisions for the marketing studio. One entry p
 decision, newest first. Gotchas and lessons go to ERRORS.md; operating reference to
 PLAYBOOK.md.
 
+## 2026-09-02 — One marketing repo: launch-engine folds in as launch/
+
+**Decision.** This repo is the single marketing repo. The standalone launch-engine
+repo is folded in as the `launch/` sub-package (`@marketing-studio/launch`) and frozen
+at its old path with a MOVED.md. gtm-engine (Practical Systems) and offlocalai-mcp stay
+separate: the first is a Postgres/Redis worker with a different runtime and its own UI,
+the second is the deliberate credential boundary for infrastructure spend. The frozen
+`C:\Projects\marketing` archive is a snapshot of gtm-engine; its three unique files
+(gtm decision log, x402 outreach kit, dashboard a11y tests) were carried into `docs/`
+and `reference/`. `/launch` now installs the gated CLI skill; the studio's announce
+flow is `/announce`.
+
+**Why.** A 199-agent review found five repos overlapping on intake, copy limits,
+publishing, operator consoles, launch skills and post ledgers, with launch-engine and
+this repo the genuine duplicate pair. This repo was the only actively developed one
+with CI and the render engine nothing else has; launch-engine had the only real
+per-network publishers and media pre-flight. The installed `/launch` skill was the
+studio's copy, so the gated CLI version never ran from other repos.
+
+**Consequences.** Five fixes landed on the way in: `launch post` is dry-run by default
+with `--live`; the ledger write is atomic and `--force` supersedes instead of
+duplicating; Bluesky and YouTube are providers behind the same contract as X and
+LinkedIn; the offlocal seam calls `create_launch` and sends `to[]` plus `environment`;
+the MCP tool inventory is generated from offlocal's real registry. Still open:
+Mission Control's approve/redo loop into the guarded launch server, one post ledger
+instead of `posts.json` plus `ledger.json`, and the per-brand `build-*`/`render-*`
+scripts, which are brand data modules imported by generic scripts and need a brand
+registry before they can go.
+
 ## 2026-09-01 — Launch films are bespoke compositions, and audio is part of done
 
 **Decision.** A launch film is written per brand as a bespoke Remotion composition
