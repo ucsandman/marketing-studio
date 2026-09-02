@@ -37,7 +37,10 @@ expensive to discover; do not re-derive or second-guess them.
 5. Full render to `out/<brand>/`; run `node scripts/smoke.mjs` if you touched studio code.
 6. Deliver: copy the artifact into the calling repo (ask once for the destination;
    default its existing media/marketing dir) and SEND the file to the user. Not done
-   until the user has seen it.
+   until the user has seen it. A video is not deliverable silent: it carries music +
+   narration + cues mastered to TARGET_I, and `node scripts/check-audio.mjs <brand>`
+   exits 0 before you say "done" (the one exception is a `-silent` variant that ships
+   NEXT TO its scored original, never instead of it).
 7. Commit the engine repo: any code/config/props changes your run made in
    ENGINE get committed there (tests + lint + smoke first). Renders
    under out/, assets/, studio/public/ stay uncommitted (gitignored). An uncommitted

@@ -1,15 +1,28 @@
 ---
 name: launch-video
-description: Use when the user wants a full launch video / hero video / 30-90s product announcement composing demo footage, logo, and copy (e.g. "/launch-video", "make the launch video for DashClaw").
+description: Use when the user wants a full launch video / hero video / 20-60s product film composing rebuilt product UI, logo, copy, narration and music (e.g. "/launch-video", "make the launch video for DashClaw").
 ---
 
 # Launch Video
 
 **REQUIRED BACKGROUND:** marketing-studio skill. Work in `${CLAUDE_SKILL_DIR}/../..`.
 
-Produces: `out/<brand>/launch.mp4` — ~45s five-act composition: logo reveal ->
-hook headline -> live demo -> feature beats (1-3) -> end card, over the brand's
-background loop.
+Produces: `out/<brand>/film/film-vN-scored.mp4` — a bespoke 20-40s film with music,
+narration and SFX cues, plus `out/<brand>/launch.mp4` (the scored lock that postkit,
+mission-control and review-in-magnetic expect).
+
+**A film is not done without audio, and audio means a voice explaining the product.**
+Step 8 is not optional and `node scripts/check-audio.mjs <brand>` must exit 0 before
+the word "done". Two postflop cuts shipped silent on 2026-09-01; that is the reason
+this line exists.
+
+## Route
+
+Default: a BESPOKE composition at `studio/src/films/<brand>/` (PLAYBOOK "Bespoke
+films"; postflop is the worked example). Every product shot is rebuilt native UI
+that animates (grids resolving, figures counting, a cursor that clicks), never a
+screenshot panel or a screen recording. The LaunchVideo template is the fallback
+only when the user asks for the five-act house style explicitly.
 
 ## Recipe
 
@@ -17,27 +30,32 @@ background loop.
    with `docs/templates/DIRECTION.md`, kill two with its kill questions, and record the
    survivor + its signature move in `out/<brand>/marketing/direction.md`. Skip only if
    that file already exists for this version.
-2. Ingredients first — this template COMPOSES existing assets. Ensure (running the
-   sibling skills as needed): logo-reveal PNG sequence (logo-reveal skill steps 1-4),
-   background loop (Blender `background_loop` scene per brand; PLAYBOOK seam rules),
-   demo capture + telemetry (product-demo skill steps 1-4), feature screenshots.
-3. Props builder: create/extend `scripts/build-<brand>-launch-props.mjs` from the
-   noban one — it is the copy's source of truth (headline, feature lines, CTA; no em
-   dashes) and pulls telemetry from the demo props so they never drift. Run it.
-4. Act timing comes from `studio/src/lib/launchTiming.ts` (shared with
-   calculateMetadata — never duplicate the math; adjust constants there if pacing
-   changes, and its vitest tests with them).
-5. Proof stills: one frame per act (logo/hook/demo/each feature/end card), Read all,
-   iterate copy and framing until intentional.
-6. Render as a VERSIONED file, never overwritten: `out/<brand>/launch-v1.mp4`, `-v2`,
-   ... The director loop is render -> watch -> write your own defect list -> fix ->
-   re-render as a NEW versioned file (notes are symptoms, not specs — translate before
-   fixing). Iterations render at half scale, `npx remotion render LaunchVideo
-   out/<brand>/launch-vN-preview.mp4 --props=props/<brand>-launch.json --scale=0.5`
-   (3.3x faster than full res, measured 2026-09-01; the x264 preset does not help,
-   Chrome frame rendering is the cost). Only the version whose stills passed gets the
-   full-res render, once: `npx remotion render LaunchVideo out/<brand>/launch-vN.mp4
-   --props=props/<brand>-launch.json` (~2400 frames, ~9 minutes).
-7. Lock: copy the approved version to `out/<brand>/launch.mp4` — mission-control and
-   review-in-magnetic expect that exact path. Deliver per marketing-studio.
-8. Audio: run the audio-track skill to add music + voiceover to the locked render.
+2. Shot spec: write `out/<brand>/marketing/film-spec.md` from the direction (copy
+   postflop's shape: non-negotiables from the brand voice, motion rules judge-motion
+   scans for, the composition contract, and a timeline table of 6-10 shots with the
+   beat each one performs and every numeral traceable to brief.json proofPoints).
+   Narration is planned HERE, per shot, at ~2.6 words/second minus a 150ms breath
+   between lines; a 28s film carries about 60 spoken words, not 150.
+3. Build: `studio/src/films/<brand>/` — timeline.ts (SHOTS, TOTAL, OVERLAP), a ui/
+   kit of the product's rebuilt pieces, one shots/ShotNN.tsx per timeline row,
+   Film.tsx sequencing them with overlap handovers, registered in Root.tsx and
+   scripts/smoke.mjs. Each shot proves itself: render its frame range at
+   `--scale=0.5`, tile a contact sheet with ffmpeg, Read it, fix, re-render.
+4. Gates on the studio: `npx tsc --noEmit -p .` in studio/, `node scripts/judge-motion.mjs
+   <brand>`, `node scripts/smoke.mjs`.
+5. Director loop on the whole film: render `out/<brand>/film/film-vN-preview.mp4` at
+   half scale, contact-sheet it (fps=2), extract the LAST frame of every shot (must be
+   static) and the frames around each cut (must overlap, no pop), write your own defect
+   list, fix, re-render as the NEXT version. Never overwrite a version.
+6. Full-res render of the version whose sheets passed: `npx remotion render <Brand>Film
+   out/<brand>/film/film-vN.mp4`. Read two full-res frames.
+7. Audio copy: `scripts/build-<brand>-film-audio.mjs` (copy source of truth: narration
+   lines with their start second, SFX cues on the landing frames, music prompt) ->
+   `props/<brand>-film-audio.json`. Written for the ear; every figure from the brief.
+8. Score: `node scripts/score-film.mjs <brand> out/<brand>/film/film-vN.mp4`. It refuses
+   overlapping lines (trim copy in the builder, never the picture) and masters to
+   TARGET_I, verifying the DELIVERED file. Then `node scripts/verify-cue.mjs` on one
+   narration window and one bed-only window: the voice must sit clearly above the bed.
+9. Lock: copy the scored file to `out/<brand>/launch.mp4`; run
+   `node scripts/check-audio.mjs <brand>` (exit 0 required) and `node scripts/judge-palette.mjs
+   <brand> <scored.mp4>`. Deliver per marketing-studio: the user watches the SCORED cut.

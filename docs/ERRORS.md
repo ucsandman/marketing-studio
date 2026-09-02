@@ -144,3 +144,28 @@ paperroute re-mastered to -13.9/-14.2 LUFS; master-audio now pins `-ar 48000`
 brands re-judged: costclaw and dashclaw PASS unchanged, sidetap and paperroute
 down to ONE real FAIL each — 2.2s/2.7s of trailing silence in the composition
 itself (the end card outlives the fade), which only a re-render can fix.
+
+## 2026-09-01 — Two silent film cuts shipped, then a music-only one
+
+**Symptom.** The first bespoke PostflopFilm (28s, reference-quality picture) was handed to
+Wes with no audio track at all. The re-cut added music + SFX and still had no
+narration. Both were called "done".
+
+**Root cause.** Nothing in the pipeline made audio part of the definition of done.
+The launch-video skill listed audio as step 8 ("run the audio-track skill"), the
+marketing intake offered "none" as an option, and no gate checked the delivered
+mp4 for a track. A picture-only definition of done let the render pass every judge.
+
+**Fix.** CLAUDE.md rule (a film is not done without audio, and audio means a voice
+explaining the product); `scripts/check-audio.mjs` hard gate over the delivery
+surfaces (track present, not silent, within 2 LU of TARGET_I, newest film scored
+with voLines > 0); `scripts/score-film.mjs` (narration + ducked bed + cues,
+verified master, refuses zero-VO manifests and overlapping lines);
+`scripts/build-<brand>-film-audio.mjs` as the copy source of truth. Intake option
+"none" removed; skills re-synced. First gate run on postflop: 5 of 14 delivery files
+failed (unmastered launch rows at -26.6 LUFS, captioned social rows with no track).
+
+**Lesson.** A deliverable's definition of done must be a gate, not a step in a
+checklist. Also: master-audio.mjs alone cannot master a generated music bed
+(mean -32 dB / peak -0.6 dBFS, crest too high for linear loudnorm) — compress the
+bed first, then measured gain into a limiter, re-measure the delivered file.

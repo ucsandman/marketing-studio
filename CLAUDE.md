@@ -21,8 +21,21 @@ Rules:
 - Rendered proof: visual work is not done until a rendered frame was inspected;
   final assets are not done until the user saw them.
 - Smoke check before claiming done: node scripts/smoke.mjs (every composition listed).
-- Six mechanical judges gate a run (judge-av-sync, judge-demo-pacing, judge-palette,
-  judge-motion, judge-drift, check-budgets). All are advisors: exit 0 unless --strict.
+- **A film is not done without audio, and audio means a voice explaining the product.**
+  Every delivered mp4 (launch lock, every `*-final*.mp4`, every postkit file that is
+  not a `-silent` variant, the newest `film-vN`) carries a mastered soundtrack: music
+  bed + narration + SFX cues, at master-audio's TARGET_I. Music-only is a recorded,
+  deliberate exception (`--music-only`), never a default; "none" is not an intake
+  option. `node scripts/check-audio.mjs <brand>` is a HARD gate (exit 1) and runs
+  before any delivery claim. Two silent postflop cuts shipped on 2026-09-01 because
+  nothing enforced this; do not make it three.
+- Bespoke films (`studio/src/films/<brand>/`, e.g. PostflopFilm) are scored with
+  `scripts/build-<brand>-film-audio.mjs` (copy + cue source of truth, generated
+  manifest props/<brand>-film-audio.json) then `scripts/score-film.mjs <brand>
+  <film.mp4>`; template films keep build-<brand>-audio.mjs + audio-track.
+- Seven mechanical gates run per brand: six judges (judge-av-sync, judge-demo-pacing,
+  judge-palette, judge-motion, judge-drift, check-budgets) plus check-audio. The
+  judges are advisors: exit 0 unless --strict; check-budgets and check-audio are hard.
   **judge-drift runs LAST** — it scores out/<brand>/ as a SET, so running it before
   everything has rendered scores an incomplete set and the number means nothing. It
   has no absolute threshold on purpose (nobody publishes one); calibrate with

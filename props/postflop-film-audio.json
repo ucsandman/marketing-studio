@@ -1,0 +1,388 @@
+{
+  "brandId": "postflop",
+  "composition": "PostflopFilm",
+  "fps": 30,
+  "totalFrames": 840,
+  "music": {
+    "src": "postflop/film-audio/music.mp3",
+    "durationMs": 28030
+  },
+  "lines": [
+    {
+      "id": "claim",
+      "text": "Your solver is grading its own homework. postflop measures instead.",
+      "src": "postflop/film-audio/claim.mp3",
+      "startMs": 400,
+      "durationMs": 4490,
+      "words": [
+        {
+          "w": "Your",
+          "startMs": 0,
+          "endMs": 209
+        },
+        {
+          "w": "solver",
+          "startMs": 267,
+          "endMs": 650
+        },
+        {
+          "w": "is",
+          "startMs": 720,
+          "endMs": 813
+        },
+        {
+          "w": "grading",
+          "startMs": 871,
+          "endMs": 1196
+        },
+        {
+          "w": "its",
+          "startMs": 1231,
+          "endMs": 1347
+        },
+        {
+          "w": "own",
+          "startMs": 1393,
+          "endMs": 1521
+        },
+        {
+          "w": "homework.",
+          "startMs": 1579,
+          "endMs": 2125
+        },
+        {
+          "w": "postflop",
+          "startMs": 2508,
+          "endMs": 3204
+        },
+        {
+          "w": "measures",
+          "startMs": 3274,
+          "endMs": 3622
+        },
+        {
+          "w": "instead.",
+          "startMs": 3669,
+          "endMs": 4458
+        }
+      ]
+    },
+    {
+      "id": "composer",
+      "text": "Give it a board, both ranges, stacks, and a convergence target.",
+      "src": "postflop/film-audio/composer.mp3",
+      "startMs": 5417,
+      "durationMs": 3840,
+      "words": [
+        {
+          "w": "Give",
+          "startMs": 0,
+          "endMs": 232
+        },
+        {
+          "w": "it",
+          "startMs": 267,
+          "endMs": 325
+        },
+        {
+          "w": "a",
+          "startMs": 348,
+          "endMs": 372
+        },
+        {
+          "w": "board,",
+          "startMs": 418,
+          "endMs": 824
+        },
+        {
+          "w": "both",
+          "startMs": 975,
+          "endMs": 1207
+        },
+        {
+          "w": "ranges,",
+          "startMs": 1265,
+          "endMs": 1753
+        },
+        {
+          "w": "stacks,",
+          "startMs": 1811,
+          "endMs": 2299
+        },
+        {
+          "w": "and",
+          "startMs": 2334,
+          "endMs": 2461
+        },
+        {
+          "w": "a",
+          "startMs": 2508,
+          "endMs": 2531
+        },
+        {
+          "w": "convergence",
+          "startMs": 2566,
+          "endMs": 3042
+        },
+        {
+          "w": "target.",
+          "startMs": 3077,
+          "endMs": 3808
+        }
+      ]
+    },
+    {
+      "id": "workbench",
+      "text": "The whole tree, solved in your browser.",
+      "src": "postflop/film-audio/workbench.mp3",
+      "startMs": 10200,
+      "durationMs": 2170,
+      "words": [
+        {
+          "w": "The",
+          "startMs": 0,
+          "endMs": 139
+        },
+        {
+          "w": "whole",
+          "startMs": 163,
+          "endMs": 325
+        },
+        {
+          "w": "tree,",
+          "startMs": 348,
+          "endMs": 673
+        },
+        {
+          "w": "solved",
+          "startMs": 952,
+          "endMs": 1242
+        },
+        {
+          "w": "in",
+          "startMs": 1265,
+          "endMs": 1312
+        },
+        {
+          "w": "your",
+          "startMs": 1347,
+          "endMs": 1440
+        },
+        {
+          "w": "browser.",
+          "startMs": 1463,
+          "endMs": 2136
+        }
+      ]
+    },
+    {
+      "id": "convergence",
+      "text": "A separate best-response calculator measures exploitability.",
+      "src": "postflop/film-audio/convergence.mp3",
+      "startMs": 15217,
+      "durationMs": 3600,
+      "words": [
+        {
+          "w": "A",
+          "startMs": 0,
+          "endMs": 93
+        },
+        {
+          "w": "separate",
+          "startMs": 186,
+          "endMs": 569
+        },
+        {
+          "w": "best-response",
+          "startMs": 604,
+          "endMs": 1300
+        },
+        {
+          "w": "calculator",
+          "startMs": 1347,
+          "endMs": 1927
+        },
+        {
+          "w": "measures",
+          "startMs": 2009,
+          "endMs": 2357
+        },
+        {
+          "w": "exploitability.",
+          "startMs": 2403,
+          "endMs": 3576
+        }
+      ]
+    },
+    {
+      "id": "features",
+      "text": "Lock any node. Seventy-seven million evals per second.",
+      "src": "postflop/film-audio/features.mp3",
+      "startMs": 19283,
+      "durationMs": 3160,
+      "words": [
+        {
+          "w": "Lock",
+          "startMs": 0,
+          "endMs": 279
+        },
+        {
+          "w": "any",
+          "startMs": 325,
+          "endMs": 453
+        },
+        {
+          "w": "node.",
+          "startMs": 522,
+          "endMs": 882
+        },
+        {
+          "w": "Seventy-seven",
+          "startMs": 1161,
+          "endMs": 1730
+        },
+        {
+          "w": "million",
+          "startMs": 1776,
+          "endMs": 2020
+        },
+        {
+          "w": "evals",
+          "startMs": 2067,
+          "endMs": 2322
+        },
+        {
+          "w": "per",
+          "startMs": 2368,
+          "endMs": 2473
+        },
+        {
+          "w": "second.",
+          "startMs": 2508,
+          "endMs": 3111
+        }
+      ]
+    },
+    {
+      "id": "browser",
+      "text": "Rust in WebAssembly. Nothing to install.",
+      "src": "postflop/film-audio/browser.mp3",
+      "startMs": 22617,
+      "durationMs": 2590,
+      "words": [
+        {
+          "w": "Rust",
+          "startMs": 0,
+          "endMs": 325
+        },
+        {
+          "w": "in",
+          "startMs": 372,
+          "endMs": 430
+        },
+        {
+          "w": "WebAssembly.",
+          "startMs": 488,
+          "endMs": 1207
+        },
+        {
+          "w": "Nothing",
+          "startMs": 1416,
+          "endMs": 1695
+        },
+        {
+          "w": "to",
+          "startMs": 1730,
+          "endMs": 1788
+        },
+        {
+          "w": "install.",
+          "startMs": 1858,
+          "endMs": 2554
+        }
+      ]
+    },
+    {
+      "id": "end",
+      "text": "Measured. Never asserted.",
+      "src": "postflop/film-audio/end.mp3",
+      "startMs": 25600,
+      "durationMs": 1750,
+      "words": [
+        {
+          "w": "Measured.",
+          "startMs": 0,
+          "endMs": 499
+        },
+        {
+          "w": "Never",
+          "startMs": 708,
+          "endMs": 940
+        },
+        {
+          "w": "asserted.",
+          "startMs": 998,
+          "endMs": 1718
+        }
+      ]
+    }
+  ],
+  "sfx": [
+    {
+      "frame": 50,
+      "name": "tick"
+    },
+    {
+      "frame": 116,
+      "name": "tick"
+    },
+    {
+      "frame": 270,
+      "name": "tick"
+    },
+    {
+      "frame": 300,
+      "name": "whoosh"
+    },
+    {
+      "frame": 384,
+      "name": "tick"
+    },
+    {
+      "frame": 406,
+      "name": "tick"
+    },
+    {
+      "frame": 504,
+      "name": "tick"
+    },
+    {
+      "frame": 570,
+      "name": "whoosh"
+    },
+    {
+      "frame": 616,
+      "name": "tick"
+    },
+    {
+      "frame": 660,
+      "name": "whoosh"
+    },
+    {
+      "frame": 740,
+      "name": "tick"
+    },
+    {
+      "frame": 746,
+      "name": "tick"
+    },
+    {
+      "frame": 752,
+      "name": "tick"
+    },
+    {
+      "frame": 797,
+      "name": "tick"
+    }
+  ]
+}

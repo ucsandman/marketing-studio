@@ -18,6 +18,9 @@ test('every brand with measured VO word times is in EMBED_AUDIO', () => {
   const embed = new Set([...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]));
   const wordTimed = readdirSync(join(root, 'props'))
     .filter((f) => f.endsWith('-audio.json'))
+    // <brand>-film-audio.json scores a bespoke film post-render (score-film.mjs);
+    // LaunchVideo never reads it, so it has no EMBED_AUDIO entry to check.
+    .filter((f) => !f.endsWith('-film-audio.json'))
     .filter((f) => (JSON.parse(readFileSync(join(root, 'props', f), 'utf8')).lines ?? []).some((l) => l.words?.length))
     .map((f) => f.replace(/-audio\.json$/, ''));
   assert.ok(wordTimed.length > 0, 'no word-timed audio manifests found');

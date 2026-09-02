@@ -8,15 +8,40 @@ description: Use when the user wants music, voiceover, narration, or a soundtrac
 **REQUIRED BACKGROUND:** marketing-studio skill. Work in `${CLAUDE_SKILL_DIR}/../..`.
 Read the PLAYBOOK's Audio section first (endpoints, ducking, manifest contract).
 
-Two modes; pick by what the user wants:
-- **Video soundtrack** — the target composition re-rendered with music + voiceover
-  (`out/<brand>/<asset>-audio.mp4`). Recipe A.
+Every film gets this pass; it is not opt-in (CLAUDE.md: a film is not done without
+audio, and audio means narration). `node scripts/check-audio.mjs <brand>` is the exit
+gate for all three recipes that touch video.
+
+Three modes; pick by what the target is:
+- **Bespoke film** (`studio/src/films/<brand>/`, e.g. PostflopFilm) — post-render
+  scoring with `scripts/build-<brand>-film-audio.mjs` + `scripts/score-film.mjs`.
+  Recipe A0.
+- **Video soundtrack** — a LaunchVideo template composition re-rendered with music +
+  voiceover (`out/<brand>/<asset>-audio.mp4`). Recipe A.
 - **Standalone audio** — a music track and/or narration mp3s delivered as files
   (a sting, a jingle, a narration for something outside this studio). Recipe B.
 
 Both need `ELEVENLABS_API_KEY` in the repo `.env` (missing key = feeder exits 2;
 videos stay silent). Generation costs real money: one pass, trim copy rather than
 regenerate blindly. Free tier returns 402; Starter or above required.
+
+## Recipe A0: bespoke film
+
+1. Shared-repo guard + toolchain per marketing-studio.
+2. Copy source of truth: `scripts/build-<brand>-film-audio.mjs` (copy postflop's).
+   Narration lines carry the film SECOND they start on, computed from the film's
+   timeline.ts so a re-timed shot moves its line with it; SFX cues carry the frame the
+   shot lands something on (Stamp/Rule/click constants + the shot's `from`), max two
+   per beat. Budget ~2.6 words/second minus a 150ms breath per line.
+3. Run it (VO lines and the exact-length bed hit the API once; re-runs reuse files,
+   `--force <id,...|music>` regenerates). Read the printed start/end table: every line
+   inside its shot.
+4. `node scripts/score-film.mjs <brand> out/<brand>/film/film-vN.mp4` — refuses
+   overlapping lines (trim copy, re-run the builder) and zero-VO manifests; masters by
+   measured gain and verifies the DELIVERED file (I within 0.5 of TARGET_I, TP <= -1).
+5. Listen-proof: `node scripts/verify-cue.mjs <scored.mp4> <voStart> <voDur>` on one
+   narration window and one bed-only window (voice ~6 dB above the bed), then
+   `node scripts/check-audio.mjs <brand>` (exit 0), then SEND the scored file.
 
 ## Recipe A: video soundtrack
 

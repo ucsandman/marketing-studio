@@ -8,6 +8,8 @@ import { ProductDemo, productDemoSchema } from "./templates/ProductDemo";
 import { LogoReveal, logoRevealSchema } from "./templates/LogoReveal";
 import { LaunchVideo, launchVideoSchema } from "./templates/LaunchVideo";
 import { AnimatedOG, animatedOgSchema } from "./templates/AnimatedOG";
+import { PostflopFilm, postflopFilmSchema } from "./films/postflop/Film";
+import { TOTAL as postflopFilmFrames } from "./films/postflop/timeline";
 import { StoreTile, storeTileSchema } from "./templates/StoreTile";
 import { Card, cardSchema } from "./templates/Card";
 import { WrapClip, wrapClipSchema, wrapDurationInFrames } from "./templates/WrapClip";
@@ -138,6 +140,22 @@ export const RemotionRoot: React.FC = () => {
               force: props.voTiming ?? null,
             }),
           ).total,
+          width: props.formatWidth ?? 1920,
+          height: props.formatHeight ?? 1080,
+        })}
+      />
+      <Composition
+        id="PostflopFilm"
+        component={PostflopFilm}
+        durationInFrames={postflopFilmFrames}
+        fps={30}
+        width={1920}
+        height={1080}
+        schema={postflopFilmSchema}
+        defaultProps={{
+          brandId: "postflop",
+        }}
+        calculateMetadata={({props}) => ({
           width: props.formatWidth ?? 1920,
           height: props.formatHeight ?? 1080,
         })}

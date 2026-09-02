@@ -23,4 +23,9 @@ headline word-spring -> screenshot panel + feature lines -> end card.
 4. Proof stills at frames 45/150/280 (headline / panel+lines / end card), Read each,
    iterate copy + zoom until intentional.
 5. `npx remotion render SocialClip out/<brand>/<name>.mp4 --props=<props>`.
-6. Deliver per marketing-studio.
+6. Score it (mandatory: SocialClip renders silent and a silent clip is not
+   deliverable): `node scripts/score-social-clip.mjs <brand> <name> --vo <act>` with the
+   ONE VO line from props/<brand>-audio.json that matches the plate. Output
+   `out/<brand>/<name>-final.mp4`; build-postkit prefers it over the matrix row.
+7. `node scripts/check-audio.mjs <brand>` exits 0, then deliver the `-final` file per
+   marketing-studio.
