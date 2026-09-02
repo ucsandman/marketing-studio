@@ -5,7 +5,7 @@ project end-to-end through domain, hosting, payments, comms, algorithm-researche
 marketing copy, and multi-platform distribution — with zero copy-paste.
 
 The CLI produces validated payloads and assisted-launch artifacts; the `/launch` skill
-(`.claude/skills/launch/SKILL.md`) orchestrates DashClaw MCP tools (domain, Vercel,
+(`../skills/launch/SKILL.md`) orchestrates DashClaw MCP tools (domain, Vercel,
 Stripe, Resend, Twilio, DNS) and does the generative work (research synthesis,
 copywriting) in-session. Everything defaults to dry-run; nothing is purchased or posted
 without explicit approval gates.

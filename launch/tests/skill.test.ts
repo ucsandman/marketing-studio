@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const ROOT = join(import.meta.dirname, '..');
-const SKILL_PATH = join(ROOT, '.claude', 'skills', 'launch', 'SKILL.md');
+const SKILL_PATH = join(ROOT, '..', 'skills', 'launch', 'SKILL.md');
 const TOOLS_PATH = join(ROOT, 'docs', 'mcp-tool-inventory.md');
 
 const MCP_NAME_RE =
