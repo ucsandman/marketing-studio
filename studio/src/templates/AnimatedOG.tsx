@@ -31,6 +31,18 @@ export const animatedOgSchema = z.object({
 
 type Props = z.infer<typeof animatedOgSchema>;
 
+/**
+ * Which registry mark (if any) this frame draws. `getMark` THROWS for an
+ * unregistered id, so the teaser lane -- whose whole point is a company with no
+ * registry entry -- must never reach it. brandOverride is that lane's own signal
+ * that no Mark exists, and logoImage stands in for one when it is supplied.
+ */
+export const markFor = (
+  brandId: string,
+  logoImage: string | null,
+  brandOverride: z.infer<typeof brandSchema> | null,
+) => (logoImage || brandOverride ? null : getMark(brandId));
+
 export const AnimatedOG: React.FC<Props> = ({
   brandId,
   tagline,
@@ -51,7 +63,7 @@ export const AnimatedOG: React.FC<Props> = ({
   const fonts = loadBrandFonts(brand);
   const logo = logoImage ?? null;
   const nameShown = showName !== false;
-  const Mark = logo ? null : getMark(brand.id);
+  const Mark = markFor(brand.id, logo, brandOverride);
   // `ctaStyle: 'block'` is a brand declaring that its accent is only ever a
   // filled block carrying ink text -- never accent-coloured type or a
   // coloured glyph (same contract EndCard/LogoReveal already read). Every

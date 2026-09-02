@@ -224,6 +224,11 @@ node --test scripts/*.test.mjs feeders/capture/*.test.mjs feeders/audio/*.test.m
 
 Every asset prop is nullable with a placeholder, so the smoke test passes on a clean clone with no captures, no Blender, and no API keys.
 
+## launch/ (distribution layer)
+
+`launch/` is the launch engine as a sub-package (`@marketing-studio/launch`): the CLI and dashboard that take a shipped product through domain, payments, comms, and multi-platform posting.
+It keeps its own toolchain (`cd launch && npm ci && npm test`), gated by the `launch` job in CI. Full docs: [launch/README.md](launch/README.md).
+
 ## License
 
 MIT

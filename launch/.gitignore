@@ -1,0 +1,29 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# dependencies
+node_modules/
+
+# build output
+dist/
+
+# per-target launch state (lives in target projects, but never commit one here)
+.launch/
+
+# test coverage
+coverage/
+
+# DashClaw local agent state
+.dashclaw-local/
+
+# supergoal run evidence (screenshots + server logs with per-run tokens)
+.supergoal/evidence/
+
+# playwright output
+test-results/
+playwright-report/
+
+# offlocal MCP local state (auto-created by the tool, never committed)
+.offlocal/

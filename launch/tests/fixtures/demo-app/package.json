@@ -1,0 +1,10 @@
+{
+  "name": "demo-app",
+  "version": "1.0.0",
+  "description": "Uptime monitor for solo developers — get pinged before your users do.",
+  "type": "module",
+  "main": "src/index.js",
+  "dependencies": {
+    "express": "^4.19.0"
+  }
+}
