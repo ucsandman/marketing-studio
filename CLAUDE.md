@@ -53,3 +53,13 @@ Rules:
   never hand-edit copy into generated props.
 - out/, assets/, studio/public/*/ are gitignored build products.
 - Blender via BLENDER_PATH in .env; ComfyUI on :8000/:8188 with documented fallback.
+- Unreal via UNREAL_PATH in .env (feeders/unreal, PLAYBOOK "Unreal Engine 5.8"); plates
+  are PNG sequences staged like Blender output.
+- **A storyboard or any approval artifact is handed over annotated, never as bare
+  frames:** shot number, timing, ground, the camera move drawn on the frame, the
+  narration line under it, and one line saying what the whole thing is. Render the page
+  and read it as a stranger before handing it over (2026-09-03: an unlabeled tile of
+  five Unreal frames was unreadable to Wes). In a terminal session, open it locally.
+- **Every gate ends with a retro** (approval, ship, wrap, any correction): what worked,
+  what did not, the one change, written to docs/ERRORS.md or PLAYBOOK in the same turn.
+  The next film starts by reading the last film's retro.

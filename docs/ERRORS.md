@@ -213,3 +213,37 @@ vs corner crop) before trusting exit 0.
 Also: the wrong-disk pick (D:, a USB spinning disk) and the stale version pick (5.6)
 both came from assumptions Wes had to correct; check `Get-PhysicalDisk` and the live
 release page before naming either.
+
+## 2026-09-03 — Retro of the Unreal day: what worked, what did not
+
+**Worked, keep doing.** (1) Proving the load-bearing mechanism first: probe, then a cube,
+then the look test, one hypothesis per engine launch, so every trap surfaced with a log
+line. (2) Writing each verified trap into the PLAYBOOK the moment it was proven: the
+second scene agent inherited 13 traps and hit only new ones. (3) Gating renders on pixel
+stats, not exit codes: three of the day's failures were exit 0 with a wrong picture.
+(4) Briefs with a VERIFIED GROUND TRUTH block: the fix agent used it to show that my
+diagnosis (load_asset returned None) was wrong and the real bug was spawn_actor_from_object.
+(5) Headers on disk over remembered API names once the engine existed.
+
+**Did not work, and the change for each.**
+- Two targets asserted from memory, both wrong, both caught by Wes: D: as the install
+  disk (a USB spinning disk) and UE 5.6 (5.8.2 was current). Change: machine facts from
+  Get-PhysicalDisk or df, versions from the live release page, before naming a target.
+- The storyboard went out as a bare 3x2 tile of frames; Wes could not tell what he was
+  looking at. Change: approval artifacts are annotated pages (now a CLAUDE.md rule),
+  rendered and read as a stranger before handoff.
+- "It's in your panel": the send-file tool reaches the claude.ai session view, not the
+  terminal Wes was in. Change: open deliverables locally in a terminal session.
+- Spec numbers that were never measured (a 2000 cd agent light, plugin names from an
+  older release) went into briefs as requirements and cost launches: the light was a
+  brand-forbidden orange wash. Change: unmeasured numbers are labelled hypotheses in a
+  brief; give the agent a measurable target (mean luminance band) instead.
+- My own taste check passed the first hall frames as "strong" because they matched the
+  spec, not because a stranger would say "server room". Change: judge frames with the
+  stranger question, then the spec.
+- The draft feeder written before the engine existed carried seven UNVERIFIED marks and
+  two of its guesses (plugin names, quoting) cost a launch each. Acceptable trade for the
+  install wait; the lesson is to test the guesses in the first launch, which is what
+  happened.
+
+**Rule.** Every gate ends with a retro; see CLAUDE.md and the global rule 7.
