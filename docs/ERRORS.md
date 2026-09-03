@@ -271,3 +271,28 @@ was checked in vs out (1200/1200) after the score-film truncation of 2026-09-03.
 - Kit debt, second occurrence: postflop and dashclaw both carry their own Cursor
   because StageCursor's click bloom is an accent wash; PngSequence has no start
   index so the film carries its own Plate. Both belong in components/.
+
+## 2026-09-03 — Wes watched the DashClaw film: "audio is shit, graphics are dogshit, story is horrible"
+
+**Symptom.** Every mechanical gate passed (tsc, judge-motion, judge-palette, judge-drift,
+check-audio, verify-cue, frame counts) and the film is bad. Nobody on the pipeline
+watched it with sound before it was called done; the coordinator judged stills, contact
+sheets and LUFS numbers.
+
+**Root cause.** The gates measure properties (loudness, palette, motion tokens, pixel
+bands), not quality. The creative calls that decide quality were all defaults chosen for
+survivability, not for the film: primitives-only geometry (reads as a tech demo), a
+premade TTS voice with no direction, a generated ambient bed, 74 words of narration over
+a light orb in a box corridor, a 40 s runtime carried by one metaphor. The direction
+template's "survive a bad day" question was answered by lowering ambition until nothing
+could fail, which is the same as nothing being good.
+
+**Fix (the one change).** A film is not done until the coordinator has WATCHED it with
+sound, at full length, and written a verdict as a viewer ("would I share this?") before
+any gate is run. The gates come after taste, never instead of it. A weak verdict stops
+the pipeline at the cheapest point: the animatic (plates at half scale + scratch VO) is
+the gate, not the scored master.
+
+**Lesson.** A pipeline that can only measure what it can measure will confidently ship
+something nobody wants. The judges are necessary and not sufficient; the viewer test is
+the one that matters, and it costs 40 seconds.

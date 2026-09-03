@@ -60,6 +60,13 @@ Rules:
   narration line under it, and one line saying what the whole thing is. Render the page
   and read it as a stranger before handing it over (2026-09-03: an unlabeled tile of
   five Unreal frames was unreadable to Wes). In a terminal session, open it locally.
+- **The viewer test comes before the gates.** A film is not done until the agent has
+  WATCHED it with sound at full length and written a viewer's verdict ("would I share
+  this?"); the seven gates measure properties, not quality, and on 2026-09-03 all of them
+  passed a film Wes called bad on every axis. The verdict happens at the animatic
+  (half-scale plates + scratch VO), the cheapest point to stop. The DashClaw NIGHT SHIFT
+  film is PARKED: do not iterate on it; a new attempt starts from a script read aloud
+  and an animatic Wes reacts to in the first hour, with real assets and a chosen voice.
 - **Every gate ends with a retro** (approval, ship, wrap, any correction): what worked,
   what did not, the one change, written to docs/ERRORS.md or PLAYBOOK in the same turn.
   The next film starts by reading the last film's retro.
