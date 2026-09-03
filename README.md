@@ -153,6 +153,7 @@ Installing the plugin ships all of them, namespaced under `marketing-studio:`. F
 brands/            per-product brand tokens (zod-validated JSON)
 studio/            Remotion project: all final video compositions
 feeders/blender/   headless bpy scenes (3D logo reveals)
+feeders/unreal/    headless Unreal Engine 5.8 scenes (story worlds, camera moves; Movie Render Queue)
 feeders/capture/   Playwright recorder (product demos)
 feeders/audio/     ElevenLabs client (voiceover + music)
 feeders/comfy/     ComfyUI client (optional AI backdrops)

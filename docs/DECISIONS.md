@@ -76,3 +76,26 @@ judge scored likeness 7.5/10 on v2 against the reference before the fix pass.
 score pipeline; render-matrix and postkit still key off the LaunchVideo id and need
 wiring to `<Brand>Film` (open). Music-only is a recorded exception via
 `score-film --music-only`, never a default.
+
+## 2026-09-03 — Story first: Unreal Engine joins the feeder set
+
+**Decision.** Marketing films are stories (a protagonist, a problem, a turn), not
+feature tours, and the studio takes on the tools a story needs. Unreal Engine 5.8.2
+is installed on the C: NVMe (`C:\Program Files\Epic Games\UE_5.8`, the D: drive is a
+USB spinning disk and never hosts anything Unreal reads at runtime) and enters the
+repo as `feeders/unreal/`, on the Blender feeder's contract: a Python scene script,
+a headless run, `frame_%04d.png` out, Remotion composites on top. The first film
+that pays for the setup is a DashClaw story with Unreal plates.
+
+**Why.** Wes overruled the "spike it when a film needs it" recommendation on
+2026-09-03: the point of the studio is telling a story, and the SaaS-UI framing of
+every brand is what kept the films reading as demos. Unreal brings places,
+characters (MetaHuman) and a camera you can fly; nothing in the Blender/capture/comfy
+set does. It is scripted through its Python API and the editor commandlet, so the
+feeder needs no computer use.
+
+**Consequences.** `UNREAL_PATH` joins `.env.example`. The load-bearing step, a
+headless Movie Render Queue render from a script, is proven before any film work.
+Legendary (open-source Epic CLI) is installed and logged in for later scripted
+engine and Fab pulls; the engine itself needed the launcher once because the UE
+entitlement is granted only by accepting the EULA there.

@@ -13,3 +13,8 @@ __pycache__/
 .context-handoffs/
 .handoff-notes-*.md
 .youtube-token.json
+# Unreal feeder build products (the scene scripts rebuild Content/ each run)
+feeders/unreal/project/Content/
+feeders/unreal/project/DerivedDataCache/
+feeders/unreal/project/Intermediate/
+feeders/unreal/project/Saved/

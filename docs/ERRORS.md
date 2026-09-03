@@ -189,3 +189,27 @@ when the delivered `nb_frames` differs from the input's.
 
 **Lesson.** A gate that measures one property (loudness) says nothing about the others
 (duration). Compare the deliverable to its source on every axis the pipeline can change.
+
+## 2026-09-03 — Unreal feeder: seven silent wrong-output traps on the way to one frame
+
+**Symptom.** Bringing UE 5.8.2 in as `feeders/unreal` took nine engine launches to
+reach a lit frame. Six of the failures exited non-zero with a clear log line; three
+exited 0 with a wrong picture, which is the dangerous kind.
+
+**Root causes, in order hit.** Draft plugin names from an older release (engine
+abort); Python list quoting doubling the `-script` quotes; the commandlet
+C-unescaping `\u` in a path; an asset registry that keeps a deleted level; a
+Blueprint-only actor factory returning None for meshes; MRQ's exclusive end frame
+(exit 0, zero frames); no camera cut (exit 0, sixty black frames); a sun pointing
+along +X with no sky or floor (exit 0, sixty black frames); a camera with zero pitch
+looking over the subject (exit 0, subject cut off). All recorded in PLAYBOOK "Unreal
+Engine 5.8".
+
+**Fix.** Verify against the shipped headers and the real engine, one launch per
+hypothesis, pixel stats on every "success" (`min/max/mean` per frame plus a centre
+vs corner crop) before trusting exit 0.
+
+**Lesson.** For a renderer, exit 0 plus N files is not a pass. The gate is the pixels.
+Also: the wrong-disk pick (D:, a USB spinning disk) and the stale version pick (5.6)
+both came from assumptions Wes had to correct; check `Get-PhysicalDisk` and the live
+release page before naming either.

@@ -20,6 +20,7 @@ is a source clone or an installed plugin.
 | Brand tokens | `brands/<id>.json` + `studio/src/lib/brand.ts` (zod) + `studio/src/brands/marks.ts` (mark registry) | |
 | Playwright capture feeder | `feeders/capture/record-noban-demo.mjs` | needs the product's app running |
 | Blender feeder | `feeders/blender/render.py <scene> --out <dir> --frame N \| --animation` | Blender via `BLENDER_PATH` in `.env` |
+| Unreal feeder | `feeders/unreal/render.py <scene> --out <dir> --frame N \| --animation [--timeout S]` | UE 5.8.2 via `UNREAL_PATH` in `.env`; two headless launches (commandlet builds level + sequence + MRQ queue, then `-game -RenderOffscreen` renders the manifest); reference scene `scenes/cube_flythrough.py`; gotchas below |
 | ComfyUI feeder | `feeders/comfy/client.mjs hero [--seed N]` | non-load-bearing; exit 2 = fallback |
 | Diagram feeder | `feeders/diagram/render.mjs <brand> <spec.d2> [--out DIR] [--width N]` | D2 (WASM) + resvg; brand-colored SVG+PNG+source -> out/<brand>/marketing/diagrams/; own npm install (MPL-2.0 deps, consumed unmodified) |
 | Infographic style bridge | `scripts/build-infographic-style.mjs <brand>` | brand tokens -> out/<brand>/marketing/infographic-style.md, a design-language file for the installed /epic-infographics skill (copy it into that skill's references/design-languages/) |
@@ -238,6 +239,47 @@ placeholder so smoke stays green on a clean clone.
   (`render.py --timeout N`). On Windows the timeout must kill the process TREE
   (`taskkill /T /F`) — killing only the shell/python parent orphans blender.exe, which
   keeps writing frames into the output dir (see build-magnetic-demo-media.mjs).
+
+### Unreal Engine 5.8 (headless, feeders/unreal) — each verified 2026-09-03 on 5.8.2
+- Install lives on the C: NVMe (`C:\Program Files\Epic Games\UE_5.8`). D: is a USB
+  spinning disk and never holds anything the engine reads at runtime.
+- The Epic launcher is a Chromium canvas with no accessibility tree; nothing can drive
+  it. The UE entitlement is granted only by accepting the EULA in it once (Wes did).
+  After that, `legendary` (pip `legendary-gl`, `legendary auth --import` after copying
+  `Saved/Config/WindowsEditor/GameUserSettings.ini` to `Saved/Config/Windows/`) is the
+  scripted Epic client.
+- 5.8 ships ONE plugin, `MovieRenderPipeline`; the older `MovieRenderPipelineCore` /
+  `RenderPasses` / `Editor` names make the engine abort at startup.
+- The `-script="..."` value must reach the engine with its own quotes: build the
+  command line as a STRING. `subprocess` list quoting doubled them and the commandlet
+  answered "-Script argument not specified".
+- The commandlet applies C escapes to the `-script` value: `\ue-probe` became
+  `\x0e-probe`. Forward slashes only inside it.
+- A commandlet cannot render MRQ (no PIE, no tick). Save the queue with
+  `MoviePipelineEditorLibrary.save_queue_to_manifest_file` and render it in a second
+  `-game -MoviePipelineConfig=<manifest> -RenderOffscreen` launch (Epic's new-process
+  executor does the same). `MoviePipelineQueueSubsystem` is the editor subsystem;
+  `MoviePipelineQueueEngineSubsystem` is not reachable through `get_editor_subsystem`.
+- `EditorActorSubsystem.spawn_actor_from_object` returns None in the commandlet (no
+  actor factory): spawn `StaticMeshActor` by class and `set_static_mesh` on its
+  component. Lights, sky and cameras spawn by class fine.
+- `new_level` refuses an existing path and, in a commandlet, `does_asset_exist`
+  answers False for it: unlink the stale `.umap`/`.uasset`, `scan_paths_synchronous`,
+  then fall back to `load_level` + destroy actors.
+- Transform keys: `section.get_channels_by_type(MovieSceneScriptingDoubleChannel)`
+  gives nine channels (loc xyz, rot roll/pitch/yaw, scale xyz); `add_key(frame, value,
+  0.0, MovieSceneTimeUnit.DISPLAY_RATE)`. `get_channels()` and `SequenceTimeUnit` do
+  not exist.
+- No camera cut track = 60 pure-black frames and exit 0. Add `MovieSceneCameraCutTrack`
+  with `set_camera_binding_id(sequence.get_binding_id(binding))`.
+- MRQ's custom end frame is exclusive: a single frame is `[n, n+1)`; `[n, n)` errors.
+- A default DirectionalLight points along +X; with no sky and no floor the picture is
+  black. Aim it down (`Rotator(roll=, pitch=-45, yaw=)`, keyword args, positional
+  order is roll, pitch, yaw), set `atmosphere_sun_light`, add `SkyAtmosphere`, set the
+  SkyLight's `real_time_capture`. A floor 200x the 100-unit plane keeps the black
+  below-horizon atmosphere out of frame. Auto exposure stays on for probe scenes.
+- Timing on the 3070 Ti: about 45 s per engine boot, so a run is ~2 min of boot for
+  ~1 s of rendering a 60-frame 720p orbit. Batch shots per launch, never one per shot.
 
 ### ComfyUI (non-load-bearing)
 - Ports 8000/8188; models live at
