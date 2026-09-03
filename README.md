@@ -66,7 +66,7 @@ Everything below was produced by one `/marketing` run against a real product, un
 ## How it works
 
 - **One engine, many brands.** All rendering happens in this repo, never in your product's repo. Finished assets are copied out at the end.
-- **Remotion is the backbone.** Every final video renders through Remotion compositions in `studio/` (SocialClip, ProductDemo, LogoReveal, LaunchVideo, AnimatedOG).
+- **Remotion is the backbone.** Every final video renders through Remotion compositions in `studio/` (SocialClip, ProductDemo, LogoReveal, LaunchVideo, AnimatedOG, AgentSession for a scripted Claude Code terminal).
 - **Brands are data.** `brands/<id>.json` holds your product's tokens (13 colors, 3 fonts, tagline, voice rules), zod-validated. Templates resolve `getBrand(brandId)` and never hardcode brand values, so a new product is a JSON file and a logo mark component, not a fork.
 - **Feeders produce raw material.** Playwright records your running app for demos, headless Blender renders 3D logo reveals, ElevenLabs generates voiceover and music, and ComfyUI can add AI backdrops. Every feeder degrades cleanly when its dependency is missing.
 - **The knowledge lives in the skills.** The `skills/` directory ships the Claude Code skills that operate this repo, including the hard-won gotchas in `docs/PLAYBOOK.md` (camera math, seamless-loop rules, Blender API traps) so the agent does not re-derive them.
