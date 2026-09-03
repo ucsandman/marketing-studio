@@ -29,6 +29,9 @@ test('mixFilter places every line at its startMs, ducks the bed, lands every cue
   assert.match(f, /\[2:a\]acompressor[^;]*adelay=400\|400\[vo0\]/);
   assert.match(f, /\[3:a\]acompressor[^;]*adelay=5420\|5420\[vo1\]/);
   assert.match(f, /sidechaincompress/);
+  // the duck key is padded to the film, or the bed (and the picture with it) stops
+  // when the last narration line does
+  assert.match(f, /\[key0\]apad=whole_dur=28\.000\[key\]/);
   assert.match(f, /adelay=1667\|1667/); // frame 50 @30fps
   assert.match(f, /adelay=3867\|3867/); // frame 116
   assert.match(f, /adelay=10000\|10000/); // frame 300

@@ -1,0 +1,62 @@
+{
+  "brandId": "offlocalhost",
+  "composition": "AgentSession",
+  "fps": 30,
+  "totalFrames": 1562,
+  "music": {
+    "src": "offlocalhost/session-audio/music.mp3",
+    "durationMs": 52110
+  },
+  "lines": [
+    {
+      "id": "open",
+      "text": "Two commands in Claude Code. The first one makes every marketing asset from your repo.",
+      "src": "offlocalhost/session-audio/open.mp3",
+      "startMs": 1300,
+      "durationMs": 4730
+    },
+    {
+      "id": "render",
+      "text": "It reads your brand tokens, films the running app, renders the film, and scores it with generated voice and music.",
+      "src": "offlocalhost/session-audio/render.mp3",
+      "startMs": 15567,
+      "durationMs": 6690
+    },
+    {
+      "id": "judges",
+      "text": "Seven judges check the result before you look. Nothing leaves your machine.",
+      "src": "offlocalhost/session-audio/judges.mp3",
+      "startMs": 24433,
+      "durationMs": 4490
+    },
+    {
+      "id": "launch",
+      "text": "The second one takes the product live. Domain, hosting, payments, email, and the posts on every platform.",
+      "src": "offlocalhost/session-audio/launch.mp3",
+      "startMs": 29400,
+      "durationMs": 7520
+    },
+    {
+      "id": "approval",
+      "text": "Anything that costs money waits for your approval.",
+      "src": "offlocalhost/session-audio/approval.mp3",
+      "startMs": 38267,
+      "durationMs": 2950
+    },
+    {
+      "id": "dryrun",
+      "text": "Everything is a dry run until you pass live.",
+      "src": "offlocalhost/session-audio/dryrun.mp3",
+      "startMs": 45867,
+      "durationMs": 2740
+    },
+    {
+      "id": "end",
+      "text": "Get it off localhost.",
+      "src": "offlocalhost/session-audio/end.mp3",
+      "startMs": 50167,
+      "durationMs": 1380
+    }
+  ],
+  "sfx": []
+}

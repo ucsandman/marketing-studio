@@ -13,7 +13,9 @@ import { TOTAL as postflopFilmFrames } from "./films/postflop/timeline";
 import { StoreTile, storeTileSchema } from "./templates/StoreTile";
 import { Card, cardSchema } from "./templates/Card";
 import { WrapClip, wrapClipSchema, wrapDurationInFrames } from "./templates/WrapClip";
+import { AgentSession, agentSessionSchema } from "./templates/AgentSession";
 import { launchTiming, voTimingFrom } from "./lib/launchTiming";
+import { sessionTiming, welcomeBoxHeight } from "./lib/sessionTiming";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -241,6 +243,52 @@ export const RemotionRoot: React.FC = () => {
           durationInFrames: wrapDurationInFrames(props.segment),
           width: props.formatWidth ?? 1920,
           height: props.formatHeight ?? 1080,
+        })}
+      />
+      <Composition
+        id="AgentSession"
+        component={AgentSession}
+        durationInFrames={300}
+        fps={30}
+        width={1920}
+        height={1080}
+        schema={agentSessionSchema}
+        // A short placeholder script so smoke and a clean clone render without the
+        // generated props file. The real one is scripts/build-offlocalhost-session-props.mjs.
+        defaultProps={{
+          brandId: "offlocalhost",
+          header: {
+            user: "Wes",
+            model: "Opus 5 with high effort · Claude Max",
+            cwd: "~/projects/sidetap",
+            tips: ["Run /launch to take the product live"],
+          },
+          beats: [
+            {kind: "prompt" as const, text: "/launch sidetap"},
+            {
+              kind: "tool" as const,
+              tool: "Bash",
+              server: null,
+              arg: "launch init ../sidetap",
+              pendingText: "Scanning…",
+              doneText: "Wrote .launch/launch.config.json",
+              frames: 28,
+              status: "success" as const,
+              expandable: false,
+            },
+            {kind: "say" as const, text: "Dry run complete. Nothing has left this machine."},
+          ],
+          cta: "offlocalhost.com",
+          command: null,
+          endHoldFrames: 75,
+        }}
+        // The component builds the SAME call. A mismatch here silently truncates the
+        // session or leaves the end card hanging on a black tail.
+        calculateMetadata={({props}) => ({
+          durationInFrames: sessionTiming(30, props.beats, {
+            endHoldFrames: props.endHoldFrames,
+            welcomeHeight: welcomeBoxHeight(props.header.tips.length),
+          }).durationInFrames,
         })}
       />
     </>

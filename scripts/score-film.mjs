@@ -86,7 +86,13 @@ export function mixFilter(manifest, totalS, sfxNames, {musicOnly = false} = {}) 
   let bedOut = '[bed]';
   if (lines.length) {
     const voSum = lines.length === 1 ? '[vo0]' : (parts.push(`${lines.map((_, i) => `[vo${i}]`).join('')}amix=inputs=${lines.length}:normalize=0:duration=longest[vosum]`), '[vosum]');
-    parts.push(`${voSum}asplit[key][voice]`);
+    parts.push(`${voSum}asplit[key0][voice]`);
+    // sidechaincompress ends with its SHORTEST input, so a key that stops when the
+    // last line does takes the bed down with it — and then `-shortest` on the mux
+    // takes the PICTURE down to that: offlocalhost lost 17 frames and postflop's
+    // film-v4-scored 22 before this pad (measured 2026-09-03). Pad the key with
+    // silence to the film so the duck lasts exactly as long as the bed does.
+    parts.push(`[key0]apad=whole_dur=${totalS.toFixed(3)}[key]`);
     parts.push(`[bed][key]${DUCK}[bedd]`);
     bedOut = '[bedd]';
   }

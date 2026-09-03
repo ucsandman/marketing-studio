@@ -27,6 +27,7 @@ is a source clone or an installed plugin.
 | Link-preview wiring check | `scripts/verify-og-wired.mjs <brand> [url] [--strict]` | fetches the LIVE page, compares its og:image against the delivered og asset; advisory, skips clean without a url |
 | Stage Blender output | `scripts/stage-blender-assets.mjs [brandId]` | assets/<brand>/ -> studio/public/<brand>/ |
 | Launch props builder | `scripts/build-launch-props.mjs` | copy source of truth (JSON is generated) |
+| Agent session (scripted terminal demo) | `studio/src/templates/AgentSession.tsx` + `studio/src/components/agent-session/` (typing.ts, palette.ts, ui.tsx) + `studio/src/lib/sessionTiming.ts`; props builder `scripts/build-offlocalhost-session-props.mjs` -> props/offlocalhost-session.json | A Claude Code session played as a beat sheet: welcome box, typed prompt, thinking spinner, tool calls that go amber and only then flip, and a buffer that scrolls in stages at overflow, over the brand's own ground, ending on `EndCard`. `sessionTiming.ts` is the one pure lib for BOTH the frame math and the transcript's pixel model, so editing one beat's `frames` reflows every later beat by exactly that amount and `calculateMetadata` cannot disagree with the component. Vendored from the `claude-code-remotion` skill by flocker.md (MIT, 2026); `agent-session/palette.ts` is the ONE allowed home for literal hex outside `brands/*.json` because those are Claude Code's own UI colours, the way a capture plate carries an app's. Brand tokens carry the meaning: accent tints the MCP server prefix, `safe` marks a finished call, `loss` marks a `hold` (finished, waiting on the human) and never flips green. MCP tool names on screen must be verified against the live server, never paraphrased |
 | Static presets | `scripts/render-statics.mjs` (noban), `scripts/render-<brand>-statics.mjs` per brand | og.png / og.mp4 / og.gif / readme.gif |
 | Audio feeder (ElevenLabs) | `feeders/audio/client.mjs vo\|music\|probe` | needs ELEVENLABS_API_KEY in .env; exit 2 = silent fallback |
 | Audio build + merge | `scripts/build-<brand>-audio.mjs`, `scripts/merge-launch-audio.mjs <brand>` | VO/music copy source of truth -> props/<brand>-audio.json; merge takes brand argv, defaults noban |
@@ -54,6 +55,8 @@ is a source clone or an installed plugin.
 | Hero takes | `scripts/render-variants.mjs <brand> <logo-reveal\|launch-hook> [--takes N]` | brand-safe motion-knob takes via nullable `motionOverride` prop (exuberant take floors at 0.65 — below ~0.55 the spring is overdamped and deltas render invisible); registers variants[] |
 
 Compositions: PostflopFilm (bespoke, studio/src/films/postflop/), SocialClip, ProductDemo, LogoReveal, LaunchVideo, AnimatedOG,
+AgentSession (scripted Claude Code terminal session; duration from lib/sessionTiming
+via calculateMetadata),
 Card (still, 1080x1080 default, 1080x1350 via formatWidth/formatHeight; stat and
 quote cards from brief proof points via scripts/build-cards.mjs),
 WrapClip, ComponentGallery + StagedGallery (test benches). All schemas carry

@@ -7,6 +7,8 @@ import {loadFont as loadLibreFranklin} from '@remotion/google-fonts/LibreFrankli
 import {loadFont as loadArchivo} from '@remotion/google-fonts/Archivo';
 import {loadFont as loadSourceSans3} from '@remotion/google-fonts/SourceSans3';
 import {loadFont as loadSourceSerif4} from '@remotion/google-fonts/SourceSerif4';
+import {loadFont as loadIBMPlexSans} from '@remotion/google-fonts/IBMPlexSans';
+import {loadFont as loadIBMPlexMono} from '@remotion/google-fonts/IBMPlexMono';
 import type {Brand} from './brand';
 
 // Load once at module scope; Remotion delays render until fonts resolve.
@@ -33,6 +35,15 @@ const families: Record<string, string> = {
   'Source Sans 3': loadSourceSans3('normal', {weights: ['400', '600'], subsets: ['latin']})
     .fontFamily,
   'Source Serif 4': loadSourceSerif4('normal', {weights: ['400', '600'], subsets: ['latin']})
+    .fontFamily,
+  // IBM Plex tops out at 700, so EndCard/LogoReveal's `fontWeight: 800` display sites
+  // match 700 and stop there; loading 700 is what keeps them from falling all the way
+  // back to 600. Mono needs 600 for the welcome box's bold rows and nothing heavier.
+  'IBM Plex Sans': loadIBMPlexSans('normal', {
+    weights: ['400', '600', '700'],
+    subsets: ['latin'],
+  }).fontFamily,
+  'IBM Plex Mono': loadIBMPlexMono('normal', {weights: ['400', '600'], subsets: ['latin']})
     .fontFamily,
 };
 
