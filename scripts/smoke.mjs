@@ -7,7 +7,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = join(root, 'out', 'smoke');
 mkdirSync(outDir, {recursive: true});
 
-const compositions = ['ComponentGallery', 'StagedGallery', 'SocialClip', 'ProductDemo', 'LogoReveal', 'LaunchVideo', 'AnimatedOG', 'WrapClip', 'Card', 'PostflopFilm', 'AgentSession'];
+const compositions = ['ComponentGallery', 'StagedGallery', 'SocialClip', 'ProductDemo', 'LogoReveal', 'LaunchVideo', 'AnimatedOG', 'WrapClip', 'Card', 'PostflopFilm', 'DashClawFilm', 'AgentSession'];
 
 for (const id of compositions) {
   const out = join(outDir, `${id}.png`);

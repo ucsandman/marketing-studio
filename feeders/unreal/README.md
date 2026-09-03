@@ -23,6 +23,13 @@ frames, 124 timeout (the whole process tree is killed).
 ## Scenes
 - `scenes/probe.py`: smoke. Proves the commandlet ran the script, forwarded its flags
   and could write to `--out`; leaves `probe.json` with the engine version.
+- `scenes/dashclaw_hall.py`: the DashClaw story film's data hall (film-spec.md
+  shots 1/2/3/5/7). One level of primitives -- 6 aisles x 16 racks, 3 emissive
+  slits per rack face, volumetric fog, one orange agent light -- and five
+  LevelSequences rendered as five MRQ jobs in ONE queue in ONE launch.
+  `--shot hall|agent|reach|release|wide|all`; with `--shot all` each shot
+  renders its own representative frame and `--frame` is ignored. The first
+  requested shot writes `<out>/frame_*.png`, the rest `<out>/<shot>/`.
 - `scenes/cube_flythrough.py`: the reference scene. Cube, floor, sun, sky atmosphere,
   sky light and a CineCameraActor built in code; a 60-frame keyframed orbit with a
   camera cut; rendered through MRQ. Copy it to start a new scene.

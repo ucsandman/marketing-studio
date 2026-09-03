@@ -10,6 +10,8 @@ import { LaunchVideo, launchVideoSchema } from "./templates/LaunchVideo";
 import { AnimatedOG, animatedOgSchema } from "./templates/AnimatedOG";
 import { PostflopFilm, postflopFilmSchema } from "./films/postflop/Film";
 import { TOTAL as postflopFilmFrames } from "./films/postflop/timeline";
+import { DashClawFilm, dashclawFilmSchema } from "./films/dashclaw/Film";
+import { TOTAL as dashclawFilmFrames } from "./films/dashclaw/timeline";
 import { StoreTile, storeTileSchema } from "./templates/StoreTile";
 import { Card, cardSchema } from "./templates/Card";
 import { WrapClip, wrapClipSchema, wrapDurationInFrames } from "./templates/WrapClip";
@@ -156,6 +158,27 @@ export const RemotionRoot: React.FC = () => {
         schema={postflopFilmSchema}
         defaultProps={{
           brandId: "postflop",
+        }}
+        calculateMetadata={({props}) => ({
+          width: props.formatWidth ?? 1920,
+          height: props.formatHeight ?? 1080,
+        })}
+      />
+      <Composition
+        id="DashClawFilm"
+        component={DashClawFilm}
+        durationInFrames={dashclawFilmFrames}
+        fps={30}
+        width={1920}
+        height={1080}
+        schema={dashclawFilmSchema}
+        defaultProps={{
+          brandId: "dashclaw",
+          // The Unreal hall plates are a gitignored feeder product, so the
+          // composition defaults to its placeholder ground and renders on a
+          // clean clone. A real render passes
+          // --props='{"platesAvailable":true}' once they are staged.
+          platesAvailable: false,
         }}
         calculateMetadata={({props}) => ({
           width: props.formatWidth ?? 1920,

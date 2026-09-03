@@ -247,3 +247,27 @@ diagnosis (load_asset returned None) was wrong and the real bug was spawn_actor_
   happened.
 
 **Rule.** Every gate ends with a retro; see CLAUDE.md and the global rule 7.
+
+## 2026-09-03 — DashClaw story film (first Unreal-plated film): retro at the lock
+
+**Worked.** Plates and the Remotion build ran in parallel because the film reads plates
+by path with a placeholder; the director loop measured its three knobs off the raw
+plates before the first render, so v1 was already calibrated and v2 passed. Frame count
+was checked in vs out (1200/1200) after the score-film truncation of 2026-09-03.
+
+**Did not work, and the change.**
+- The wide plate's 24 agent lights tinted rack faces amber, a wash the brand forbids,
+  and judge-palette passed it because DashClaw's voice is prose and the judge only
+  parses "never <color>" rules. Change: WIDE_CD 72 -> 30, WIDE_RADIUS 220 -> 160 and a
+  re-render (warm-tinted pixels 0.21%). Open: judge-palette needs a "signal colour
+  coverage cap" rule for brands where the accent is allowed but never a wash.
+- The last narration line started 2.6 s before the lockup. Change: line start moved
+  in the audio builder to 35.0 s, never the picture.
+- check-audio FAILs 22 stale DashClaw surfaces (the July postkit and launch-final)
+  that predate the audio rule. The new film passes; the old postkit was not rebuilt
+  because build-postkit and render-matrix still key off LaunchVideo, not
+  `<Brand>Film` (open since postflop). Until that wiring lands, a bespoke film's
+  postkit cannot be generated from the film.
+- Kit debt, second occurrence: postflop and dashclaw both carry their own Cursor
+  because StageCursor's click bloom is an accent wash; PngSequence has no start
+  index so the film carries its own Plate. Both belong in components/.
