@@ -163,6 +163,22 @@ export const KNOWLEDGE: Record<Platform, PlatformKnowledge> = {
     format: ['Sitemap submission + URL Inspection index-status check.'],
     banRisks: ['None notable for GSC.'],
   },
+  bing: {
+    platform: 'bing',
+    asOf: AS_OF,
+    strategy: 'api',
+    hardRules: [
+      'One API key per ACCOUNT, not per site — the same key covers every verified property.',
+      'A site must be verified before a sitemap or URL is accepted; the meta tag is <meta name="msvalidate.01" content="...">, and its code is per account too.',
+      'URL submission is quota-limited per site per day and per month — check GetUrlSubmissionQuota before a batch.',
+    ],
+    costs: ['Free (Bing Webmaster Tools JSON API).'],
+    timing: [
+      'Same moment as Google: submit the sitemap the day the domain serves. Bing feeds Copilot, DuckDuckGo and ChatGPT search, so it is not optional for a developer product.',
+    ],
+    format: ['AddSite + VerifySite, then SubmitFeed (sitemap) and SubmitUrlBatch (pages).'],
+    banRisks: ['None notable; spamming the URL submission quota just gets the calls rejected.'],
+  },
   'email-sms': {
     platform: 'email-sms',
     asOf: AS_OF,

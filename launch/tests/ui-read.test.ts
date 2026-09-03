@@ -216,7 +216,7 @@ describe('GET /api/target/doctor', () => {
     const { status, body } = await api('/api/target/doctor');
     expect(status).toBe(200);
     const data = (body as { data: { rows: { provider: string; mode: string; detail: string }[] } }).data;
-    expect(data.rows.length).toBe(9);
+    expect(data.rows.length).toBe(10);
     for (const row of data.rows) {
       expect(row.provider).toBeTruthy();
       expect(['api', 'assist', 'blocked']).toContain(row.mode);

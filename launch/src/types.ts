@@ -11,6 +11,7 @@ export const PLATFORMS = [
   'hackernews',
   'producthunt',
   'google',
+  'bing',
   'email-sms',
 ] as const;
 

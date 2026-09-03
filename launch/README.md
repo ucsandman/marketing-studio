@@ -4,8 +4,8 @@ The launch engine, folded into marketing-studio as the `@marketing-studio/launch
 on 2026-09-02 (formerly the standalone `launch-engine` repo). A Claude Code skill plus a
 TypeScript CLI that takes a developed project end-to-end through domain, hosting, payments,
 comms, algorithm-researched marketing copy, and multi-platform distribution: X, LinkedIn,
-Facebook, Reddit, Google Search Console, Bluesky and YouTube by API, Hacker News and Product
-Hunt assisted. Posting is dry-run unless `--live`.
+Facebook, Reddit, Google Search Console, Bing Webmaster Tools, Bluesky and YouTube by API,
+Hacker News and Product Hunt assisted. Posting is dry-run unless `--live`.
 
 The CLI produces validated payloads and assisted-launch artifacts; the `/launch` skill
 (`../skills/launch/SKILL.md`) orchestrates DashClaw MCP tools (domain, Vercel,
@@ -115,7 +115,8 @@ Launch day: [docs/launch-runbook.md](docs/launch-runbook.md)
 
 ```bash
 npm run build           # vite (dashboard → dist/ui) + tsc (CLI → dist/)
-npm test                # vitest run (155 tests, all HTTP mocked — no network)
+npm test                # vitest run (251 tests; HTTP mocked except one live read against
+                        # ssl.bing.com that proves the Bing fault shape — it self-skips offline)
 npm run lint            # eslint (CLI + dashboard sources)
 npm run dev:ui          # vite dev loop for the dashboard (proxies /api to a running `launch ui`)
 npx playwright test     # browser smoke suite (after `npx playwright install chromium`)

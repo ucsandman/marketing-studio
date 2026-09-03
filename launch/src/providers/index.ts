@@ -6,6 +6,7 @@ import { RedditProvider } from './reddit.js';
 import { FacebookProvider } from './facebook.js';
 import { LinkedInProvider } from './linkedin.js';
 import { GscProvider } from './gsc.js';
+import { BingProvider } from './bing.js';
 import { HackerNewsProvider } from './hackernews.js';
 import { ProductHuntProvider } from './producthunt.js';
 
@@ -21,5 +22,6 @@ export function buildProviders(env: NodeJS.ProcessEnv = process.env): Provider[]
     new HackerNewsProvider(env),
     new ProductHuntProvider(env),
     new GscProvider(env),
+    new BingProvider(env),
   ];
 }

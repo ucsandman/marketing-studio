@@ -18,7 +18,7 @@ describe('runDoctor', () => {
     expect(result.exitCode).toBe(0);
 
     const byName = Object.fromEntries(result.rows.map((r) => [r.provider, r]));
-    for (const api of ['x', 'facebook', 'linkedin', 'reddit', 'google']) {
+    for (const api of ['x', 'facebook', 'linkedin', 'reddit', 'google', 'bing']) {
       expect(byName[api]?.mode, `${api} should be blocked`).toBe('blocked');
       expect(byName[api]?.fixHint, `${api} needs a fix hint`).toBeTruthy();
     }
