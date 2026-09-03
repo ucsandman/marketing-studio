@@ -169,3 +169,23 @@ failed (unmastered launch rows at -26.6 LUFS, captioned social rows with no trac
 checklist. Also: master-audio.mjs alone cannot master a generated music bed
 (mean -32 dB / peak -0.6 dBFS, crest too high for linear loudnorm) — compress the
 bed first, then measured gain into a limiter, re-measure the delivered file.
+
+## 2026-09-03 — score-film cut 17 frames off the picture
+
+**Symptom.** The first scored AgentSession delivery for offlocalhost was 1545 frames
+against a 1562-frame source (51.5 s of 52.1 s). Every gate passed: loudness, true peak,
+check-audio. Nothing compares the delivered frame count to the input film.
+
+**Root cause.** `mixFilter` fed the raw VO sum into `sidechaincompress` as the duck key.
+That filter ends with its shortest input, so the bed stopped when the last narration
+line did, and `-shortest` on the mux trimmed the video to match. Any film whose last
+line ends before the picture does loses the tail.
+
+**Fix.** The key is padded to the film length (`apad=whole_dur`) before the compressor;
+`score-film.test.mjs` pins it. Postflop's shipped `film/film-v4-scored.mp4` has the same
+defect (818 of 840 frames) and still needs `score-film --force`; probe its bed length
+first, since a bed shorter than the film also cuts picture. Open: score-film should fail
+when the delivered `nb_frames` differs from the input's.
+
+**Lesson.** A gate that measures one property (loudness) says nothing about the others
+(duration). Compare the deliverable to its source on every axis the pipeline can change.

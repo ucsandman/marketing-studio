@@ -4,6 +4,28 @@ Durable architecture and product decisions for the marketing studio. One entry p
 decision, newest first. Gotchas and lessons go to ERRORS.md; operating reference to
 PLAYBOOK.md.
 
+## 2026-09-03 — Agent sessions are scripted compositions, and the terminal keeps its own palette
+
+**Decision.** A "watch the agent work" scene is the `AgentSession` composition: a
+frame-pure Claude Code terminal driven by a beats array, never a screen capture. The
+UI kit and typing helper are vendored from flocker-md/skills (MIT) under
+`studio/src/components/agent-session/`. The terminal's Tokyo Night + terracotta palette
+is the one allowed home for literal hex outside `brands/*.json`, because it is a third
+party product's own UI, like a capture plate. Brand tokens colour everything around and
+inside it that carries meaning: page ground, success (safe), the human hold (loss), the
+MCP server prefix (info, since the brand reserves green for done).
+
+**Why.** offlocalhost.com's pitch is two commands in Claude Code and its only demo was
+the output film. A capture would drift with every Claude Code release and could not be
+diffed; a scripted session is copy in a props builder, gated by lint-copy, re-rendered
+in a minute. Tool names on screen are real (`offlocal` preflight_launch and
+check_domain_availability) by rule 5 of the vendored skill.
+
+**Consequences.** New brands need their fonts registered in `lib/fonts.ts` before any
+render (offlocalhost's IBM Plex was missing until this). `sessionTiming.ts` owns both
+the duration math and the transcript layout model, since scroll offsets are a function
+of accumulated height.
+
 ## 2026-09-02 — One marketing repo: launch-engine folds in as launch/
 
 **Decision.** This repo is the single marketing repo. The standalone launch-engine
