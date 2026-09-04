@@ -296,3 +296,46 @@ the gate, not the scored master.
 **Lesson.** A pipeline that can only measure what it can measure will confidently ship
 something nobody wants. The judges are necessary and not sufficient; the viewer test is
 the one that matters, and it costs 40 seconds.
+
+## 2026-09-04 — Truckside /marketing run: the dissenter earned its seat, the captioned-vertical trap recurred
+
+**What worked.** The copy council's MANDATORY DISSENTER caught a gate-accuracy overclaim
+the other two judges and the main loop missed. The brief said "nothing reaches a customer
+or moves money without your tap" — false for Truckside, whose reception agent answers a
+live call and books an appointment window autonomously. Verified against product source
+(`src/lib/agents/quote.ts` "Approving is the owner's send gate", `notify.ts` LIVE_MODE
+gate): only SENDS and money moves are gated; the call and its booking are not. Rescoped
+everywhere to "nothing is sent to a customer and no money moves without your tap." A
+two-of-three-judges rule would have let this ship (only the dissenter flagged it); the
+adversarial seat is not decoration.
+
+**What did not.** The postkit's captioned vertical SOCIAL rows failed check-audio and
+carried a layout collision — the SAME class of bug the postflop retro (2026-09-01) already
+logged as "tiktok/shorts/instagram rows had no track." Two failures compounded:
+`render-matrix` renders SocialClip rows with a SILENT audio stream by design, and its
+`-captioned` variant burns the launch hook-VO caption OVER the SocialClip's own headline +
+benefit lines (both unreadable at the overlap). The postkit maps tiktok/shorts/instagram
+straight at those `-captioned` rows, so it shipped silent, colliding verticals until
+check-audio (run again after postkit, correctly) caught the silence and a frame read caught
+the collision.
+
+**Fix applied this run (manual).** Mastered the `launch-16x9` matrix row (it renders with
+audio but unmastered at -24.3 LUFS). For the verticals, muxed the matching social clip's
+mastered audio onto the NON-captioned vertical video (readable lines, no collision) and
+overwrote the postkit files. check-audio then passed 11/11.
+
+**The one change (for the engine, next run).** SocialClip captioned matrix rows are a trap
+for text-heavy clips: the burned VO caption collides with the clip's own lines and the row
+is silent. Either (a) `render-matrix` should score the vertical social rows (bed + the
+matching VO line, mastered) the way `score-social-clip` does the 16:9, and skip burning a
+second caption layer on a clip that already carries text, or (b) `build-postkit` should
+point tiktok/shorts/instagram at the non-captioned vertical social muxed with the scored
+audio, never the `-captioned` SocialClip row. Until one lands, the post-postkit check-audio
+gate plus a frame read on one captioned vertical is the manual guard.
+
+**Also.** The launch demo act (33 s telemetry) tripped judge-demo-pacing's dead-air FAIL:
+the final Outbox beat holds ~4 s frozen because the capture's last `focusOn` has a 4 s
+`waitForTimeout` with no motion after it. Left as a deliberate end-hold on the "nothing
+leaves" payoff rather than re-capture (the fix cascades into demo + launch silent + launch
+scored + audio re-renders). Cheap future fix: shorten only the LAST beat's hold in
+`record-truckside-demo.mjs`, or add a tiny final scroll so the tail is not literally static.
