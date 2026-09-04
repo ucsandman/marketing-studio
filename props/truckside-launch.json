@@ -1,0 +1,141 @@
+{
+  "brandId": "truckside",
+  "kicker": "truckside.io",
+  "headline": "The back office for a business that runs out of a truck.",
+  "demo": {
+    "video": "truckside/demo.webm",
+    "telemetry": {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "durationMs": 30587,
+      "events": [
+        {
+          "type": "step",
+          "t": 2183,
+          "label": "The whole shop on one dashboard, run from the cab."
+        },
+        {
+          "type": "focus",
+          "t": 2919,
+          "x": 720,
+          "y": 118,
+          "w": 1440,
+          "h": 235
+        },
+        {
+          "type": "step",
+          "t": 6925,
+          "label": "The missed call, answered and booked while you were on the job."
+        },
+        {
+          "type": "focus",
+          "t": 7647,
+          "x": 720,
+          "y": 361,
+          "w": 1048,
+          "h": 428
+        },
+        {
+          "type": "step",
+          "t": 11663,
+          "label": "A priced quote, waiting for your one-tap approval."
+        },
+        {
+          "type": "focus",
+          "t": 12380,
+          "x": 720,
+          "y": 450,
+          "w": 1048,
+          "h": 900
+        },
+        {
+          "type": "step",
+          "t": 16390,
+          "label": "You confirm, reschedule, or move each appointment."
+        },
+        {
+          "type": "focus",
+          "t": 17112,
+          "x": 720,
+          "y": 430,
+          "w": 1048,
+          "h": 371
+        },
+        {
+          "type": "step",
+          "t": 21121,
+          "label": "Follow-ups drafted and held until they are due."
+        },
+        {
+          "type": "focus",
+          "t": 21844,
+          "x": 720,
+          "y": 546,
+          "w": 1048,
+          "h": 669
+        },
+        {
+          "type": "step",
+          "t": 25856,
+          "label": "You approve every send, and in demo mode nothing leaves the app."
+        },
+        {
+          "type": "focus",
+          "t": 26575,
+          "x": 720,
+          "y": 646,
+          "w": 1048,
+          "h": 468
+        }
+      ]
+    }
+  },
+  "features": [
+    {
+      "screenshot": "truckside/feature-reception.png",
+      "heading": "Answers the missed call and books it",
+      "lines": [
+        "Picks up when you cannot",
+        "Gets the name, number, address, and problem",
+        "Books a window or flags an emergency for you"
+      ]
+    },
+    {
+      "screenshot": "truckside/feature-quoting.png",
+      "heading": "Turns a job into a priced quote you approve with one tap",
+      "lines": [
+        "Builds a line-item quote from your pricing",
+        "Adds tax and any discount",
+        "You approve or edit a line first"
+      ]
+    },
+    {
+      "screenshot": "truckside/feature-followup.png",
+      "heading": "Drafts the follow-ups and holds them until due",
+      "lines": [
+        "Drafts nudges, reminders, and review requests",
+        "Holds each one until it is due",
+        "You approve, snooze, or dismiss"
+      ]
+    }
+  ],
+  "cta": "See the live demo, no signup",
+  "command": "truckside.io",
+  "actLengths": {
+    "hook": 240,
+    "features": [
+      216,
+      216,
+      204
+    ],
+    "end": 300
+  },
+  "assets": {
+    "logoSequence": "truckside/logo-reveal",
+    "logoFrames": 90,
+    "loopSequence": null,
+    "loopFrames": 1
+  }
+}

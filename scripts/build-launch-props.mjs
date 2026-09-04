@@ -409,6 +409,69 @@ const BRANDS = {
       loopFrames: 1,
     },
   }),
+
+  // Voice (brands/truckside.json): a plain back-office tool for a one-truck trades
+  // owner on a phone between jobs. Green #22c55e is the approve/action color AND the
+  // mark; red is an emergency flag or stop only; amber is waiting-on-the-owner only.
+  // No hype, no em dashes, no exclamation marks. Copy is the brief's
+  // (out/truckside/marketing/brief.json) and is overlaid below; the hardcoded strings
+  // are the same text so a brief-less run renders identically. Feature panels are REAL
+  // dashboard surfaces cropped from the live seeded demo by
+  // feeders/capture/shoot-truckside-feature-stills.mjs (never staged). GATE SCOPE IS
+  // LOAD-BEARING: the reception agent answers the call and books a window
+  // autonomously; only SENDS to a customer and money moves are gated. Never widen
+  // "every message and charge waits for your tap" into "nothing happens without you".
+  truckside: (demo) => ({
+    brandId: 'truckside',
+    kicker: 'truckside.io',
+    headline: 'The back office for a business that runs out of a truck.',
+    demo: {video: demo.video, telemetry: demo.telemetry},
+    features: [
+      {
+        screenshot: 'truckside/feature-reception.png',
+        heading: 'Answers the missed call and books it',
+        lines: [
+          'Picks up when you cannot',
+          'Gets the name, number, address, and problem',
+          'Books a window or flags an emergency for you',
+        ],
+      },
+      {
+        screenshot: 'truckside/feature-quoting.png',
+        heading: 'Turns a job into a priced quote you approve with one tap',
+        lines: [
+          'Builds a line-item quote from your pricing',
+          'Adds tax and any discount',
+          'You approve or edit a line first',
+        ],
+      },
+      {
+        screenshot: 'truckside/feature-followup.png',
+        heading: 'Drafts the follow-ups and holds them until due',
+        lines: [
+          'Drafts nudges, reminders, and review requests',
+          'Holds each one until it is due',
+          'You approve, snooze, or dismiss',
+        ],
+      },
+    ],
+    cta: 'See the live demo, no signup',
+    // The end card's mono chip carries the destination: the CTA says to open the demo
+    // and the brand name alone does not say where that is.
+    command: 'truckside.io',
+    // Act lengths widened from the shared defaults so every approved narration line in
+    // out/truckside/marketing/brief.json fits at ~150 wpm plus VO_LEAD and VO_PAD (the
+    // audio pass scores this picture lock later). Defaults would clip hook (17 words)
+    // and end (22 words). The demo act is telemetry-derived from the ~30.6s capture and
+    // is not listed here (widen the recording, never shorten it).
+    actLengths: {hook: 240, features: [216, 216, 204], end: 300},
+    assets: {
+      logoSequence: 'truckside/logo-reveal',
+      logoFrames: 90,
+      loopSequence: null,
+      loopFrames: 1,
+    },
+  }),
 };
 
 const build = BRANDS[brand];

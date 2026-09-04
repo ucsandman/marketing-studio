@@ -16,6 +16,9 @@ const ACRONYM_ALLOWLIST = new Set([
   // The CLAUDE.md filename (Claude Code project memory) reads as an all-caps
   // word to the hype rule but is a literal artifact name.
   'CLAUDE',
+  // Trade-domain acronym: HVAC is a core audience vertical (garage door, HVAC,
+  // plumbing, decks) named in the brand voice and product copy, not hype.
+  'HVAC',
 ]);
 
 // name: label used for grouping/reporting. re: word-boundary regex, matched case-insensitively.

@@ -1,0 +1,12 @@
+{
+  "brandId": "truckside",
+  "kicker": "truckside.io",
+  "headline": "The missed call, answered and booked",
+  "lines": [
+    "Reception picks up when you cannot",
+    "The quote is priced and waits for your tap",
+    "Follow-ups drafted and held until they are due"
+  ],
+  "screenshot": "truckside/feature-reception.png",
+  "cta": "See the live demo, truckside.io"
+}
