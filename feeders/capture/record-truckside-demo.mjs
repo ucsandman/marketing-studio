@@ -22,6 +22,9 @@ import {captureKeyParts} from './capture-cache.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PORT = process.env.TS_PORT ?? '3007';
+// Owner sign-in. The signing key derives from OWNER_PASSCODE, so the local server is started
+// with a known throwaway passcode (never the real .env one) and we log in with the same value.
+const PASSCODE = process.env.TS_PASSCODE ?? 'trucksidedemo';
 const TS_ROOT = process.env.TS_ROOT ?? 'C:/Projects/tradesdesk';
 const base = `http://localhost:${PORT}`;
 const VIEWPORT = {width: 1440, height: 900};
@@ -118,8 +121,10 @@ try {
 
   rec.start();
 
-  // /demo mints the owner session and 302s to /app (the seeded dashboard).
-  await page.goto(`${base}/demo`, {waitUntil: 'networkidle'});
+  // Owner sign-in mints the owner session cookie in this context, then load the seeded /app.
+  const login = await context.request.post(`${base}/api/login`, {form: {passcode: PASSCODE}});
+  if (!login.ok()) throw new Error(`owner login failed ${login.status()} (set OWNER_PASSCODE on the server)`);
+  await page.goto(`${base}/app`, {waitUntil: 'networkidle'});
   await page.getByRole('heading', {name: /Summit Garage/i}).waitFor({timeout: 20_000});
   await page.waitForTimeout(SETTLE_MS);
 
@@ -145,7 +150,7 @@ try {
 
   // 5. Follow-ups due - drafted and held until due; approve queues the send.
   rec.step('Follow-ups drafted and held until they are due.');
-  await focusOn('section:has(h2:has-text("Follow-ups due"))', {padX: 36, padY: 40, biasY: -20});
+  await focusOn('section:has(h2:has-text("Follow-ups"))', {padX: 36, padY: 40, biasY: -20});
   await page.waitForTimeout(VIEW_HOLD_MS);
 
   // 6. Outbox - every send recorded as simulated; nothing leaves without a tap.

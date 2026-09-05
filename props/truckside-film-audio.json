@@ -1,0 +1,123 @@
+{
+  "brandId": "truckside",
+  "composition": "LaunchVideo",
+  "fps": 30,
+  "totalFrames": 2292,
+  "music": {
+    "src": "truckside/audio/music.mp3",
+    "durationMs": 76430
+  },
+  "lines": [
+    {
+      "id": "logo",
+      "text": "Truckside.",
+      "src": "truckside/audio/logo.mp3",
+      "startMs": 400,
+      "durationMs": 910
+    },
+    {
+      "id": "hook",
+      "text": "You are on the job when the call comes in, and voicemail loses it. Truckside answers instead.",
+      "src": "truckside/audio/hook.mp3",
+      "startMs": 5400,
+      "durationMs": 6400
+    },
+    {
+      "id": "demo",
+      "text": "This is the whole shop, run from one dashboard while you are out on the truck.",
+      "src": "truckside/audio/demo.mp3",
+      "startMs": 13400,
+      "durationMs": 4360
+    },
+    {
+      "id": "feature-0",
+      "text": "When you cannot pick up, the reception agent gets the details and books a window.",
+      "src": "truckside/audio/feature-0.mp3",
+      "startMs": 45600,
+      "durationMs": 4860
+    },
+    {
+      "id": "feature-1",
+      "text": "Give it a job and it builds a priced quote. You approve with one tap.",
+      "src": "truckside/audio/feature-1.mp3",
+      "startMs": 52800,
+      "durationMs": 4600
+    },
+    {
+      "id": "feature-2",
+      "text": "It drafts the nudges and reminders and holds each one until it is due.",
+      "src": "truckside/audio/feature-2.mp3",
+      "startMs": 60000,
+      "durationMs": 4680
+    },
+    {
+      "id": "end",
+      "text": "The call that would have been lost is booked. Every message and charge waits for your tap. See the live demo.",
+      "src": "truckside/audio/end.mp3",
+      "startMs": 66800,
+      "durationMs": 7000
+    }
+  ],
+  "sfx": [
+    {
+      "name": "whoosh",
+      "frame": 150
+    },
+    {
+      "name": "whoosh",
+      "frame": 390
+    },
+    {
+      "name": "whoosh",
+      "frame": 1356
+    },
+    {
+      "name": "tick",
+      "frame": 1371
+    },
+    {
+      "name": "tick",
+      "frame": 1381
+    },
+    {
+      "name": "tick",
+      "frame": 1391
+    },
+    {
+      "name": "whoosh",
+      "frame": 1572
+    },
+    {
+      "name": "tick",
+      "frame": 1587
+    },
+    {
+      "name": "tick",
+      "frame": 1597
+    },
+    {
+      "name": "tick",
+      "frame": 1607
+    },
+    {
+      "name": "whoosh",
+      "frame": 1788
+    },
+    {
+      "name": "tick",
+      "frame": 1803
+    },
+    {
+      "name": "tick",
+      "frame": 1813
+    },
+    {
+      "name": "tick",
+      "frame": 1823
+    },
+    {
+      "name": "riser",
+      "frame": 1947
+    }
+  ]
+}

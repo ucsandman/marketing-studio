@@ -1,7 +1,7 @@
 {
   "music": {
     "src": "truckside/audio/music.mp3",
-    "durationMs": 75650
+    "durationMs": 76430
   },
   "lines": [
     {
@@ -46,5 +46,8 @@
       "durationMs": 7000,
       "text": "The call that would have been lost is booked. Every message and charge waits for your tap. See the live demo."
     }
-  ]
+  ],
+  "sfx": {
+    "enabled": true
+  }
 }

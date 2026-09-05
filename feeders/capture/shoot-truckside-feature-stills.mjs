@@ -15,6 +15,7 @@ import {fileURLToPath} from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PORT = process.env.TS_PORT ?? '3007';
+const PASSCODE = process.env.TS_PASSCODE ?? 'trucksidedemo';
 const base = `http://localhost:${PORT}`;
 const VIEWPORT = {width: 1440, height: 900};
 const CW = 1120; // 16:10 crop
@@ -36,7 +37,7 @@ const HIDE_DEVTOOLS = `
 const shots = [
   {sel: 'section:has(h2:has-text("missed calls"))', out: 'feature-reception.png'},
   {sel: 'section:has(h2:has-text("Quotes awaiting approval"))', out: 'feature-quoting.png'},
-  {sel: 'section:has(h2:has-text("Follow-ups due"))', out: 'feature-followup.png'},
+  {sel: 'section:has(h2:has-text("Follow-ups"))', out: 'feature-followup.png'},
 ];
 
 const destDir = join(ROOT, 'studio', 'public', 'truckside');
@@ -46,8 +47,10 @@ try {
   browser = await chromium.launch();
   const context = await browser.newContext({viewport: VIEWPORT, deviceScaleFactor: 2});
   await context.addInitScript(HIDE_DEVTOOLS);
+  const login = await context.request.post(`${base}/api/login`, {form: {passcode: PASSCODE}});
+  if (!login.ok()) throw new Error(`owner login failed ${login.status()} (set OWNER_PASSCODE on the server)`);
   const page = await context.newPage();
-  await page.goto(`${base}/demo`, {waitUntil: 'networkidle'});
+  await page.goto(`${base}/app`, {waitUntil: 'networkidle'});
   await page.getByRole('heading', {name: /Summit Garage/i}).waitFor({timeout: 20_000});
 
   for (const {sel, out} of shots) {
