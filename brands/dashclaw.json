@@ -1,7 +1,7 @@
 {
   "id": "dashclaw",
   "name": "DashClaw",
-  "tagline": "Agent decision infrastructure",
+  "tagline": "The approval layer for unattended AI agents",
   "url": "dashclaw.io",
   "colors": {
     "bg": "#0e1014",

@@ -18,7 +18,7 @@ mkdirSync(outDir, {recursive: true});
 
 const props = {
   brandId: 'dashclaw',
-  tagline: 'Agent decision infrastructure',
+  tagline: 'The approval layer for unattended AI agents',
   cta: 'Govern your agents at dashclaw.io',
   heroImage: null,
   loopSequence: null,
