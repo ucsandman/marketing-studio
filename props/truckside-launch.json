@@ -9,85 +9,128 @@
         "width": 1440,
         "height": 900
       },
-      "durationMs": 31390,
+      "durationMs": 22726,
       "events": [
         {
           "type": "step",
-          "t": 2985,
-          "label": "The whole shop on one dashboard, run from the cab."
+          "t": 3076,
+          "label": "A missed call comes in while you are on the job."
         },
         {
           "type": "focus",
-          "t": 3715,
+          "t": 3236,
           "x": 720,
-          "y": 143,
+          "y": 167,
           "w": 1440,
-          "h": 286
+          "h": 334
         },
         {
-          "type": "step",
-          "t": 7727,
-          "label": "The missed call, answered and booked while you were on the job."
+          "type": "click",
+          "t": 4258,
+          "x": 316,
+          "y": 157
         },
         {
           "type": "focus",
-          "t": 8442,
+          "t": 5695,
           "x": 720,
-          "y": 471,
+          "y": 331,
           "w": 1048,
-          "h": 546
+          "h": 662
         },
         {
           "type": "step",
-          "t": 12457,
-          "label": "A priced quote, waiting for your one-tap approval."
+          "t": 7709,
+          "label": "The quote is priced. One tap approves it."
         },
         {
           "type": "focus",
-          "t": 13181,
+          "t": 8642,
           "x": 720,
           "y": 450,
-          "w": 1048,
+          "w": 1040,
+          "h": 900
+        },
+        {
+          "type": "click",
+          "t": 9665,
+          "x": 443,
+          "y": 438
+        },
+        {
+          "type": "focus",
+          "t": 10232,
+          "x": 720,
+          "y": 450,
+          "w": 1040,
           "h": 900
         },
         {
           "type": "step",
-          "t": 17191,
-          "label": "You confirm, reschedule, or move each appointment."
+          "t": 11843,
+          "label": "Confirm, move, or cancel each appointment."
         },
         {
           "type": "focus",
-          "t": 17910,
+          "t": 12767,
           "x": 720,
-          "y": 430,
-          "w": 1048,
-          "h": 487
+          "y": 297,
+          "w": 1040,
+          "h": 594
+        },
+        {
+          "type": "click",
+          "t": 13779,
+          "x": 917,
+          "y": 102
+        },
+        {
+          "type": "focus",
+          "t": 14264,
+          "x": 720,
+          "y": 297,
+          "w": 1040,
+          "h": 594
         },
         {
           "type": "step",
-          "t": 21912,
-          "label": "Follow-ups drafted and held until they are due."
+          "t": 15872,
+          "label": "Follow-ups are drafted and held until you approve."
         },
         {
           "type": "focus",
-          "t": 22644,
+          "t": 16791,
           "x": 720,
           "y": 450,
-          "w": 1048,
+          "w": 1040,
+          "h": 900
+        },
+        {
+          "type": "click",
+          "t": 17799,
+          "x": 937,
+          "y": 103
+        },
+        {
+          "type": "focus",
+          "t": 18198,
+          "x": 720,
+          "y": 450,
+          "w": 1040,
           "h": 900
         },
         {
           "type": "step",
-          "t": 26651,
-          "label": "You approve every send, and in demo mode nothing leaves the app."
+          "t": 19802,
+          "label": "Every send is recorded. In demo mode nothing leaves the app."
         },
         {
           "type": "focus",
-          "t": 27379,
+          "t": 20721,
           "x": 720,
-          "y": 430,
-          "w": 1048,
-          "h": 716
+          "y": 450,
+          "w": 1040,
+          "h": 900
         }
       ]
     }

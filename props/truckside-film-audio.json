@@ -2,10 +2,10 @@
   "brandId": "truckside",
   "composition": "LaunchVideo",
   "fps": 30,
-  "totalFrames": 2292,
+  "totalFrames": 2032,
   "music": {
     "src": "truckside/audio/music.mp3",
-    "durationMs": 76430
+    "durationMs": 67760
   },
   "lines": [
     {
@@ -33,28 +33,28 @@
       "id": "feature-0",
       "text": "When you cannot pick up, the reception agent gets the details and books a window.",
       "src": "truckside/audio/feature-0.mp3",
-      "startMs": 45600,
+      "startMs": 36933,
       "durationMs": 4860
     },
     {
       "id": "feature-1",
       "text": "Give it a job and it builds a priced quote. You approve with one tap.",
       "src": "truckside/audio/feature-1.mp3",
-      "startMs": 52800,
+      "startMs": 44133,
       "durationMs": 4600
     },
     {
       "id": "feature-2",
       "text": "It drafts the nudges and reminders and holds each one until it is due.",
       "src": "truckside/audio/feature-2.mp3",
-      "startMs": 60000,
+      "startMs": 51333,
       "durationMs": 4680
     },
     {
       "id": "end",
       "text": "The call that would have been lost is booked. Every message and charge waits for your tap. See the live demo.",
       "src": "truckside/audio/end.mp3",
-      "startMs": 66800,
+      "startMs": 58133,
       "durationMs": 7000
     }
   ],
@@ -69,55 +69,55 @@
     },
     {
       "name": "whoosh",
-      "frame": 1356
+      "frame": 1096
     },
     {
       "name": "tick",
-      "frame": 1371
+      "frame": 1111
     },
     {
       "name": "tick",
-      "frame": 1381
+      "frame": 1121
     },
     {
       "name": "tick",
-      "frame": 1391
+      "frame": 1131
     },
     {
       "name": "whoosh",
-      "frame": 1572
+      "frame": 1312
     },
     {
       "name": "tick",
-      "frame": 1587
+      "frame": 1327
     },
     {
       "name": "tick",
-      "frame": 1597
+      "frame": 1337
     },
     {
       "name": "tick",
-      "frame": 1607
+      "frame": 1347
     },
     {
       "name": "whoosh",
-      "frame": 1788
+      "frame": 1528
     },
     {
       "name": "tick",
-      "frame": 1803
+      "frame": 1543
     },
     {
       "name": "tick",
-      "frame": 1813
+      "frame": 1553
     },
     {
       "name": "tick",
-      "frame": 1823
+      "frame": 1563
     },
     {
       "name": "riser",
-      "frame": 1947
+      "frame": 1687
     }
   ]
 }

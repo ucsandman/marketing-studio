@@ -2,15 +2,22 @@
 /**
  * record-truckside-demo.mjs - records a Truckside owner-dashboard walkthrough for ProductDemo.
  *
- * Prereq: the product app running with demo seed data on localhost:
- *   cd C:\Projects\tradesdesk && DEMO_MODE=1 npm run dev:next   (port 3007)
- * The /demo route mints the owner session and 302s to /app; no passcode needed.
+ * This is a USED dashboard, not a scroll of screenshots: every scene performs a real click on a
+ * real control and waits for the visible consequence (a new row, a changed badge, a queued send),
+ * so ProductDemo draws a cursor travelling to each control and pressing it (rec.click telemetry).
+ *
+ * Prereq: the product app running with demo seed data on localhost (owner session):
+ *   cd C:\Projects\tradesdesk
+ *   DEMO_MODE=1 TRUCKSIDE_LLM=off OWNER_PASSCODE=trucksidedemo npm run start   (port 3007)
+ *   npx tsx prisma/seed.ts   (fresh seed so there is something to act on)
+ * We sign in as OWNER with the same throwaway passcode (the session key derives from it); the
+ * real .env passcode is never read.
  *
  * Output: ../../studio/public/truckside/demo.webm + ../../props/truckside-demo.json
  *
- * Camera focus rects are MEASURED from each target element's real boundingBox
- * (viewport px == webm px because recordVideo.size == viewport), never derived
- * from click points. The dashboard is one long route, so we scroll+focus.
+ * Camera focus rects are MEASURED from each target element's real boundingBox (viewport px ==
+ * webm px because recordVideo.size == viewport), never derived from click points. Clicks are
+ * logged at the control centre so the cursor lands on the button it presses.
  */
 import {chromium} from '@playwright/test';
 import {copyFileSync, mkdirSync, writeFileSync} from 'node:fs';
@@ -28,8 +35,10 @@ const PASSCODE = process.env.TS_PASSCODE ?? 'trucksidedemo';
 const TS_ROOT = process.env.TS_ROOT ?? 'C:/Projects/tradesdesk';
 const base = `http://localhost:${PORT}`;
 const VIEWPORT = {width: 1440, height: 900};
-const VIEW_HOLD_MS = 4000;
-const SETTLE_MS = 700;
+const SETTLE_MS = 650; // after a smooth scroll, let the page come to rest
+const APPROACH_MS = 1000; // camera stable + cursor eases the last 700ms into the control
+const CHANGE_HOLD_MS = 1600; // after a click, hold long enough to read the consequence
+const REVEAL_HOLD_MS = 2000; // hold on a revealed section (scene 1 new row, scene 5 outbox)
 
 const argv = process.argv.slice(2);
 const FORCE = argv.includes('--force');
@@ -40,7 +49,7 @@ const CACHE_ARTIFACTS = [videoOut, propsOut];
 const keyParts = captureKeyParts({
   repo: TS_ROOT,
   scriptPath: fileURLToPath(import.meta.url),
-  config: {viewport: VIEWPORT, holdMs: VIEW_HOLD_MS, settleMs: SETTLE_MS},
+  config: {viewport: VIEWPORT, settleMs: SETTLE_MS, approachMs: APPROACH_MS, changeHoldMs: CHANGE_HOLD_MS},
 });
 const CACHE_KEY = cacheKey(keyParts);
 const CACHE_ENABLED = keyParts.productHead !== null;
@@ -64,7 +73,7 @@ try {
   const res = await fetch(`${base}/`, {signal: AbortSignal.timeout(4000)});
   if (res.status >= 500) throw new Error(`server error ${res.status}`);
 } catch {
-  console.error(`App unreachable at ${base}. Start it: cd C:\\Projects\\tradesdesk && DEMO_MODE=1 npm run dev:next`);
+  console.error(`App unreachable at ${base}. Start it: cd C:\\Projects\\tradesdesk && DEMO_MODE=1 TRUCKSIDE_LLM=off OWNER_PASSCODE=trucksidedemo npm run start`);
   process.exit(1);
 }
 
@@ -106,14 +115,29 @@ try {
   const page = await context.newPage();
   const rec = new Recorder();
 
-  // Focus one measured element after settling; the top of a tall section is
-  // biased into frame so the section header reads.
-  const focusOn = async (selector, {padX, padY, biasY = 0} = {}) => {
-    const loc = page.locator(selector).first();
-    await loc.scrollIntoViewIfNeeded();
-    await page.waitForTimeout(SETTLE_MS);
+  // A dashboard section, addressed by its exact <h2> title.
+  const section = (title) =>
+    page.locator('section').filter({has: page.getByRole('heading', {name: title, exact: true})});
+
+  // The count badge that sits right after a section's <h2> (SectionHeader).
+  const sectionCount = async (title) => {
+    const badge = section(title).locator('h2 + span').first();
+    const txt = (await badge.innerText()).trim();
+    return Number.parseInt(txt, 10);
+  };
+
+  // Smooth-scroll an element to the vertical centre so the footage shows real
+  // scroll motion between scenes, not a jump cut, then let it settle.
+  const smoothScrollTo = async (loc, block = 'center') => {
+    await loc.evaluate((el, b) => el.scrollIntoView({behavior: 'smooth', block: b}), block);
+    await page.waitForTimeout(SETTLE_MS + 250);
+  };
+
+  // Focus one measured element after settling; a section header is biased into
+  // frame so the title and the acted row read together.
+  const focusOn = async (loc, {padX = 40, padY = 40, biasY = 0} = {}) => {
     const box = await loc.boundingBox();
-    if (!box) throw new Error(`focus target ${selector} has no bounding box`);
+    if (!box) throw new Error('focus target has no bounding box');
     const f = clampFocus(box, {padX, padY});
     f.y = Math.min(Math.max(f.y + biasY, f.h / 2), VIEWPORT.height - f.h / 2);
     rec.focusAt(f.x, f.y, {w: f.w, h: f.h});
@@ -125,38 +149,108 @@ try {
   const login = await context.request.post(`${base}/api/login`, {form: {passcode: PASSCODE}});
   if (!login.ok()) throw new Error(`owner login failed ${login.status()} (set OWNER_PASSCODE on the server)`);
   await page.goto(`${base}/app`, {waitUntil: 'networkidle'});
-  await page.getByRole('heading', {name: /Summit Garage/i}).waitFor({timeout: 20_000});
+  await page.getByRole('button', {name: 'Simulate missed call', exact: true}).waitFor({timeout: 20_000});
   await page.waitForTimeout(SETTLE_MS);
 
-  // 1. Header - the shop, the day's counts, the Simulate missed call button.
-  rec.step('The whole shop on one dashboard, run from the cab.');
-  await focusOn('header', {padX: 30, padY: 30});
-  await page.waitForTimeout(VIEW_HOLD_MS);
+  // --- Scene 1: a missed call comes in. Click Simulate, then reveal the new row. ---
+  rec.step('A missed call comes in while you are on the job.');
+  const missedBefore = await sectionCount("Today's missed calls");
+  const simulate = page.getByRole('button', {name: 'Simulate missed call', exact: true});
+  await focusOn(page.locator('header'), {padX: 24, padY: 24}); // frame the header + the button
+  await page.waitForTimeout(APPROACH_MS);
+  await rec.click(simulate);
+  await page.waitForFunction(
+    (n) => {
+      const sec = [...document.querySelectorAll('section')].find(
+        (s) => s.querySelector('h2')?.textContent?.trim() === "Today's missed calls",
+      );
+      const badge = sec?.querySelector('h2 + span');
+      return badge && Number.parseInt(badge.textContent.trim(), 10) > n;
+    },
+    missedBefore,
+    {timeout: 20_000},
+  );
+  const missedSection = section("Today's missed calls");
+  await smoothScrollTo(missedSection, 'start');
+  await focusOn(missedSection, {padX: 36, padY: 44, biasY: -30}); // frame the top: the new row + badge
+  await page.waitForTimeout(REVEAL_HOLD_MS);
 
-  // 2. Today's missed calls - the call answered and booked while on the job.
-  rec.step('The missed call, answered and booked while you were on the job.');
-  await focusOn('section:has(h2:has-text("missed calls"))', {padX: 36, padY: 40, biasY: -20});
-  await page.waitForTimeout(VIEW_HOLD_MS);
+  // --- Scene 2: the quote is priced. One tap approves it. ---
+  rec.step('The quote is priced. One tap approves it.');
+  const quotesBefore = await sectionCount('Quotes awaiting approval');
+  const quotes = section('Quotes awaiting approval');
+  await smoothScrollTo(quotes, 'start');
+  const approveQuote = quotes.getByRole('button', {name: 'Approve', exact: true}).first();
+  await focusOn(quotes, {padX: 32, padY: 40, biasY: -30});
+  await page.waitForTimeout(APPROACH_MS);
+  await rec.click(approveQuote);
+  await page.waitForFunction(
+    (n) => {
+      const sec = [...document.querySelectorAll('section')].find(
+        (s) => s.querySelector('h2')?.textContent?.trim() === 'Quotes awaiting approval',
+      );
+      const badge = sec?.querySelector('h2 + span');
+      return badge && Number.parseInt(badge.textContent.trim(), 10) < n;
+    },
+    quotesBefore,
+    {timeout: 20_000},
+  );
+  await focusOn(quotes, {padX: 32, padY: 40, biasY: -30});
+  await page.waitForTimeout(CHANGE_HOLD_MS);
 
-  // 3. Quotes awaiting approval - the gate: a priced quote waiting for one tap.
-  rec.step('A priced quote, waiting for your one-tap approval.');
-  await focusOn('section:has(h2:has-text("Quotes awaiting approval"))', {padX: 36, padY: 40, biasY: -20});
-  await page.waitForTimeout(VIEW_HOLD_MS);
+  // --- Scene 3: confirm the appointment. ---
+  rec.step('Confirm, move, or cancel each appointment.');
+  const appts = section('Upcoming appointments');
+  await smoothScrollTo(appts, 'start');
+  const confirmedBefore = await appts.getByText('Confirmed', {exact: true}).count();
+  const confirm = appts.getByRole('button', {name: 'Confirm', exact: true}).first();
+  await focusOn(appts, {padX: 32, padY: 40, biasY: -30});
+  await page.waitForTimeout(APPROACH_MS);
+  await rec.click(confirm);
+  await page.waitForFunction(
+    (n) => {
+      const sec = [...document.querySelectorAll('section')].find(
+        (s) => s.querySelector('h2')?.textContent?.trim() === 'Upcoming appointments',
+      );
+      if (!sec) return false;
+      const confirmed = [...sec.querySelectorAll('span')].filter((s) => s.textContent.trim() === 'Confirmed').length;
+      return confirmed > n;
+    },
+    confirmedBefore,
+    {timeout: 20_000},
+  );
+  await focusOn(appts, {padX: 32, padY: 40, biasY: -30});
+  await page.waitForTimeout(CHANGE_HOLD_MS);
 
-  // 4. Upcoming appointments - confirm, reschedule, cancel.
-  rec.step('You confirm, reschedule, or move each appointment.');
-  await focusOn('section:has(h2:has-text("Upcoming appointments"))', {padX: 36, padY: 40, biasY: -20});
-  await page.waitForTimeout(VIEW_HOLD_MS);
+  // --- Scene 4: approve a drafted follow-up (queues a send into the Outbox). ---
+  rec.step('Follow-ups are drafted and held until you approve.');
+  const outboxBefore = await sectionCount('Outbox');
+  const followups = section('Follow-ups');
+  await smoothScrollTo(followups, 'start');
+  const approveFollowup = followups.getByRole('button', {name: 'Approve', exact: true}).first();
+  await focusOn(followups, {padX: 32, padY: 40, biasY: -30});
+  await page.waitForTimeout(APPROACH_MS);
+  await rec.click(approveFollowup);
+  await page.waitForFunction(
+    (n) => {
+      const sec = [...document.querySelectorAll('section')].find(
+        (s) => s.querySelector('h2')?.textContent?.trim() === 'Outbox',
+      );
+      const badge = sec?.querySelector('h2 + span');
+      return badge && Number.parseInt(badge.textContent.trim(), 10) > n;
+    },
+    outboxBefore,
+    {timeout: 20_000},
+  );
+  await focusOn(followups, {padX: 32, padY: 40, biasY: -30});
+  await page.waitForTimeout(CHANGE_HOLD_MS);
 
-  // 5. Follow-ups due - drafted and held until due; approve queues the send.
-  rec.step('Follow-ups drafted and held until they are due.');
-  await focusOn('section:has(h2:has-text("Follow-ups"))', {padX: 36, padY: 40, biasY: -20});
-  await page.waitForTimeout(VIEW_HOLD_MS);
-
-  // 6. Outbox - every send recorded as simulated; nothing leaves without a tap.
-  rec.step('You approve every send, and in demo mode nothing leaves the app.');
-  await focusOn('section:has(h2:has-text("Outbox"))', {padX: 36, padY: 40, biasY: -20});
-  await page.waitForTimeout(VIEW_HOLD_MS);
+  // --- Scene 5: the Outbox. Every send recorded; in demo mode nothing leaves. ---
+  rec.step('Every send is recorded. In demo mode nothing leaves the app.');
+  const outbox = section('Outbox');
+  await smoothScrollTo(outbox, 'start');
+  await focusOn(outbox, {padX: 32, padY: 44, biasY: -30});
+  await page.waitForTimeout(REVEAL_HOLD_MS);
 
   const telemetry = rec.finish(VIEWPORT);
   const video = page.video();
