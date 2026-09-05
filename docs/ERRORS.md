@@ -339,3 +339,42 @@ the final Outbox beat holds ~4 s frozen because the capture's last `focusOn` has
 leaves" payoff rather than re-capture (the fix cascades into demo + launch silent + launch
 scored + audio re-renders). Cheap future fix: shorten only the LAST beat's hold in
 `record-truckside-demo.mjs`, or add a tiny final scroll so the tail is not literally static.
+
+---
+
+## Truckside light-theme media refresh (2026-09-05)
+
+**What worked.** OKLCH -> sRGB via Ottosson math gave exact hex from the product's
+globals.css; the Blender logo scene reads brand hex from the JSON so the new green
+re-rendered with no scene edit; regenerating only the MUSIC bed to the new 76.4 s total
+(VO reused) killed the silent-tail failure mode (judge-audio trailing 0.65 s, PASS).
+
+**What did not (the load-bearing gotcha).** Re-rendering LaunchVideo WITH the audio
+manifest (the canonical template soundtrack path, Recipe A) crashed the Remotion
+compositor intermittently: `Could not extract frame from compositor: Request closed` ->
+`No frame found at position N for ...demo source`, at a DIFFERENT frame each attempt
+(1018, 614, 707), with both a webm and an h264 demo source. The silent lock render (same
+composition, no audio) succeeded every time. So it is the audio+video decode load, not a
+seek bug or a bad frame. Three ~5-minute renders were lost chasing webm-seek theories.
+
+**Fix applied this run.** Scored the SILENT launch lock with `score-film.mjs` instead:
+added `scripts/build-truckside-film-audio.mjs`, which places each VO line at the exact
+frame `audioMix.ts` uses (`act.from + VO_LEAD`, VO_LEAD=12) and derives sfx cue frames
+from `sfxCues.ts`. score-film muxes bed+VO+sfx onto the lock, masters to -14, verifies.
+judge-audio 7/7 and judge-av-sync PASS, so the mux is timing-identical to the embedded
+path. Matrix launch rows reused `launch-final.mp4` (re-encoded to the 8 MB web budget) +
+stills, avoiding the same crash.
+
+**The one change (for the engine, next run).** A LaunchVideo template film whose demo act
+is a real captured video should be scored by muxing onto the silent lock, NOT by an
+audio-embedded re-render — the compositor crash is reproducible under load. Either teach
+the audio-track Recipe A to prefer the score-film mux when the film has a video demo act,
+or set `--concurrency=1` on the audio-embedded re-render (render-matrix already retries
+launch rows at concurrency=1 for this reason). Until then: silent lock + build-<brand>-
+film-audio + score-film is the reliable path.
+
+**Also (product-side, redesign drift).** The redesigned truckside `/demo` route now mints
+a READ-ONLY demo session (no Simulate button, static fixture); film the OWNER dashboard
+via `/api/login` with a passcode set in the server env (never read `.env`). Section header
+renamed "Follow-ups due" -> "Follow-ups"; capture selectors updated. cropdetect finds no
+crop on an off-white composite, so hero crops come from the raw dashboard capture.
