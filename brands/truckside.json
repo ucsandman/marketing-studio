@@ -5,32 +5,32 @@
   "tagline": "The back office for a business that runs out of a truck",
   "url": "truckside.io",
   "colors": {
-    "bg": "#09090b",
-    "surface": "#141417",
-    "surface2": "#1c1c21",
-    "line": "#27272a",
-    "ink": "#f4f4f5",
-    "ink2": "#d4d4d8",
-    "ink3": "#a1a1aa",
-    "brand": "#22c55e",
-    "profit": "#4ade80",
-    "safe": "#22c55e",
-    "loss": "#ef4444",
-    "info": "#38bdf8",
-    "rare": "#f59e0b"
+    "bg": "#fafafa",
+    "surface": "#ffffff",
+    "surface2": "#eef1ef",
+    "line": "#ced2cf",
+    "ink": "#101911",
+    "ink2": "#484f49",
+    "ink3": "#656b66",
+    "brand": "#00792f",
+    "profit": "#00792f",
+    "safe": "#00792f",
+    "loss": "#c21725",
+    "info": "#006aa0",
+    "rare": "#c96900"
   },
   "fonts": {
-    "display": "Inter",
-    "body": "Inter",
+    "display": "Archivo",
+    "body": "Atkinson Hyperlegible Next",
     "mono": "JetBrains Mono"
   },
   "effects": {
     "wash": 0,
-    "glow": 0.08
+    "glow": 0
   },
   "grade": {
     "grain": 0.08,
-    "vignette": 0.14,
+    "vignette": 0,
     "bloom": 0,
     "halation": 0,
     "aberration": 0,
@@ -45,5 +45,5 @@
     "settle": 0.3,
     "textReveal": "maskWipe"
   },
-  "voice": "A plain back-office tool for a one-truck trades business (garage door, HVAC, plumbing, decks). The reader is an owner on a phone between jobs. Short concrete sentences, verbs first: answers, books, quotes, approves, sends. Green #22c55e is the approve and action color and the mark; the owner's button is always green. Red #ef4444 is an emergency flag or a stop only, never decoration. Amber #f59e0b means waiting on the owner, nothing else. Dark zinc UI, white ink, no gradients, no glow, no neon. Wordmark is 'Truckside', capital T, one word. The product's promise is the gate: nothing reaches a customer or moves money without the owner's tap, so copy never claims it sends, charges, or books on its own. No hype, no em dashes, no exclamation marks, not a SaaS dashboard pitch, not a startup, not an AI-first brand: the truck and the job come first, the software is the office in the passenger seat."
+  "voice": "A plain back-office tool for a one-truck trades business (garage door, HVAC, plumbing, decks). The reader is an owner on a phone between jobs, outdoors in daylight. Short concrete sentences, verbs first: answers, books, quotes, approves, sends. Green #00792f is the approve and action color and the mark; the owner's button is always green. Red #c21725 is an emergency flag or a stop only, never decoration. Amber #c96900 means waiting on the owner, nothing else. Light daylight UI: off-white #fafafa ground, white #ffffff cards, near-black #101911 ink, true neutrals, no gradients, no glow, no neon, no wash. Wordmark is 'Truckside', capital T, one word. The product's promise is the gate: nothing reaches a customer or moves money without the owner's tap, so copy never claims it sends, charges, or books on its own. No hype, no em dashes, no exclamation marks, not a SaaS dashboard pitch, not a startup, not an AI-first brand: the truck and the job come first, the software is the office in the passenger seat."
 }

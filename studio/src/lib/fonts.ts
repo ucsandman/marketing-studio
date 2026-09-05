@@ -5,6 +5,7 @@ import {loadFont as loadInter} from '@remotion/google-fonts/Inter';
 import {loadFont as loadJetBrainsMono} from '@remotion/google-fonts/JetBrainsMono';
 import {loadFont as loadLibreFranklin} from '@remotion/google-fonts/LibreFranklin';
 import {loadFont as loadArchivo} from '@remotion/google-fonts/Archivo';
+import {loadFont as loadAtkinsonNext} from '@remotion/google-fonts/AtkinsonHyperlegibleNext';
 import {loadFont as loadSourceSans3} from '@remotion/google-fonts/SourceSans3';
 import {loadFont as loadSourceSerif4} from '@remotion/google-fonts/SourceSerif4';
 import {loadFont as loadIBMPlexSans} from '@remotion/google-fonts/IBMPlexSans';
@@ -32,6 +33,12 @@ const families: Record<string, string> = {
   // re-weighted and re-broke lines in 2026-09-01's review). fonts.test.ts guards it.
   Archivo: loadArchivo('normal', {weights: ['500', '600', '700'], subsets: ['latin']})
     .fontFamily,
+  // Truckside body/UI. Body 400, buttons/labels 600; 700 kept so display fallbacks land
+  // on 700 rather than 600. Atkinson Hyperlegible Next is the daylight-theme body face.
+  'Atkinson Hyperlegible Next': loadAtkinsonNext('normal', {
+    weights: ['400', '600', '700'],
+    subsets: ['latin'],
+  }).fontFamily,
   'Source Sans 3': loadSourceSans3('normal', {weights: ['400', '600'], subsets: ['latin']})
     .fontFamily,
   'Source Serif 4': loadSourceSerif4('normal', {weights: ['400', '600'], subsets: ['latin']})
