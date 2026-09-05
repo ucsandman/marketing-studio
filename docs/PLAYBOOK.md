@@ -180,6 +180,21 @@ placeholder so smoke stays green on a clean clone.
   ends up baked into footage. Capture scripts need a shadow-root-piercing interval sweep;
   verify it's gone in the first extracted frame before recording the full take
   (see record-paperroute-demo.mjs).
+- A demo capture MUST perform real clicks (`rec.click(locator)`), not just scroll+hold.
+  DemoStage renders the cursor ONLY when telemetry has click events
+  (`clickList.length > 0`), so a click-free capture (the truckside script until
+  2026-09-05) draws no cursor and the composition is "rotating screenshots" — the exact
+  thing Wes rejected. Every scene clicks a control and waits for the visible consequence
+  (a new row, a changed badge, a queued Outbox send) before the camera frames it; use
+  `page.waitForFunction` on a section's count badge or a status badge, not a fixed sleep,
+  because owner ActionForm buttons are `useActionState` client actions that re-render in
+  place (no navigation).
+- The product hero (`public/media/demo-720.mp4`) and any "cursor visible" deliverable are
+  derived from the ProductDemo COMPOSITION (which draws the cursor from click telemetry),
+  NEVER from a crop of the raw Playwright webm — the raw recording has no cursor, so a
+  raw crop is cursorless. The 2026-09-05 morning run cropped the raw capture and shipped a
+  cursorless hero; the reshoot switched it to the composition and moved page.tsx aspect to
+  16/9.
 
 ### Marketing Handoff / wrap pipeline (Magnetic round-trip — DashClaw pilot facts)
 - The walkthrough fed to Magnetic MUST carry an audio stream: envelope/dead-air analysis
