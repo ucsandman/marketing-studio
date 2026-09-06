@@ -22,8 +22,9 @@
   "fonts": {
     "display": "Archivo",
     "body": "Atkinson Hyperlegible Next",
-    "mono": "JetBrains Mono"
+    "mono": "Atkinson Hyperlegible Next"
   },
+  "textAccent": "brand",
   "effects": {
     "wash": 0,
     "glow": 0
@@ -45,5 +46,5 @@
     "settle": 0.3,
     "textReveal": "maskWipe"
   },
-  "voice": "A plain back-office tool for a one-truck trades business (garage door, HVAC, plumbing, decks). The reader is an owner on a phone between jobs, outdoors in daylight. Short concrete sentences, verbs first: answers, books, quotes, approves, sends. Green #00792f is the approve and action color and the mark; the owner's button is always green. Red #c21725 is an emergency flag or a stop only, never decoration. Amber #c96900 means waiting on the owner, nothing else. Light daylight UI: off-white #fafafa ground, white #ffffff cards, near-black #101911 ink, true neutrals, no gradients, no glow, no neon, no wash. Wordmark is 'Truckside', capital T, one word. The product's promise is the gate: nothing reaches a customer or moves money without the owner's tap, so copy never claims it sends, charges, or books on its own. No hype, no em dashes, no exclamation marks, not a SaaS dashboard pitch, not a startup, not an AI-first brand: the truck and the job come first, the software is the office in the passenger seat."
+  "voice": "A plain back-office tool for a one-truck trades business (garage door, HVAC, plumbing, decks). The reader is an owner on a phone between jobs, outdoors in daylight. Short concrete sentences, verbs first: answers, books, quotes, approves, sends. Green #00792f is the approve and action color and the mark; the owner's button is always green. Red #c21725 is an emergency flag or a stop only, never decoration. Amber #c96900 means waiting on the owner, nothing else. Light daylight UI: off-white #fafafa ground, white #ffffff cards, near-black #101911 ink, true neutrals, no gradients, no glow, no neon, no wash. Wordmark is 'Truckside', capital T, one word. The product's promise is the gate: the reception agent answers the call and books an appointment window on its own, and every message to a customer and every charge waits for the owner's tap, so copy never claims the software sends or charges on its own and never claims nothing reaches a customer (the live call and the booking are autonomous). No hype, no em dashes, no exclamation marks, not a SaaS dashboard pitch, not a startup, not an AI-first brand: the truck and the job come first, the software is the office in the passenger seat."
 }

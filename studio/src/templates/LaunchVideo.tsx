@@ -18,6 +18,7 @@ import {brandSpring, entrance} from '../lib/motion';
 import type {Motion} from '../lib/motion';
 import {parallaxOffset, settleOn, offsetTransform, settleTransform} from '../lib/depth';
 import {useFormat} from '../lib/layout';
+import {containedStage, markBox} from '../lib/aspectLayout';
 import {telemetrySchema, steps} from '../lib/telemetry';
 import {launchTiming, voTimingFrom} from '../lib/launchTiming';
 import {directionSpecSchema} from '../lib/direction';
@@ -183,14 +184,21 @@ const ActContainer: React.FC<{motion: Motion; children: React.ReactNode}> = ({mo
   return transform ? <AbsoluteFill style={{transform}}>{children}</AbsoluteFill> : <>{children}</>;
 };
 
-const LogoAct: React.FC<{assets: Props['assets']; len: number; brand: Brand}> = ({assets, len, brand}) => {
-  const fade = useActFade(len);
-  const {scale} = useFormat();
-  const box = Math.round(500 * scale);
+// `fade` is the act-local crossfade. It stays on for the legacy act route, which has
+// no other entry or exit. The directed route turns it off: DirectedTransition already
+// owns every entry and exit there, so the act fade only doubled up and left the film's
+// opening and closing logo frames near-invisible.
+const LogoAct: React.FC<{assets: Props['assets']; len: number; brand: Brand; fade?: boolean}> = ({assets, len, brand, fade = true}) => {
+  const actFade = useActFade(len);
+  const format = useFormat();
+  // 500 * format.scale at the master; a share of the safe width on a narrow canvas,
+  // where format.scale (the smaller axis ratio) would leave the mark at a quarter of
+  // the frame. Glow and fallback mark stay in the same proportion to the box.
+  const box = markBox(format);
   const Mark = getMark(brand.id);
   return (
-    <AbsoluteFill style={{opacity: fade, justifyContent: 'center', alignItems: 'center'}}>
-      <div style={{width: box, height: box, filter: `drop-shadow(0 0 ${Math.round(42 * scale)}px ${brand.colors.brand}${alphaHex(brand.effects.glow)})`}}>
+    <AbsoluteFill style={{opacity: fade ? actFade : 1, justifyContent: 'center', alignItems: 'center'}}>
+      <div style={{width: box, height: box, filter: `drop-shadow(0 0 ${Math.round(box * 0.084)}px ${brand.colors.brand}${alphaHex(brand.effects.glow)})`}}>
         {assets.logoSequence ? (
           <PngSequence
             dir={assets.logoSequence}
@@ -200,7 +208,7 @@ const LogoAct: React.FC<{assets: Props['assets']; len: number; brand: Brand}> = 
           />
         ) : (
           <AbsoluteFill style={{justifyContent: 'center', alignItems: 'center', position: 'relative'}}>
-            <Mark size={Math.round(400 * scale)} color={brand.colors.brand} />
+            <Mark size={Math.round(box * 0.8)} color={brand.colors.brand} />
           </AbsoluteFill>
         )}
       </div>
@@ -390,6 +398,34 @@ const DirectedTransition: React.FC<{shot: LaunchShot; direction: Direction; chil
   );
 };
 
+// The establishing logo shot on the directed route. The mark itself is the legacy
+// LogoAct, minus its act fade; what is added is the direction's own material edge. A
+// `rule` direction is a film set on ruled paper, so the rule is on the page from frame
+// 0 and the mark is drawn onto it. Without it the film opened on frames that carried
+// no ink at all: the staged mark sequence starts with a blank lead-in hold, and the
+// act fade held those frames near-transparent on top of that, so the first samples of
+// the film measured as an empty page (judge-production render-integrity, 2026-09-06).
+const DirectedLogo: React.FC<{assets: Props['assets']; len: number; brand: Brand; direction: Direction}> = ({assets, len, brand, direction}) => {
+  const {scale, safe} = useFormat();
+  return (
+    <AbsoluteFill style={{background: brand.colors.bg}}>
+      {direction.material.edge === 'rule' ? (
+        <div
+          style={{
+            position: 'absolute',
+            top: safe.top,
+            left: safe.left,
+            right: safe.right,
+            height: Math.max(3, Math.round(6 * scale)),
+            background: brand.colors.brand,
+          }}
+        />
+      ) : null}
+      <LogoAct assets={assets} len={len} brand={brand} fade={false} />
+    </AbsoluteFill>
+  );
+};
+
 const DirectedHook: React.FC<{kicker: string; headline: string; brand: Brand; direction: Direction; copy?: LaunchShot['copy']}> = ({kicker, headline, brand, direction, copy}) => {
   const {height} = useVideoConfig();
   const fonts = loadBrandFonts(brand);
@@ -411,7 +447,8 @@ const DirectedFeature: React.FC<{feature: Props['features'][number]; brand: Bran
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   const {width, height} = useVideoConfig();
-  const {orientation} = useFormat();
+  const format = useFormat();
+  const {orientation} = format;
   const sourceViewport = shot.sourceViewport ?? {width: 1600, height: 1000};
   const focusFrames = shot.camera.cadence === 'locked' ? 1 : shot.camera.cadence === 'kinetic' ? 12 : 18;
   const camera = shot.focus
@@ -420,20 +457,41 @@ const DirectedFeature: React.FC<{feature: Props['features'][number]; brand: Bran
     : null;
   const copyIn = brandSpring(frame, fps, brand.motion, {delayFrames: Math.round(direction.motion.stagger * 12)});
   const treatment = direction.typography.composition === 'instrument' ? 'precision' : direction.typography.composition === 'kinetic' ? 'playful' : 'editorial';
-  const cropWidth = width * (orientation === 'portrait' ? 0.84 : orientation === 'square' ? 0.78 : 0.704);
-  const cropHeight = orientation === 'portrait' ? cropWidth * 0.235 : height * 0.296;
-  const cropLeft = orientation === 'landscape' ? width * 0.073 : (width - cropWidth) / 2;
-  const cropTop = height * (orientation === 'portrait' ? 0.28 : 0.22);
+  // Landscape geometry fixed 2026-09-05: the crop box used to sit at width*0.073 with
+  // width*0.704, so the panel had a 140px left margin against a 428px right margin —
+  // aligned to neither the title's own width*0.04 left edge nor to frame center — and
+  // cropTop 0.22 pinned title AND panel into the top half, leaving the bottom 48% of a
+  // 16:9 frame empty. It now hangs from the same left edge as a left-set title (or
+  // centers under a centered one), fills the frame's width symmetrically, and sits in
+  // the lower-middle so the title has air above it. Portrait and square are unchanged.
+  // Square and portrait relayout: the strip keeps its FULL width inside the safe area
+  // and sits centred between the title band and the burned-caption zone, instead of the
+  // master's fraction-of-frame box on a 1080-wide canvas. Landscape is the picture-lock
+  // geometry, untouched.
+  const landscape = orientation === 'landscape';
+  const contained = landscape ? null : containedStage(format, sourceViewport, {titled: true});
+  const cropWidth = contained ? contained.width : width * 0.92;
+  const cropHeight = contained ? contained.height : height * 0.39;
+  const cropLeft = contained
+    ? contained.left
+    : direction.typography.align === 'left'
+      ? width * 0.04
+      : (width - cropWidth) / 2;
+  const cropTop = contained ? contained.top : height * 0.38;
   const stageScale = cropWidth / sourceViewport.width;
   const stageTop = (cropHeight - sourceViewport.height * stageScale) / 2;
   const title = direction.typography.casing === 'upper' ? (shot.copy?.title ?? feature.heading).toUpperCase() : shot.copy?.title ?? feature.heading;
-  const titleScale = (orientation === 'portrait' ? 0.66 : 0.72) * (direction.typography.density === 'compact' ? 1.08 : direction.typography.density === 'airy' ? 1 : 1.04);
+  // The master sets a feature title at 0.72 of the size headlineLayout fitted for a
+  // 1920-wide frame. On a 1080-wide canvas that fitted size is ALREADY the canvas's own
+  // measure, so shrinking it again left the title at 58% of the frame width with a dead
+  // right margin; take it at full fitted size and let the safe area be the bound.
+  const titleScale = (landscape ? 0.72 : 1) * (direction.typography.density === 'compact' ? 1.08 : direction.typography.density === 'airy' ? 1 : 1.04);
   const glass = direction.material.treatment === 'glass';
   const shadowY = 10 + direction.material.depth * 56;
   const shadowBlur = 24 + direction.material.depth * 90;
   return (
     <AbsoluteFill style={{background: brand.colors.bg}}>
-      <div style={{position: 'absolute', inset: 0, left: direction.typography.align === 'left' ? width * 0.04 : 0, opacity: copyIn, transform: `translateY(${(1 - copyIn) * direction.motion.travel * 24}px) scale(${titleScale})`, transformOrigin: direction.typography.align === 'left' ? 'top left' : 'top center'}}>
+      <div style={{position: 'absolute', inset: 0, left: landscape && direction.typography.align === 'left' ? width * 0.04 : 0, opacity: copyIn, transform: `translateY(${(1 - copyIn) * direction.motion.travel * 24}px) scale(${titleScale})`, transformOrigin: direction.typography.align === 'left' ? 'top left' : 'top center'}}>
         <Headline kicker="" headline={title} brand={brand} hideKicker topAlign treatment={treatment} />
       </div>
       <div
@@ -464,19 +522,48 @@ const DirectedFeature: React.FC<{feature: Props['features'][number]; brand: Bran
   );
 };
 
-const DirectedDemo: React.FC<{demo: Props['demo']; brand: Brand; shot: LaunchShot}> = ({demo, brand, shot}) => {
+const DirectedDemo: React.FC<{demo: Props['demo']; brand: Brand; direction: Direction; shot: LaunchShot}> = ({demo, brand, direction, shot}) => {
   const {width, height, fps} = useVideoConfig();
+  const format = useFormat();
   const viewport = demo.telemetry?.viewport ?? {width: 1600, height: 1000};
-  const cover = Math.max(width / viewport.width, height / viewport.height);
   const start = shot.source.kind === 'demo' ? shot.source.sourceStartFrame : 0;
   const frame = useCurrentFrame();
+  const stage = (
+    <Sequence from={-start} layout="none">
+      <DemoStage video={demo.video} telemetry={demo.telemetry} timeMs={((frame + start) / fps) * 1000} brand={brand} />
+    </Sequence>
+  );
+  // The master fills a 16:9 frame with the capture (a 16:10 plate loses ~5% of its
+  // height, no text). Cover on a 1:1 or 9:16 canvas is a CENTRE CROP of the same plate:
+  // at 1080 wide it keeps 56% (square) or 35% (portrait) of the capture's width and
+  // slices the dashboard's own rows mid-word at both edges. Those canvases get the plate
+  // CONTAINED instead — full width inside the safe area, letterboxed on the paper ground
+  // under the direction's green rule.
+  if (format.orientation !== 'landscape') {
+    const box = containedStage(format, viewport);
+    return (
+      <AbsoluteFill style={{background: brand.colors.bg}}>
+        <div
+          style={{
+            position: 'absolute',
+            left: box.left,
+            top: box.top,
+            width: box.width,
+            height: box.height,
+            borderTop: direction.material.edge === 'rule' ? `4px solid ${brand.colors.brand}` : undefined,
+          }}
+        >
+          <div style={{width: viewport.width, height: viewport.height, transform: `scale(${box.scale})`, transformOrigin: 'top left'}}>
+            {stage}
+          </div>
+        </div>
+      </AbsoluteFill>
+    );
+  }
+  const cover = Math.max(width / viewport.width, height / viewport.height);
   return (
     <AbsoluteFill style={{justifyContent: 'center', alignItems: 'center', background: brand.colors.bg}}>
-      <div style={{width: viewport.width, height: viewport.height, transform: `scale(${cover})`}}>
-        <Sequence from={-start} layout="none">
-          <DemoStage video={demo.video} telemetry={demo.telemetry} timeMs={((frame + start) / fps) * 1000} brand={brand} />
-        </Sequence>
-      </div>
+      <div style={{width: viewport.width, height: viewport.height, transform: `scale(${cover})`}}>{stage}</div>
     </AbsoluteFill>
   );
 };
@@ -501,7 +588,7 @@ const DirectedEnd: React.FC<{cta: string; command: string | null; headline: stri
   const {height, width} = useVideoConfig();
   const fonts = loadBrandFonts(brand);
   const Mark = getMark(brand.id);
-  if (direction.outro.kind === 'command') return <EndCard cta={cta} command={command} brand={brand} />;
+  if (direction.outro.kind === 'command') return <EndCard cta={cta} command={command} brand={brand} casing={direction.typography.casing} />;
   if (direction.outro.kind === 'lockup') {
     return (
       <AbsoluteFill style={{background: brand.colors.bg, justifyContent: 'center', alignItems: 'center', gap: height * 0.05}}>
@@ -532,9 +619,9 @@ const DirectedShotContent: React.FC<{shot: LaunchShot; props: Props; brand: Bran
   const turn = moving && shot.camera.cadence === 'kinetic' ? {fromY: -5, toY: -1.2, len: shot.len, perspective: 2600} : null;
   const dolly = moving && shot.camera.cadence === 'measured' ? [{at: Math.round(shot.len * 0.16), dur: Math.round(shot.len * 0.62), to: 1.035}] : [];
   const content = (() => {
-    if (shot.source.kind === 'logo') return <LogoAct assets={props.assets} len={shot.len} brand={brand} />;
+    if (shot.source.kind === 'logo') return <DirectedLogo assets={props.assets} len={shot.len} brand={brand} direction={direction} />;
     if (shot.source.kind === 'hook') return <DirectedHook kicker={props.kicker} headline={props.headline} brand={brand} direction={direction} copy={shot.copy} />;
-    if (shot.source.kind === 'demo') return <DirectedDemo demo={props.demo} brand={brand} shot={shot} />;
+    if (shot.source.kind === 'demo') return <DirectedDemo demo={props.demo} brand={brand} direction={direction} shot={shot} />;
     if (shot.source.kind === 'feature') {
       const feature = props.features[shot.source.index];
       return feature ? <DirectedFeature feature={feature} brand={brand} direction={direction} shot={shot} /> : null;

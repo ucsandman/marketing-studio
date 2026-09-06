@@ -42,7 +42,7 @@ Fresh runs only. Ask everything in a single AskUserQuestion, then run without as
    - `rendered` — artifact on disk, post-render frame check pending (extract 2–3 frames from the artifact and inspect them — self-check in both modes).
    - `approved` — frame check passed; approval is recorded in the manifest the moment it happens, never inferred from chat history. A resumed session redoes the frame check for any `rendered` asset, showing the frames to the user first in gated mode.
    - `delivered` — copied to the product repo.
-   Update the manifest after every status change. Never restart a run from scratch because the session died.
+   Update the manifest after every status change. Never restart a run from scratch because the session died. In executor-judge mode the judge writes `rendered` plus the artifact path the moment an executor returns, before judging: the truckside session died on 2026-09-05 with a finished, scored launch film on disk and a manifest that still read `planned`, and the resume had to be reconstructed from file timestamps.
 4. Infographic bridge: build the product-owned `<workspace>/marketing/infographic-style.md`, then name it when an infographic is part of this run so that asset uses the approved brand tokens.
 
 **Content and direction gate.** Once `<workspace>/marketing/brief.json` is synthesized
@@ -71,7 +71,7 @@ The engine repo is shared mutable state (props builders, registries, render queu
 | 4 | /audio-track | MANDATORY unless the recorded music-only exception applies. Score the lock from product-owned audio inputs with `--project <product>`, verify the delivered master, and set the launch artifact to that scored file. A silent launch card is a defect, not a variant. |
 | 5 | /social-clip × N | Reuse approved sources per platform. Every delivered clip is scored in the product workspace before it counts. Muted-autoplay captions do not grant permission to ship a silent media file. |
 | 6 | /og-assets | Statics + README GIF pulled from final footage |
-| 7 | Cards | One stat card per brief proofPoint plus a quote card from the hook, rendered into `<workspace>/marketing/cards/`; skip when there is no grounded brief. |
+| 7 | Cards | One stat card per brief proofPoint plus a quote card from the hook, rendered into `<workspace>/marketing/cards/`; skip when there is no grounded brief. A proof point with no figure is engineering-grounding prose, not a card — pass `--skip-figureless` to drop it instead of rendering it as a quote card. Footers never print a path or code citation: `build-cards.mjs` routes every source through `displaySource`, which prints the citation only when it reads as a plain human line and otherwise prints "Verified in the `<brand>` source". |
 
 Per asset, inspect inexpensive representative stills before a full render. For the hero
 film, generate hash-bound start/middle/end samples for every planned shot from the exact
@@ -134,7 +134,13 @@ Fable never goes inside a workflow (the model-guard hook blocks it in `parallel(
 1b. `node scripts/check-audio.mjs <brand> --project <product>` — HARD gate: every
    delivery-surface video carries its intended mastered track. Run it again after postkit.
 1c. Run the existing A/V sync, pacing, palette, motion, drift, and budget judges with
-`--project <product>` where supported. These measure properties; warnings return to the
+`--project <product>` where supported. `judge-audio` is mandatory reading, not optional:
+the sound-design judge's PASS counts VO lines from the manifest, while judge-audio
+transcribes the master and is the only check that proves each line was heard. On
+truckside (2026-09-06) the scored film passed the sound-design judge with a music bed
+whose outro fell inside the picture, which left 3s of dead air and an unheard line that
+only judge-audio caught. Read its content, order and trailing-silence lines before
+approving the audio track. These measure properties; warnings return to the
 perceptual review rather than becoming invented aesthetic thresholds.
 1d. Record the structured non-author review in Mission Control, then run
 `judge-production <brand> --project <product> --plan <production-plan.json> --render
@@ -147,7 +153,11 @@ render/audio attestations, or hash bindings blocks delivery.
 1. Assets already live in the product workspace; do not copy an engine-local render into
    place at the end. Write a product-owned README listing each file and intended use.
 2. Launch `node scripts/mission-control.mjs <brand> --project <product>` and give the
-   user its local URL. The run is not done until a named non-author has watched the
+   user its local URL. First re-run `contact-sheet` on the hero master if any matrix
+   row's judge ran after it: every judge-production run overwrites
+   `production-evidence.json`, and the console binds the perceptual review to whatever
+   render the evidence names last (truckside 2026-09-06: it pointed at a rejected 9:16
+   row until the sheet was regenerated). The run is not done until a named non-author has watched the
    scored film and the structured review is bound to current evidence.
 3. Poll `<workspace>/marketing/{run,review}.json` for approve/redo actions. Approval is a
    recorded, hash-bound action, never inferred from chat. A redo returns to the responsible

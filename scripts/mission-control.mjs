@@ -507,12 +507,12 @@ export function applyStageReview({projectRoot, directionPath, stageName, payload
   const action = payload?.action;
   const name = typeof payload?.reviewerName === 'string' ? payload.reviewerName.trim() : '';
   const role = payload?.reviewerRole;
+  // Observations are optional under the one-click form (2026-09-06 redesign): default to empty rather than requiring text.
   const observations = typeof payload?.observations === 'string' ? payload.observations.trim() : '';
   if (!['approved', 'revise'].includes(action)) return {status: 400, body: {error: 'action must be approved or revise'}};
   if (!name || !['director', 'operator', 'independent'].includes(role)) {
     return {status: 400, body: {error: 'a named director, operator, or independent reviewer is required'}};
   }
-  if (!observations) return {status: 400, body: {error: 'review observations are required'}};
 
   let direction;
   try {
@@ -1025,6 +1025,9 @@ header{position:sticky;top:0;z-index:10;background:#14171b;border-bottom:1px sol
 header h1{margin:0;font-size:17px;font-weight:650;letter-spacing:.3px;}
 header .brand{color:#7fb2ff;}
 header .started{color:#8a929b;font-size:13px;}
+.reviewer-id{display:flex;gap:10px;align-items:flex-end;}
+.reviewer-id label{display:flex;flex-direction:column;gap:2px;font-size:11px;color:#8a929b;}
+.reviewer-id input,.reviewer-id select{background:#0d0f12;color:#e6e8eb;border:1px solid #2b3138;border-radius:7px;padding:5px 8px;font:inherit;font-size:13px;}
 .counts{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap;}
 .count{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-variant-numeric:tabular-nums;padding:3px 10px;border-radius:999px;border:1px solid #2b3138;background:#181c21;}
 .count b{font-size:13px;}
@@ -1037,8 +1040,8 @@ header .started{color:#8a929b;font-size:13px;}
 .mcerror{margin:0;padding:10px 22px;background:#2a1414;border-bottom:1px solid #5a2323;color:#ff8a8a;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;white-space:pre-wrap;word-break:break-word;}
 .mcerror[hidden]{display:none;}
 .production-review{margin:16px 22px;padding:16px;background:#14171b;border:1px solid #2b3138;border-radius:12px;}
-.stage-reviews{margin:16px 22px;display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px}.stage-card{padding:16px;background:#14171b;border:1px solid #2b3138;border-radius:12px}.stage-card h2{font-size:16px;margin:0 0 6px}.stage-media img,.stage-media video{display:block;width:100%;max-height:48vh;object-fit:contain;background:#060708;border-radius:8px;margin:10px 0}.stage-review-meta{font-size:12px;color:#8a929b;margin:7px 0}.stage-card input,.stage-card select,.stage-card textarea{width:100%;background:#0d0f12;color:#e6e8eb;border:1px solid #2b3138;border-radius:7px;padding:7px;margin-top:7px}.stage-actions{display:flex;gap:8px;margin-top:9px}.stage-missing{color:#e6b45a}.stage-approved{color:#8ce6a5}
-.production-review h2{margin:0 0 6px;font-size:16px}.production-meta{color:#8a929b;font-size:12px;margin-bottom:12px}.production-links{display:flex;gap:12px;margin:8px 0}.production-links a{color:#7fb2ff}.review-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}.review-grid label,.review-checks label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:#c9d1d9}.review-checks{display:flex;flex-wrap:wrap;gap:14px;margin:10px 0}.review-checks label{flex-direction:row;align-items:center}.production-review input,.production-review select{background:#0d0f12;color:#e6e8eb;border:1px solid #2b3138;border-radius:7px;padding:7px}.production-review textarea{margin-top:9px}.production-actions{display:flex;gap:9px;margin-top:10px}.production-status{font-size:12px;color:#8ce6a5;margin-left:8px}.production-missing{color:#e6b45a;}
+.stage-reviews{margin:16px 22px;display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px}.stage-card{padding:16px;background:#14171b;border:1px solid #2b3138;border-radius:12px}.stage-card h2{font-size:16px;margin:0 0 6px}.stage-media img,.stage-media video{display:block;width:100%;max-height:48vh;object-fit:contain;background:#060708;border-radius:8px;margin:10px 0}.stage-review-meta{font-size:12px;color:#8a929b;margin:7px 0}.stage-card input{width:100%;background:#0d0f12;color:#e6e8eb;border:1px solid #2b3138;border-radius:7px;padding:7px;margin-top:7px}.stage-actions{display:flex;gap:8px;margin-top:9px}.stage-missing{color:#e6b45a}.stage-approved{color:#8ce6a5}
+.production-review h2{margin:0 0 6px;font-size:16px}.production-meta{color:#8a929b;font-size:12px;margin-bottom:12px}.production-links{display:flex;gap:12px;margin:8px 0}.production-links a{color:#7fb2ff}.production-review textarea{margin-top:9px}.production-actions{display:flex;gap:9px;margin-top:10px}.production-status{font-size:12px;color:#8ce6a5;margin-left:8px}.production-missing{color:#e6b45a;}.attest-note{font-size:11px;color:#8a929b;margin:6px 0 0;}
 .production-player{display:block;width:100%;max-height:70vh;background:#060708;border:1px solid #2b3138;border-radius:9px;margin:12px 0}.production-gate{display:inline-block;border-radius:6px;padding:4px 9px;font-size:12px;font-weight:750;letter-spacing:.04em}.production-gate.incomplete{color:#ffb4a8;background:#351716;border:1px solid #71322d}.production-gate.complete{color:#8ce6a5;background:#123023;border:1px solid #256b45}.production-actions .approve{flex:none}.production-status[role=alert]{color:#ffb4a8;min-height:1.4em;display:inline-flex;align-items:center}
 .judge{position:relative;}
 .judge summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-variant-numeric:tabular-nums;padding:3px 10px;border-radius:999px;border:1px solid #2b3138;background:#181c21;}
@@ -1112,6 +1115,10 @@ function consolePage() {
 <header>
   <h1>Mission Control · <span class="brand" id="hBrand"></span></h1>
   <span class="started" id="hStarted"></span>
+  <div class="reviewer-id">
+    <label>Reviewer<input id="reviewerName" placeholder="Your name" autocomplete="name"></label>
+    <label>Role<select id="reviewerRole"><option value="operator">Operator</option><option value="director">Director</option><option value="independent">Independent reviewer</option></select></label>
+  </div>
   <div class="counts" id="hCounts"></div>
 </header>
 <div class="advisories" id="advisories"></div>
@@ -1135,6 +1142,17 @@ const lastRender = {}; // assetId -> serialized entry, so we only rebuild change
 const stageEl=document.getElementById('stageReviews');
 const productionEl=document.getElementById('productionReview');
 let lastProductionKey='';
+
+// One reviewer identity for the whole page, remembered across visits and immune to the
+// 2s poll: the header is never rebuilt by renderStages/renderProduction, so these
+// elements keep whatever the reviewer typed while cards below them re-render.
+const reviewerNameEl=document.getElementById('reviewerName');
+const reviewerRoleEl=document.getElementById('reviewerRole');
+reviewerNameEl.value=localStorage.getItem('mc-reviewer-name')||'';
+reviewerRoleEl.value=localStorage.getItem('mc-reviewer-role')||'operator';
+reviewerNameEl.addEventListener('input',()=>localStorage.setItem('mc-reviewer-name',reviewerNameEl.value));
+reviewerRoleEl.addEventListener('change',()=>localStorage.setItem('mc-reviewer-role',reviewerRoleEl.value));
+function reviewerIdentity(){return {reviewerName:reviewerNameEl.value.trim(),reviewerRole:reviewerRoleEl.value};}
 
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function fmtSize(b){if(b==null)return null;if(b<1024)return b+' B';if(b<1048576)return (b/1024).toFixed(0)+' KB';return (b/1048576).toFixed(1)+' MB';}
@@ -1182,13 +1200,14 @@ function verdictHtml(e){
   return '<div class="verdict-badge '+cls+'">magnetic: '+esc(action)+(v.note?' — '+esc(v.note):'')+'</div>';
 }
 
-function scoreSelect(key,label){
-  return '<label>'+esc(label)+'<select name="'+esc(key)+'" required><option value="">Choose 1–5</option>'+[1,2,3,4,5].map(n=>'<option value="'+n+'">'+n+(n<4?' · revise':' · approval-eligible')+'</option>').join('')+'</select></label>';
-}
-function reviewerFields(){
-  return '<label>Reviewer name<input name="reviewerName" required></label><label>Reviewer role<select name="reviewerRole"><option value="director">Director</option><option value="operator">Operator</option><option value="independent">Independent reviewer</option></select></label>';
-}
+// Same guard as renderProduction: the 2s poll must not rebuild the cards while a
+// reviewer is typing a note or playing the animatic. Re-render only when the
+// server-side stage state actually changes (artifact hash, review, readiness).
+let lastStagesKey='';
 function renderStages(stages){
+  const key=JSON.stringify(stages||null);
+  if(key===lastStagesKey)return;
+  lastStagesKey=key;
   stageEl.innerHTML=(stages||[]).map(stage=>{
     const review=stage.review;
     const reviewText=review
@@ -1199,15 +1218,15 @@ function renderStages(stages){
       ?'<video controls preload="metadata" src="'+esc(stage.artifactUrl)+'"></video>'
       :'<img loading="lazy" src="'+esc(stage.artifactUrl)+'" alt="'+esc(stage.label)+'">';
     return '<article class="stage-card" data-stage="'+esc(stage.stageName)+'"><h2>'+esc(stage.label)+'</h2><div class="stage-media">'+media+'</div>'+reviewText
-      +'<form data-stage-form="'+esc(stage.stageName)+'">'+reviewerFields()+'<textarea name="observations" required placeholder="What you saw and why this stage is ready or needs revision"></textarea><div class="stage-actions"><button class="btn approve" type="submit" value="approved">Approve stage</button><button class="btn redo" type="submit" value="revise">Revise stage</button><span class="production-status" role="alert"></span></div></form></article>';
+      +'<form data-stage-form="'+esc(stage.stageName)+'"><input type="text" name="observations" placeholder="Optional note"><div class="stage-actions"><button class="btn approve" type="submit" value="approved">Approve</button><button class="btn redo" type="submit" value="revise">Revise</button><span class="production-status" role="alert"></span></div></form></article>';
   }).join('');
 }
 
 stageEl.addEventListener('submit',async ev=>{
   ev.preventDefault();const form=ev.target;const data=new FormData(form);const stageName=form.dataset.stageForm;const status=form.querySelector('[role=alert]');
-  const body={action:ev.submitter?.value||'revise',reviewerName:data.get('reviewerName'),reviewerRole:data.get('reviewerRole'),observations:data.get('observations')};
+  const body={action:ev.submitter?.value||'revise',observations:data.get('observations')||'',...reviewerIdentity()};
   status.textContent='Saving…';
-  try{const r=await fetch('/stage-review/'+encodeURIComponent(stageName),{method:'POST',headers:{...MC_HEADERS,'content-type':'application/json'},body:JSON.stringify(body)});const result=await r.json().catch(()=>({}));if(!r.ok){status.textContent=result.error||('HTTP '+r.status);return;}status.textContent='Stage review recorded.';refresh();}catch(err){status.textContent=err.message;}
+  try{const r=await fetch('/stage-review/'+encodeURIComponent(stageName),{method:'POST',headers:{...MC_HEADERS,'content-type':'application/json'},body:JSON.stringify(body)});const result=await r.json().catch(()=>({}));if(!r.ok){status.textContent=result.error||('HTTP '+r.status);return;}status.textContent='Stage review recorded.';lastStagesKey='';refresh();}catch(err){status.textContent=err.message;}
 });
 function renderProduction(p){
   const key=JSON.stringify(p||null);
@@ -1223,21 +1242,15 @@ function renderProduction(p){
   const gate='<span class="production-gate '+(gatePassed?'complete':'incomplete')+'">'+gateLabel+'</span>';
   const player=p.renderUrl?'<video class="production-player" controls preload="metadata" src="'+esc(p.renderUrl)+'"></video>':'<p class="production-missing">The final render is unavailable. Approval is blocked.</p>';
   productionEl.innerHTML='<h2>Production visual review</h2>'+gate+'<div class="production-meta">'+p.shots+' shots · '+p.samples+' rendered samples · gate '+report+' · latest review '+latest+'</div>'+player+'<div class="production-links">'+links+'</div>'
-    +'<form id="productionForm" novalidate><div class="review-grid">'+reviewerFields()
-    +scoreSelect('storyClarity','Story clarity')+scoreSelect('visualHierarchy','Visual hierarchy')+scoreSelect('motionIntent','Motion intent')+scoreSelect('productReadability','Product readability')+scoreSelect('endingConfidence','Ending confidence')+'</div>'
-    +'<textarea name="observations" required placeholder="What you actually saw: strongest moment, weakest moment, and why"></textarea>'
-    +'<textarea name="blockingDefects" placeholder="Blocking defects, one per line (optional)"></textarea><textarea name="otherDefects" placeholder="Major defects, one per line (optional; any one blocks PASS)"></textarea>'
-    +'<div class="review-checks"><label><input type="checkbox" name="watchedFullRender">I watched the full render</label><label><input type="checkbox" name="heardAudio">I heard the full soundtrack</label><label><input type="checkbox" name="wouldShare">I would share this</label></div>'
-    +'<div class="production-actions"><button class="btn approve" type="submit" value="approved">Approve production</button><button class="btn redo" type="submit" value="revise">Needs revision</button><span class="production-status" id="productionMessage" role="alert" aria-live="polite"></span></div></form>';
+    +'<form id="productionForm" novalidate>'
+    +'<textarea name="observations" placeholder="Optional note"></textarea>'
+    +'<div class="production-actions"><button class="btn approve" type="submit" value="approved">Approve film</button><button class="btn redo" type="submit" value="revise">Request revision</button><span class="production-status" id="productionMessage" role="alert" aria-live="polite"></span></div>'
+    +'<p class="attest-note">Clicking approve records that you watched the full render with sound and would share it</p></form>';
 }
 
 productionEl.addEventListener('submit',async ev=>{
   ev.preventDefault();const form=ev.target;const data=new FormData(form);const action=ev.submitter?.value||'revise';
-  const defects=[];
-  String(data.get('blockingDefects')||'').split(/\\r?\\n/).filter(Boolean).forEach(description=>defects.push({severity:'blocking',category:'perceptual',description}));
-  String(data.get('otherDefects')||'').split(/\\r?\\n/).filter(Boolean).forEach(description=>defects.push({severity:'major',category:'perceptual',description}));
-  const scores={};['storyClarity','visualHierarchy','motionIntent','productReadability','endingConfidence'].forEach(k=>scores[k]=Number(data.get(k)));
-  const body={action,reviewerName:data.get('reviewerName'),reviewerRole:data.get('reviewerRole'),observations:data.get('observations'),watchedFullRender:data.get('watchedFullRender')==='on',heardAudio:data.get('heardAudio')==='on',wouldShare:data.get('wouldShare')==='on',scores,defects};
+  const body={action,observations:data.get('observations')||'',...reviewerIdentity()};
   const status=form.querySelector('#productionMessage');status.textContent='Saving…';
   try{const r=await fetch('/production-review',{method:'POST',headers:{...MC_HEADERS,'content-type':'application/json'},body:JSON.stringify(body)});const result=await r.json().catch(()=>({}));if(!r.ok){status.textContent=result.error||('HTTP '+r.status);return;}status.textContent='Review recorded.';lastProductionKey='';refresh();}catch(err){status.textContent=err.message;}
 });

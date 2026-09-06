@@ -4,8 +4,9 @@ import type {Brand} from '../lib/brand';
 import {alphaHex} from '../lib/brand';
 import {loadBrandFonts} from '../lib/fonts';
 import {useFormat} from '../lib/layout';
+import {captionDisplayLines} from '../lib/aspectLayout';
 import type {Cue} from '../lib/captionTiming';
-import {captionFontSize, cueAt, splitDisplayLines} from '../lib/captionTiming';
+import {captionFontSize, cueAt} from '../lib/captionTiming';
 
 const FADE = 6; // frames of fade in/out at each cue edge
 
@@ -14,7 +15,8 @@ const FADE = 6; // frames of fade in/out at each cue edge
 // progress bar. No active cue -> renders nothing.
 export const CaptionTrack: React.FC<{cues: Cue[]; brand: Brand}> = ({cues, brand}) => {
   const frame = useCurrentFrame();
-  const {scale, safe, height} = useFormat();
+  const format = useFormat();
+  const {scale, safe, height} = format;
   const cue = cueAt(cues, frame);
   if (!cue) return null;
 
@@ -36,8 +38,17 @@ export const CaptionTrack: React.FC<{cues: Cue[]; brand: Brand}> = ({cues, brand
       : 1;
 
   const fonts = loadBrandFonts(brand);
-  const lines = splitDisplayLines(cue.text);
   const fontSize = captionFontSize(scale, height);
+  // Inner text width of the box below: the pinned band minus its own padding and
+  // hairline. A character-count wrap cannot see this, so on a 1080-wide canvas it hands
+  // the renderer a line too wide and the renderer orphans that line's last word.
+  const padX = Math.round(38 * scale);
+  const lines = captionDisplayLines(
+    cue.text,
+    format,
+    format.width - safe.left - safe.right - 2 * padX - 2,
+    fonts.body,
+  );
 
   return (
     <div
@@ -55,7 +66,7 @@ export const CaptionTrack: React.FC<{cues: Cue[]; brand: Brand}> = ({cues, brand
       <div
         style={{
           maxWidth: '100%',
-          padding: `${Math.round(20 * scale)}px ${Math.round(38 * scale)}px`,
+          padding: `${Math.round(20 * scale)}px ${padX}px`,
           borderRadius: Math.round(14 * scale),
           background: `${brand.colors.surface}${alphaHex(0.85)}`,
           border: `1px solid ${brand.colors.line}`,

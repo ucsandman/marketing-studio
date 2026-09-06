@@ -61,8 +61,9 @@ function rel(base, path) {
   return relative(base, path).replaceAll('\\', '/');
 }
 
-export function evaluateProduction({workspace, brand, productionPlanPath, renderPath, evidencePath, reviewPath}) {
+export function evaluateProduction({workspace, brand, productionPlanPath, renderPath, evidencePath, reviewPath, heroReportPath}) {
   const base = workspace.projectRoot;
+  const resolvedHeroReportPath = heroReportPath ?? join(workspace.marketingDir, 'judge-production.json');
   const bundle = loadProductionBundle(base, brand, productionPlanPath, {
     directionPath: join(workspace.marketingDir, 'direction.json'),
     shotPlanPath: join(workspace.marketingDir, 'shot-plan.json'),
@@ -130,11 +131,34 @@ export function evaluateProduction({workspace, brand, productionPlanPath, render
       findings.push({level: 'FAIL', category: 'perceptual-review', message: `Review log is unreadable: ${err.message}`});
     }
   }
+  // A hero master's own strict PASS lets its human review govern other matrix rows
+  // rendered from the same approved plan and source bundle (see docs/production-quality.md).
+  // Judging the hero itself never needs this: same renderSha256, so skip it silently.
+  let hero = null;
+  const resolvedHeroReport = resolveInside(base, resolvedHeroReportPath);
+  if (render && resolvedHeroReport && existsSync(resolvedHeroReport)) {
+    try {
+      const heroReport = JSON.parse(readFileSync(resolvedHeroReport, 'utf8'));
+      const heroRenderSha256 = heroReport?.input?.renderSha256 ?? null;
+      if (heroRenderSha256 && heroRenderSha256 !== render.sha256) {
+        hero = {
+          renderSha256: heroRenderSha256,
+          planSha256: heroReport?.input?.productionPlanSha256 ?? null,
+          sourceBundleSha256: heroReport?.input?.sourceBundleSha256 ?? null,
+          verdict: heroReport?.verdict ?? null,
+          path: rel(base, resolvedHeroReport),
+        };
+      }
+    } catch {
+      // A malformed hero report grants no inheritance; the row falls back to its own review.
+    }
+  }
   const perceptual = perceptualReview(reviewEntries, {
     planSha256: bundle.productionPlanSha256,
     renderSha256: render?.sha256,
     sourceBundleSha256: bundle.sourceBundleSha256,
     evidenceSha256: evidenceResult.evidenceSha256,
+    hero,
   });
   findings.push(...perceptual.findings);
 
@@ -174,6 +198,7 @@ export function evaluateProduction({workspace, brand, productionPlanPath, render
     },
     perceptual: {
       reviews: perceptual.reviews ?? 0,
+      inherited: perceptual.inherited ?? null,
       latest: perceptual.review ? {
         at: perceptual.review.at,
         reviewer: perceptual.review.reviewer,
@@ -217,10 +242,13 @@ function main() {
   const evidencePath = within(argValue(argv, '--evidence') ?? join(workspace.marketingDir, 'production-evidence.json'));
   const reviewPath = within(argValue(argv, '--review') ?? join(workspace.marketingDir, 'review.json'));
   const reportPath = within(argValue(argv, '--report') ?? join(workspace.marketingDir, 'judge-production.json'));
+  const heroReportPath = within(argValue(argv, '--hero-report') ?? join(workspace.marketingDir, 'judge-production.json'));
   mkdirSync(dirname(reportPath), {recursive: true});
-  const report = evaluateProduction({workspace, brand, productionPlanPath, renderPath, evidencePath, reviewPath});
+  const report = evaluateProduction({workspace, brand, productionPlanPath, renderPath, evidencePath, reviewPath, heroReportPath});
   writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n');
-  console.log(`judge-production ${report.verdict}: shots=${report.input.shots} frames=${report.input.frames} samples=${report.input.reviewedFrames} reviews=${report.summary.perceptualReviews} fails=${report.summary.fails} incomplete=${report.summary.incomplete} warns=${report.summary.warns}`);
+  const inherited = report.perceptual.inherited;
+  const inheritedSuffix = inherited ? ` (inherited from hero ${inherited.from.slice(0, 8)})` : '';
+  console.log(`judge-production ${report.verdict}: shots=${report.input.shots} frames=${report.input.frames} samples=${report.input.reviewedFrames} reviews=${report.summary.perceptualReviews}${inheritedSuffix} fails=${report.summary.fails} incomplete=${report.summary.incomplete} warns=${report.summary.warns}`);
   console.log(`report: ${rel(workspace.projectRoot, reportPath)}`);
   if (argv.includes('--json')) console.log(JSON.stringify(report));
   if (argv.includes('--strict') && report.verdict !== 'PASS') process.exit(1);

@@ -38,10 +38,10 @@ const workspace = resolveWorkspace(ROOT, {brand: 'truckside', project: projectAr
 const TS_ROOT = workspace.projectRoot;
 const base = `http://localhost:${PORT}`;
 const VIEWPORT = {width: 1440, height: 900};
-const SETTLE_MS = 650; // after a smooth scroll, let the page come to rest
-const APPROACH_MS = 1000; // camera stable + cursor eases the last 700ms into the control
-const CHANGE_HOLD_MS = 1600; // after a click, hold long enough to read the consequence
-const REVEAL_HOLD_MS = 2000; // hold on a revealed section (scene 1 new row, scene 5 outbox)
+const SETTLE_MS = 750; // after a smooth scroll, let the page come to rest
+const APPROACH_MS = 1300; // camera stable + cursor eases the last 700ms into the control
+const CHANGE_HOLD_MS = 2100; // after a click, hold long enough to read the consequence
+const REVEAL_HOLD_MS = 2400; // hold on a revealed section (scene 1 new row, scene 5 outbox)
 
 const FORCE = argv.includes('--force');
 const CHECK_ONLY = argv.includes('--cache-check-only');
@@ -97,12 +97,24 @@ const HIDE_DEVTOOLS = `
   })();
 `;
 
-const clampFocus = (box, {padX = 48, padY = 48} = {}) => {
-  const w = Math.min(VIEWPORT.width, box.width + padX * 2);
-  const h = Math.min(VIEWPORT.height, box.height + padY * 2);
-  const x = Math.min(Math.max(box.x + box.width / 2, w / 2), VIEWPORT.width - w / 2);
-  const y = Math.min(Math.max(box.y + box.height / 2, h / 2), VIEWPORT.height - h / 2);
-  return {x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h)};
+// Union of measured boxes, padded and clamped to the viewport. `maxH` frames the top
+// band of a tall section (its title plus the acted row) instead of the whole card, which
+// is what lets DemoStage's auto shot scale pick a real zoom instead of sitting at 1.0.
+const focusRect = (boxes, {padX = 30, padY = 24, maxH = null} = {}) => {
+  const x0 = Math.min(...boxes.map((b) => b.x));
+  const y0 = Math.min(...boxes.map((b) => b.y));
+  const x1 = Math.max(...boxes.map((b) => b.x + b.width));
+  const y1 = Math.max(...boxes.map((b) => b.y + b.height));
+  const w = Math.min(VIEWPORT.width, x1 - x0 + padX * 2);
+  const h = Math.min(VIEWPORT.height, maxH ?? y1 - y0 + padY * 2);
+  const cx = x0 + (x1 - x0) / 2;
+  const cy = maxH ? y0 - padY + h / 2 : y0 + (y1 - y0) / 2;
+  return {
+    x: Math.round(Math.min(Math.max(cx, w / 2), VIEWPORT.width - w / 2)),
+    y: Math.round(Math.min(Math.max(cy, h / 2), VIEWPORT.height - h / 2)),
+    w: Math.round(w),
+    h: Math.round(h),
+  };
 };
 
 const videoDir = join(workspace.assetsDir, '.capture');
@@ -137,13 +149,16 @@ try {
     await page.waitForTimeout(SETTLE_MS + 250);
   };
 
-  // Focus one measured element after settling; a section header is biased into
-  // frame so the title and the acted row read together.
-  const focusOn = async (loc, {padX = 40, padY = 40, biasY = 0} = {}) => {
-    const box = await loc.boundingBox();
-    if (!box) throw new Error('focus target has no bounding box');
-    const f = clampFocus(box, {padX, padY});
-    f.y = Math.min(Math.max(f.y + biasY, f.h / 2), VIEWPORT.height - f.h / 2);
+  // Focus the MEASURED bounding boxes of one or more elements after settling. Pass a
+  // list to union them (the quote table plus the Approve button reads as one shot).
+  const focusOn = async (locs, {padX = 30, padY = 24, maxH = null} = {}) => {
+    const boxes = [];
+    for (const loc of Array.isArray(locs) ? locs : [locs]) {
+      const box = await loc.boundingBox();
+      if (!box) throw new Error('focus target has no bounding box');
+      boxes.push(box);
+    }
+    const f = focusRect(boxes, {padX, padY, maxH});
     rec.focusAt(f.x, f.y, {w: f.w, h: f.h});
   };
 
@@ -157,10 +172,12 @@ try {
   await page.waitForTimeout(SETTLE_MS);
 
   // --- Scene 1: a missed call comes in. Click Simulate, then reveal the new row. ---
-  rec.step('A missed call comes in while you are on the job.');
+  rec.step('The missed call gets answered and a window gets booked.');
   const missedBefore = await sectionCount("Today's missed calls");
   const simulate = page.getByRole('button', {name: 'Simulate missed call', exact: true});
-  await focusOn(page.locator('header'), {padX: 24, padY: 24}); // frame the header + the button
+  // The header's inner max-w-5xl block, not the full-bleed <header>: a 1440-wide rect is a
+  // 1.0x shot (no zoom at all).
+  await focusOn(page.locator('header > div').last(), {padX: 20, padY: 20});
   await page.waitForTimeout(APPROACH_MS);
   await rec.click(simulate);
   await page.waitForFunction(
@@ -176,16 +193,17 @@ try {
   );
   const missedSection = section("Today's missed calls");
   await smoothScrollTo(missedSection, 'start');
-  await focusOn(missedSection, {padX: 36, padY: 44, biasY: -30}); // frame the top: the new row + badge
+  await focusOn(missedSection, {padX: 30, padY: 24, maxH: 240}); // title, count badge, the new row
   await page.waitForTimeout(REVEAL_HOLD_MS);
 
   // --- Scene 2: the quote is priced. One tap approves it. ---
-  rec.step('The quote is priced. One tap approves it.');
+  rec.step('The quote is priced off the rate card. One tap approves it.');
   const quotesBefore = await sectionCount('Quotes awaiting approval');
   const quotes = section('Quotes awaiting approval');
   await smoothScrollTo(quotes, 'start');
   const approveQuote = quotes.getByRole('button', {name: 'Approve', exact: true}).first();
-  await focusOn(quotes, {padX: 32, padY: 40, biasY: -30});
+  // The hero beat: the line items, the total, and the button that commits them, in one frame.
+  await focusOn([quotes.locator('table').first(), approveQuote], {padX: 16, padY: 8});
   await page.waitForTimeout(APPROACH_MS);
   await rec.click(approveQuote);
   await page.waitForFunction(
@@ -199,16 +217,17 @@ try {
     quotesBefore,
     {timeout: 20_000},
   );
-  await focusOn(quotes, {padX: 32, padY: 40, biasY: -30});
+  await focusOn(quotes, {padX: 30, padY: 24, maxH: 260}); // the badge drops and the card is gone
   await page.waitForTimeout(CHANGE_HOLD_MS);
 
   // --- Scene 3: confirm the appointment. ---
-  rec.step('Confirm, move, or cancel each appointment.');
+  rec.step('Confirm, move or cancel the booked window.');
   const appts = section('Upcoming appointments');
   await smoothScrollTo(appts, 'start');
   const confirmedBefore = await appts.getByText('Confirmed', {exact: true}).count();
   const confirm = appts.getByRole('button', {name: 'Confirm', exact: true}).first();
-  await focusOn(appts, {padX: 32, padY: 40, biasY: -30});
+  const firstAppt = appts.locator('li').first();
+  await focusOn(firstAppt, {padX: 24, padY: 20});
   await page.waitForTimeout(APPROACH_MS);
   await rec.click(confirm);
   await page.waitForFunction(
@@ -223,16 +242,16 @@ try {
     confirmedBefore,
     {timeout: 20_000},
   );
-  await focusOn(appts, {padX: 32, padY: 40, biasY: -30});
+  await focusOn(firstAppt, {padX: 24, padY: 20}); // the row now reads Confirmed
   await page.waitForTimeout(CHANGE_HOLD_MS);
 
   // --- Scene 4: approve a drafted follow-up (queues a send into the Outbox). ---
-  rec.step('Follow-ups are drafted and held until you approve.');
+  rec.step('The nudges and reminders are written. You clear each with a tap.');
   const outboxBefore = await sectionCount('Outbox');
   const followups = section('Follow-ups');
   await smoothScrollTo(followups, 'start');
   const approveFollowup = followups.getByRole('button', {name: 'Approve', exact: true}).first();
-  await focusOn(followups, {padX: 32, padY: 40, biasY: -30});
+  await focusOn(followups.locator('li').first(), {padX: 24, padY: 20});
   await page.waitForTimeout(APPROACH_MS);
   await rec.click(approveFollowup);
   await page.waitForFunction(
@@ -246,14 +265,16 @@ try {
     outboxBefore,
     {timeout: 20_000},
   );
-  await focusOn(followups, {padX: 32, padY: 40, biasY: -30});
+  await focusOn(followups, {padX: 30, padY: 24, maxH: 260}); // the cleared row is gone
   await page.waitForTimeout(CHANGE_HOLD_MS);
 
   // --- Scene 5: the Outbox. Every send recorded; in demo mode nothing leaves. ---
-  rec.step('Every send is recorded. In demo mode nothing leaves the app.');
+  rec.step('Every send is recorded. In demo mode each row reads Simulated.');
   const outbox = section('Outbox');
   await smoothScrollTo(outbox, 'start');
-  await focusOn(outbox, {padX: 32, padY: 44, biasY: -30});
+  await focusOn(outbox, {padX: 30, padY: 24, maxH: 300});
+  await page.waitForTimeout(REVEAL_HOLD_MS);
+  await focusOn(outbox.locator('li').first(), {padX: 24, padY: 20}); // one queued row, reading Simulated
   await page.waitForTimeout(REVEAL_HOLD_MS);
 
   const telemetry = rec.finish(VIEWPORT);

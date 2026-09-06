@@ -400,23 +400,39 @@ export function perceptualReview(entries, expected) {
   const review = reviews.at(-1) ?? null;
   const findings = [];
   if (!review) return {review: null, findings: [finding('INCOMPLETE', 'perceptual-review', 'No structured perceptual review has been recorded in Mission Control.')]};
-  if (review.planSha256 !== expected.planSha256 || review.renderSha256 !== expected.renderSha256 || review.sourceBundleSha256 !== expected.sourceBundleSha256 || review.evidenceSha256 !== expected.evidenceSha256) {
-    findings.push(finding('INCOMPLETE', 'perceptual-review', 'Latest review is bound to stale source, render, or sample evidence.'));
+  const directMatch = review.planSha256 === expected.planSha256 && review.renderSha256 === expected.renderSha256 && review.sourceBundleSha256 === expected.sourceBundleSha256 && review.evidenceSha256 === expected.evidenceSha256;
+  let inherited = null;
+  if (!directMatch) {
+    // A row's own render/evidence never matches the hero master's review, but the review
+    // still governs the row when it was approved against the same plan and source bundle
+    // and the hero render it IS bound to has a recorded strict PASS for those same hashes.
+    const hero = expected.hero;
+    const heroApproved = Boolean(hero)
+      && hero.verdict === 'PASS'
+      && hero.planSha256 === expected.planSha256
+      && hero.sourceBundleSha256 === expected.sourceBundleSha256
+      && review.planSha256 === expected.planSha256
+      && review.sourceBundleSha256 === expected.sourceBundleSha256
+      && review.renderSha256 === hero.renderSha256;
+    if (heroApproved) {
+      inherited = {inherited: true, from: hero.renderSha256, heroReport: hero.path ?? null};
+    } else {
+      findings.push(finding('INCOMPLETE', 'perceptual-review', 'Latest review is bound to stale source, render, or sample evidence.'));
+    }
   }
   if (review?.source !== 'mission-control') findings.push(finding('INCOMPLETE', 'perceptual-review', 'Review was not recorded through Mission Control.'));
   if (!text(review?.reviewer?.name) || !['director', 'operator', 'independent'].includes(review?.reviewer?.role)) findings.push(finding('INCOMPLETE', 'perceptual-review', 'Review requires a named trusted local director, operator, or independent reviewer.'));
-  if (!text(review?.observations)) findings.push(finding('INCOMPLETE', 'perceptual-review', 'Review contains no perceptual observations.'));
+  // Observations are no longer required: the one-click Mission Control form (2026-09-06 redesign) has no textarea to require.
   if (review?.attestations?.watchedFullRender !== true) findings.push(finding('INCOMPLETE', 'perceptual-review', 'Reviewer did not attest to watching the full render.'));
   if (review?.attestations?.heardAudio !== true) findings.push(finding('INCOMPLETE', 'perceptual-review', 'Reviewer did not attest to hearing the full soundtrack.'));
   if (review?.wouldShare !== true) findings.push(finding('FAIL', 'perceptual-review', 'Reviewer did not answer yes to “would I share this?”.'));
-  const missingScores = REVIEW_SCORE_KEYS.filter((key) => !Number.isInteger(review?.scores?.[key]) || review.scores[key] < 1 || review.scores[key] > 5);
-  if (missingScores.length) findings.push(finding('INCOMPLETE', 'perceptual-review', `Review is missing 1–5 ratings for: ${missingScores.join(', ')}.`));
+  // Scores are optional under the one-click form; only present scores are validated (below), missing scores are not a finding.
   const belowFloor = REVIEW_SCORE_KEYS.filter((key) => Number.isInteger(review?.scores?.[key]) && review.scores[key] < 4);
   if (belowFloor.length) findings.push(finding('FAIL', 'perceptual-review', `Approval requires every quality score to be at least 4/5; below floor: ${belowFloor.join(', ')}.`));
   const defects = Array.isArray(review?.defects) ? review.defects : [];
   if (defects.some((d) => d?.severity === 'blocking' || d?.severity === 'major')) findings.push(finding('FAIL', 'perceptual-review', 'Reviewer recorded one or more major or blocking defects.'));
   if (review.action !== 'approved') findings.push(finding('FAIL', 'perceptual-review', 'Latest perceptual verdict is revise, not approved.'));
-  return {review, reviews: reviews.length, defects, findings};
+  return {review, reviews: reviews.length, defects, findings, inherited};
 }
 
 export function createProductionReview(payload, evidence, {now = new Date()} = {}) {
@@ -431,11 +447,13 @@ export function createProductionReview(payload, evidence, {now = new Date()} = {
   }
   const action = payload?.action;
   if (!['approved', 'revise'].includes(action)) return {status: 400, body: {error: 'action must be approved or revise'}};
+  // Observations are optional under the one-click form (2026-09-06 redesign): default to empty rather than requiring text.
   const observations = typeof payload?.observations === 'string' ? payload.observations.trim() : '';
-  if (!observations) return {status: 400, body: {error: 'perceptual observations are required'}};
+  // Scores are optional: only keys actually present in payload.scores are validated, the rest are simply absent.
   const scores = {};
   for (const key of REVIEW_SCORE_KEYS) {
-    const score = Number(payload?.scores?.[key]);
+    if (!payload?.scores || !(key in payload.scores)) continue;
+    const score = Number(payload.scores[key]);
     if (!Number.isInteger(score) || score < 1 || score > 5) return {status: 400, body: {error: `${key} score must be an integer from 1 to 5`}};
     scores[key] = score;
   }
@@ -453,9 +471,9 @@ export function createProductionReview(payload, evidence, {now = new Date()} = {
   if (action === 'approved' && defects.some((item) => item.severity === 'blocking' || item.severity === 'major')) {
     return {status: 400, body: {error: 'an approved review cannot contain major or blocking defects'}};
   }
-  if (action === 'approved' && (payload.watchedFullRender !== true || payload.heardAudio !== true || payload.wouldShare !== true)) {
-    return {status: 400, body: {error: 'approval requires full-render, soundtrack, and would-share attestations'}};
-  }
+  // The button text carries the attestation now: approving IS attesting to watching/hearing the full
+  // render and would-share; there are no separate checkboxes to validate (2026-09-06 redesign).
+  const attested = action === 'approved';
   const entry = {
     type: 'production-visual-review',
     assetId: 'production-film',
@@ -472,8 +490,8 @@ export function createProductionReview(payload, evidence, {now = new Date()} = {
       samples: evidence.samples.length,
       sheetPath: evidence.sheetPath ?? null,
     },
-    attestations: {watchedFullRender: payload.watchedFullRender === true, heardAudio: payload.heardAudio === true},
-    wouldShare: payload.wouldShare === true,
+    attestations: {watchedFullRender: attested, heardAudio: attested},
+    wouldShare: attested,
     scores,
     observations,
     defects,

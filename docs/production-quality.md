@@ -26,12 +26,11 @@ A passing film has four independent properties:
    labels, not authenticated identities.
 3. **Rendered proof:** start, middle, and end frames from every planned shot are extracted
    from the exact final render and bound to both the render and production-plan hashes.
-4. **Viewer proof:** a local director, operator, or independent reviewer attests they watched the
-   entire render with sound, answers yes to “would I share this?”, rates story clarity,
-   visual hierarchy, motion intent, product readability, and ending confidence from 1–5,
-   and records structured defects. Approval requires all five scores to be at least 4/5;
-   any major or blocking defect fails the review. This is local attestation, not identity
-   authentication.
+4. **Viewer proof:** a local director, operator, or independent reviewer, identified once at the
+   top of Mission Control, clicks Approve or Revise on the full render with sound, and that click
+   itself records the watched-render, heard-audio, and would-share attestations; an optional note
+   and optional 1–5 scores, when given, still fail an approval below 4/5 or with a major or
+   blocking defect. This is local attestation, not identity authentication.
 
 Mechanical checks reject stale sources, missing shots, blank/black frames, truncated
 renders, and missing evidence. Low contrast, low edge occupancy, repetition, and
@@ -131,6 +130,18 @@ node scripts/build-postkit.mjs <brand> --project <product> --production
 `--production --stills-only` is layout proof, never delivery. `--verify-production`
 rechecks pending existing media without rerendering. The matrix hashes every complete
 row to its plan and evidence; the production post kit copies only PASS, hash-bound rows.
+
+A matrix row (`launch-16x9.mp4`, `social-9x16.mp4`, ...) is a different file with
+different samples than the hero master, so its own perceptual review would always be
+missing. Rather than demand a separate human viewing per format, `judge-production.mjs`
+lets a row inherit the hero's review: if the row's plan hash and source-bundle hash
+match the review's, the review is bound to the hero master's render hash, and the hero
+has its own recorded strict PASS for that same plan and bundle (`marketing/judge-production.json`,
+overridable with `--hero-report`), the row's report marks its perceptual section
+`{inherited: true, from: <hero renderSha256>, heroReport: <path>}` instead of raising the
+stale-review INCOMPLETE. Every machine check (samples, motion, references, stage
+approvals, frame count) still runs unchanged on the row itself; only the perceptual
+step is inherited, and only when the hero's own report is a strict PASS.
 
 ## Ranked audit and remediation
 

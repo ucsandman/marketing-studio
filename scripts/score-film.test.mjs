@@ -52,6 +52,9 @@ test('nextGain moves by the measured shortfall', () => {
 test('check-audio classifies delivery surfaces and skips deliberate silent files', () => {
   assert.equal(classify('postkit/x/social-16x9.mp4').check, true);
   assert.equal(classify('postkit/x/social-16x9-silent.mp4').check, false);
+  assert.equal(classify('matrix/launch-16x9.mp4').check, true);
+  assert.equal(classify('matrix/social-9x16-captioned.mp4').check, true);
+  assert.equal(classify('matrix/social-9x16-captioned-silent.mp4').check, false);
   assert.equal(classify('launch.mp4').check, true);
   assert.equal(classify('launch-final.mp4').check, true);
   assert.equal(classify('social-x-final-v2.mp4').check, true);

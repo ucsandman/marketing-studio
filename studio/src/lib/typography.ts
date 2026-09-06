@@ -133,6 +133,38 @@ export const headlineLayout = (
   return {lines, fontSize, maxWidth, contentWidth, wordGap, ...profile};
 };
 
+export type CtaCasing = 'sentence' | 'upper';
+
+export type CtaSetting = {
+  text: string;
+  fontFamily: string;
+  /** Left undefined by `upper` so that branch keeps inheriting its weight. */
+  fontWeight: number | undefined;
+  letterSpacing: string;
+};
+
+/**
+ * How an end-card CTA is SET. `upper` is the studio default every brand has rendered
+ * since the first end card: wide-tracked mono in caps. `sentence` belongs to a
+ * direction whose typography casing is sentence — Truckside's DESIGN.md permits
+ * uppercase only for a badge of four words or fewer, so a full CTA sentence keeps the
+ * words exactly as the props hold them and takes the brand's display face instead of
+ * shouting in tracked mono.
+ */
+export const ctaSetting = (
+  cta: string,
+  casing: CtaCasing,
+  fonts: {display: string; mono: string},
+): CtaSetting =>
+  casing === 'sentence'
+    ? {text: cta, fontFamily: fonts.display, fontWeight: 800, letterSpacing: '-0.01em'}
+    : {
+        text: cta.toUpperCase(),
+        fontFamily: fonts.mono,
+        fontWeight: undefined,
+        letterSpacing: '0.2em',
+      };
+
 export const headlineLineWidth = (
   line: string,
   layout: HeadlineLayout,

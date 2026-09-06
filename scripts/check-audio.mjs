@@ -10,6 +10,11 @@
 //   out/<brand>/postkit/**/*.mp4        except *-silent.mp4 (deliberate muted variants)
 //   out/<brand>/*.mp4                   except og.mp4 (a silent web loop by design)
 //                                       and *-silent.mp4
+//   out/<brand>/matrix/*.mp4            production render-matrix rows — these feed the
+//                                       postkit and ship un-mastered (Remotion's internal
+//                                       VO+bed mix) unless render-matrix.mjs's --master
+//                                       step replaced the audio, so this scan surface
+//                                       catches a bad row before the post kit exists
 //   out/<brand>/film/                   the newest film-vN.mp4 must have a
 //                                       film-vN-scored.mp4 and a score.json with
 //                                       voLines > 0 (or musicOnly recorded as a
@@ -43,6 +48,7 @@ export function classify(rel) {
   const base = basename(p);
   if (base.endsWith('-silent.mp4')) return {check: false, why: 'silent variant by design'};
   if (p.startsWith('postkit/')) return {check: true, why: 'postkit'};
+  if (p.startsWith('matrix/')) return {check: true, why: 'matrix row'};
   if (!p.includes('/')) {
     if (base === 'og.mp4') return {check: false, why: 'og loop is silent by design'};
     // The locks and finals are what postkit and the product repo consume; the
@@ -108,8 +114,10 @@ function main() {
     process.exit(2);
   }
   const outDir = ws.brandOut;
+  const matrixDir = join(outDir, 'matrix');
   const files = walk(join(outDir, 'postkit')).concat(
     existsSync(outDir) ? readdirSync(outDir).map((n) => join(outDir, n)).filter((p) => statSync(p).isFile()) : [],
+    existsSync(matrixDir) ? readdirSync(matrixDir).map((n) => join(matrixDir, n)).filter((p) => statSync(p).isFile()) : [],
   ).filter((p) => p.endsWith('.mp4'));
   const results = [];
   let skipped = 0;

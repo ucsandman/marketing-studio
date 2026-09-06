@@ -471,13 +471,15 @@ const BRANDS = {
     // and the brand name alone does not say where that is.
     command: 'truckside.io',
     // Act lengths widened from the shared defaults so every approved narration line in
-    // out/truckside/marketing/brief.json fits at ~150 wpm plus VO_LEAD and VO_PAD (the
-    // audio pass scores this picture lock later). Defaults would clip hook (17 words)
-    // and end (22 words). The demo act is telemetry-derived from the ~30.6s capture and
-    // is not listed here (widen the recording, never shorten it).
-    actLengths: {hook: 240, features: [216, 216, 204], end: 300},
+    // marketing/brief.json fits at ~150 wpm plus VO_LEAD and VO_PAD (the audio pass
+    // scores this picture lock later). Defaults would clip hook and end. These mirror
+    // the authored shot durations in BRAND_SHOTS.truckside so the emitted shot-plan
+    // `timing` block agrees with the shots; the directed render reads the shots.
+    // demoTail 0 because the three demo shots consume the capture exactly, with no
+    // held tail (widen a recording, never shorten it).
+    actLengths: {logo: 200, hook: 250, features: [255, 255, 255], end: 300, demoTail: 0},
     assets: {
-      logoSequence: 'truckside/logo-reveal',
+      logoSequence: 'truckside/logo-reveal-truckside',
       logoFrames: 90,
       loopSequence: null,
       loopFrames: 1,
@@ -579,6 +581,256 @@ function validBrief(text) {
   };
 }
 
+// Per-brand AUTHORED direction. Same per-brand-map shape as directionPreset below,
+// but it carries the whole spec (metaphor, sound intent, references with provenance,
+// grammar overrides) instead of only a preset name. A brand absent here still gets
+// the preset default, so every existing brand is byte-identical.
+const BRAND_DIRECTION = {
+  // Truckside 2026-09-05: "The job sheet in daylight". The editorial preset supplies
+  // the paper/rule material, the measured camera and the dissolve, but the typography
+  // is overridden to `instrument` (left-set) with SENTENCE casing, because the brand
+  // writes plain sentences and the product's own DESIGN.md bans uppercase eyebrows;
+  // `precision` wholesale would have set the film in the uppercase developer voice the
+  // production-quality audit ranks #10, and it is also the preset the previous
+  // Truckside run used.
+  truckside: () => ({
+    preset: 'editorial',
+    reason:
+      'The film is one off-white job sheet in daylight. Sentences are set left like a work order, the captured product enters as a wide strip under a green rule, and every shot ends on the single control the sentence just named, because the owner tap is the product. Editorial supplies paper, a measured camera and the dissolve; typography is overridden to left-set sentence case so the film speaks in the brand voice instead of the uppercase instrument voice.',
+    visualMetaphor:
+      'The office rides in the passenger seat. One off-white screen in daylight, and one green button in front of every decision the owner still owns.',
+    soundIntent:
+      'A working day, not a product launch. Narration leads, an unhurried acoustic bed sits under it, and nothing rises or swells. Music a trades owner would not notice.',
+    references: [
+      {
+        id: 'demo-capture',
+        pathOrUrl: 'marketing/assets/truckside/public/truckside/demo.webm',
+        intendedAttributes: ['real owner dashboard', 'real clicks with visible consequences', 'recorded cursor'],
+        provenance: {kind: 'capture', source: 'feeders/capture/record-truckside-demo.mjs', capturedAt: '2026-09-05'},
+      },
+      {
+        id: 'feature-reception',
+        pathOrUrl: 'marketing/assets/truckside/public/truckside/feature-reception.png',
+        intendedAttributes: ['missed call that came back booked', 'green booked window line', 'red emergency flag'],
+        provenance: {kind: 'product', source: 'feeders/capture/shoot-truckside-feature-stills.mjs', capturedAt: '2026-09-05'},
+      },
+      {
+        id: 'feature-quoting',
+        pathOrUrl: 'marketing/assets/truckside/public/truckside/feature-quoting.png',
+        intendedAttributes: ['priced line items', 'total off the rate card', 'green Approve button'],
+        provenance: {kind: 'product', source: 'feeders/capture/shoot-truckside-feature-stills.mjs', capturedAt: '2026-09-05'},
+      },
+      {
+        id: 'feature-followup',
+        pathOrUrl: 'marketing/assets/truckside/public/truckside/feature-followup.png',
+        intendedAttributes: ['drafted follow-up text', 'one green Approve per row', 'nothing sent yet'],
+        provenance: {kind: 'product', source: 'feeders/capture/shoot-truckside-feature-stills.mjs', capturedAt: '2026-09-05'},
+      },
+      {
+        id: 'logo-mark-sequence',
+        pathOrUrl: 'marketing/assets/truckside/public/truckside/logo-reveal-truckside',
+        intendedAttributes: ['pickup mark drawn on', 'brand green', 'transparent daylight ground'],
+        provenance: {kind: 'generated', source: 'feeders/blender/scenes/logo_reveal_truckside.py', capturedAt: '2026-09-05'},
+      },
+      {
+        id: 'brand-tokens',
+        pathOrUrl: 'brands/truckside.json',
+        intendedAttributes: ['off-white ground', 'green is the owner action and the mark', 'no gradients or glow'],
+        provenance: {kind: 'brand', source: 'brands/truckside.json', capturedAt: null},
+      },
+    ],
+    // Declared stage proofs. These are the artifact/review PATHS only — the review
+    // sidecars are written by Mission Control's applyStageReview when a named
+    // director, operator or independent reviewer records a verdict, never here and
+    // never by hand. Declaring them is what lets judge-production stop reporting the
+    // style frame and animatic as undeclared and start reporting them as unapproved.
+    styleFrame: {
+      artifact: 'marketing/assets/truckside/marketing/stills/style-hook.png',
+      review: 'marketing/assets/truckside/marketing/reviews/style-frame.json',
+    },
+    animatic: {
+      artifact: 'marketing/assets/truckside/marketing/launch-animatic-v3.mp4',
+      review: 'marketing/assets/truckside/marketing/reviews/animatic.json',
+    },
+    overrides: {
+      camera: {cadence: 'measured', establishingScale: 'wide', proofScale: 'close', detailScale: 'detail'},
+      motion: {energy: 0.26, travel: 0.16, stagger: 0.4, settle: 0.12},
+      typography: {composition: 'instrument', align: 'left', density: 'airy', casing: 'sentence'},
+      material: {treatment: 'paper', edge: 'rule', depth: 0.12},
+      // eslint-disable-next-line @remotion/non-pure-animation -- Timeline metadata, not a CSS transition
+      edit: {rhythm: 'measured', transition: 'dissolve', transitionFrames: 12},
+      intro: {kind: 'mark', holdFrames: 150},
+      outro: {kind: 'command', holdFrames: 240},
+    },
+  }),
+};
+
+// Per-brand AUTHORED shot list. Absent brands fall through to defaultDirectedShots.
+const BRAND_SHOTS = {
+  // Truckside: talk / show / talk / show. The 839-frame capture plays in SOURCE ORDER
+  // across three shots so it is never re-cut out of sequence, and each feature panel is
+  // the close-up recap of the beat that just played. Every entry INTO footage is a hard
+  // cut (the film hands the screen to the product); every entry into type is a dissolve.
+  truckside: () => {
+    // Measured focus rects for the three feature panels, written by
+    // feeders/capture/shoot-truckside-feature-stills.mjs. They are product-owned and
+    // OPTIONAL by contract: `focus` and `sourceViewport` are both optional in
+    // launchShotInputSchema, and the engine's rule is nullable asset props with
+    // placeholder fallbacks so a clean clone still builds. Without them the panels
+    // frame the whole plate instead of the measured region — a visible difference the
+    // mandatory still inspection catches — so this warns and carries on rather than
+    // killing a workspace that has not been captured yet (a hard exit here broke
+    // build-launch-props.test.mjs, whose fixture repo has no capture, 2026-09-06).
+    const focusPath = join(workspace.propsDir, 'truckside-feature-focus.json');
+    const focusDoc = existsSync(focusPath) ? JSON.parse(readFileSync(focusPath, 'utf8')) : null;
+    if (!focusDoc) {
+      console.warn(
+        `build-launch-props: truckside has no ${focusPath}, so feature panels will frame the whole plate; run feeders/capture/shoot-truckside-feature-stills.mjs --project <repo> for measured framing`,
+      );
+    }
+    const panel = (key) =>
+      focusDoc ? {sourceViewport: focusDoc.viewport, focus: focusDoc.features[key].focus} : {};
+    const READ = {safeArea: true, minContrast: 4.5};
+    return [
+      {
+        id: 'logo',
+        source: {kind: 'logo'},
+        purpose: 'establish',
+        durationFrames: 200,
+        scale: 'wide',
+        transition: {kind: 'cut', frames: 0},
+        onScreenText: {maxChars: 24, minHoldFrames: 90},
+        readability: READ,
+        audioRef: 'logo',
+        audio: {entry: 'soft', music: 'hold'},
+        references: ['logo-mark-sequence', 'brand-tokens'],
+      },
+      {
+        id: 'hook',
+        source: {kind: 'hook'},
+        purpose: 'problem',
+        durationFrames: 250,
+        scale: 'close',
+        transition: {kind: 'dissolve', frames: 12},
+        matchFrom: {shotId: 'logo', mode: 'color'},
+        onScreenText: {maxChars: 88, minHoldFrames: 150},
+        readability: {safeArea: true, minContrast: 7},
+        audioRef: 'hook',
+        audio: {entry: 'none', music: 'hold'},
+        references: ['brand-tokens'],
+      },
+      {
+        id: 'demo-answer',
+        source: {kind: 'demo', sourceStartFrame: 0, sourceEndFrame: 228},
+        purpose: 'mechanism',
+        durationFrames: 228,
+        scale: 'wide',
+        hero: true,
+        transition: {kind: 'cut', frames: 0},
+        onScreenText: {maxChars: 40, minHoldFrames: 60},
+        readability: READ,
+        audioRef: 'demo',
+        audio: {
+          entry: 'soft',
+          music: 'lift',
+          events: [{id: 'simulate-missed-call', frame: 110, kind: 'confirm', intensity: 'low'}],
+        },
+        references: ['demo-capture'],
+      },
+      {
+        id: 'feature-0',
+        source: {kind: 'feature', index: 0},
+        purpose: 'proof',
+        durationFrames: 255,
+        scale: 'close',
+        ...panel('reception'),
+        transition: {kind: 'dissolve', frames: 12},
+        matchFrom: {shotId: 'demo-answer', mode: 'subject'},
+        onScreenText: {maxChars: 40, minHoldFrames: 150},
+        readability: READ,
+        audioRef: 'feature-0',
+        audio: {entry: 'soft', music: 'hold', events: [{id: 'booked-window', frame: 18, kind: 'focus', intensity: 'low'}]},
+        references: ['feature-reception'],
+      },
+      {
+        id: 'demo-quote',
+        source: {kind: 'demo', sourceStartFrame: 228, sourceEndFrame: 518},
+        purpose: 'detail',
+        durationFrames: 290,
+        scale: 'close',
+        transition: {kind: 'cut', frames: 0},
+        matchFrom: {shotId: 'demo-answer', mode: 'motion'},
+        onScreenText: {maxChars: 40, minHoldFrames: 60},
+        readability: READ,
+        audioRef: null,
+        audio: {entry: 'none', music: 'hold', events: [{id: 'approve-quote', frame: 70, kind: 'confirm', intensity: 'low'}]},
+        references: ['demo-capture'],
+      },
+      {
+        id: 'feature-1',
+        source: {kind: 'feature', index: 1},
+        purpose: 'benefit',
+        durationFrames: 255,
+        // medium, not detail: a detail push on this strip lands below the priced line
+        // items and leaves the panel half empty. Medium keeps a line item, the total
+        // and the Approve button in one frame.
+        scale: 'medium',
+        ...panel('quoting'),
+        transition: {kind: 'dissolve', frames: 12},
+        matchFrom: {shotId: 'demo-quote', mode: 'subject'},
+        onScreenText: {maxChars: 40, minHoldFrames: 150},
+        readability: READ,
+        audioRef: 'feature-1',
+        audio: {entry: 'soft', music: 'hold', events: [{id: 'approve-button', frame: 18, kind: 'focus', intensity: 'low'}]},
+        references: ['feature-quoting'],
+      },
+      {
+        id: 'demo-followups',
+        source: {kind: 'demo', sourceStartFrame: 518, sourceEndFrame: 839},
+        purpose: 'detail',
+        durationFrames: 321,
+        scale: 'detail',
+        transition: {kind: 'cut', frames: 0},
+        matchFrom: {shotId: 'demo-quote', mode: 'motion'},
+        onScreenText: {maxChars: 40, minHoldFrames: 60},
+        readability: READ,
+        audioRef: null,
+        audio: {entry: 'none', music: 'hold', events: [{id: 'clear-follow-up', frame: 69, kind: 'confirm', intensity: 'low'}]},
+        references: ['demo-capture'],
+      },
+      {
+        id: 'feature-2',
+        source: {kind: 'feature', index: 2},
+        purpose: 'benefit',
+        durationFrames: 255,
+        scale: 'detail',
+        ...panel('followup'),
+        transition: {kind: 'dissolve', frames: 12},
+        matchFrom: {shotId: 'demo-followups', mode: 'subject'},
+        onScreenText: {maxChars: 40, minHoldFrames: 150},
+        readability: READ,
+        audioRef: 'feature-2',
+        audio: {entry: 'soft', music: 'hold', events: [{id: 'drafted-and-waiting', frame: 18, kind: 'focus', intensity: 'low'}]},
+        references: ['feature-followup'],
+      },
+      {
+        id: 'end',
+        source: {kind: 'end'},
+        purpose: 'cta',
+        durationFrames: 300,
+        scale: 'wide',
+        transition: {kind: 'cut', frames: 0},
+        endingHoldFrames: 240,
+        onScreenText: {maxChars: 96, minHoldFrames: 180},
+        readability: {safeArea: true, minContrast: 7},
+        audioRef: 'end',
+        audio: {entry: 'none', music: 'resolve'},
+        references: ['brand-tokens'],
+      },
+    ];
+  },
+};
+
 const directionPreset = {
   noban: 'playful',
   costclaw: 'precision',
@@ -588,7 +840,7 @@ const directionPreset = {
   postflop: 'editorial',
   truckside: 'precision',
 }[brand] ?? 'precision';
-const directionInput = brief?.direction ?? {
+const directionInput = brief?.direction ?? BRAND_DIRECTION[brand]?.() ?? {
   preset: directionPreset,
   reason: `Derived from ${brand}'s stable brand voice and product evidence.`,
   visualMetaphor: brief?.visualMetaphor ?? null,
@@ -602,12 +854,13 @@ const resolvedDirection = resolveDirection(directionInput);
 launch.direction = directionInput;
 launch.shots = brief?.shots?.length
   ? brief.shots
-  : defaultDirectedShots(
+  : (BRAND_SHOTS[brand]?.(launch, resolvedDirection) ??
+    defaultDirectedShots(
       resolvedDirection,
       launch.features.length,
       launch.demo.telemetry?.durationMs ?? null,
       30,
-    );
+    ));
 if (brief?.shots?.length) {
   const selectedAudio = new Set(launch.shots.map((shot) => shot.audioRef).filter(Boolean));
   if (launch.audio) launch.audio.lines = launch.audio.lines.filter((line) => selectedAudio.has(line.act));

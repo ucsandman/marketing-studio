@@ -77,8 +77,9 @@ test('live server rejects cross-site and non-JSON POSTs, then accepts its same-o
   assert.ok(token, 'same-origin page receives a process-local token');
   assert.match(page.headers.get('content-security-policy') ?? '', /frame-ancestors 'none'/);
   assert.equal(page.headers.get('x-frame-options'), 'DENY');
-  assert.match(html, /Approve stage/);
-  assert.match(html, /Revise stage/);
+  // Stage buttons read "Approve"/"Revise" (one-click contract change, 2026-09-06), not "Approve stage"/"Revise stage".
+  assert.match(html, />Approve</);
+  assert.match(html, />Revise</);
   const state = await (await fetch(`${origin}/state`)).json();
   assert.equal(state._stages.length, 2);
   assert.deepEqual(state._stages.map((stage) => stage.ready), [true, true]);

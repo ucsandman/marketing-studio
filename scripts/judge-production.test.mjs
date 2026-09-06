@@ -154,6 +154,129 @@ test('complete rendered fixture passes with explicit processed counts', () => {
   assert.equal(report.input.frames, 30);
 });
 
+// Hero-inheritance (2026-09-06): a matrix row rendered from the same approved plan and
+// source bundle as the hero master inherits the hero's human perceptual review, so long
+// as the hero itself has a recorded strict PASS binding it to those same hashes.
+test('a matrix row inherits the hero master review when the hero report on disk is a strict PASS for the same plan and bundle', () => {
+  const f = fixture();
+  const heroReportPath = join(f.workspace.marketingDir, 'judge-production.json');
+  const heroReport = evaluateProduction({workspace: f.workspace, brand: 'acme', productionPlanPath: f.productionPlanPath, renderPath: f.renderPath, evidencePath: f.evidencePath, reviewPath: f.reviewPath});
+  assert.equal(heroReport.verdict, 'PASS', JSON.stringify(heroReport.findings));
+  writeFileSync(heroReportPath, JSON.stringify(heroReport));
+
+  mkdirSync(f.workspace.matrixDir, {recursive: true});
+  const rowRenderPath = join(f.workspace.matrixDir, 'row.mp4');
+  execFileSync('ffmpeg', [
+    '-hide_banner', '-loglevel', 'error', '-y',
+    '-f', 'lavfi', '-i', 'testsrc2=size=64x36:rate=30',
+    '-f', 'lavfi', '-i', 'sine=frequency=880:sample_rate=48000',
+    '-t', '1', '-shortest', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac',
+    rowRenderPath,
+  ]);
+  assert.notEqual(sha256File(rowRenderPath), sha256File(f.renderPath));
+
+  const rowEvidencePath = join(f.workspace.marketingDir, 'row-evidence.json');
+  writeFileSync(rowEvidencePath, JSON.stringify({...f.evidence, renderSha256: sha256File(rowRenderPath)}));
+
+  // Reuses the hero-bound review.json unchanged: the row never gets its own perceptual pass.
+  const rowReport = evaluateProduction({workspace: f.workspace, brand: 'acme', productionPlanPath: f.productionPlanPath, renderPath: rowRenderPath, evidencePath: rowEvidencePath, reviewPath: f.reviewPath});
+  assert.equal(rowReport.verdict, 'PASS', JSON.stringify(rowReport.findings));
+  assert.deepEqual(rowReport.perceptual.inherited, {
+    inherited: true,
+    from: heroReport.input.renderSha256,
+    heroReport: relative(f.workspace.projectRoot, heroReportPath).replaceAll('\\', '/'),
+  });
+
+  // Judging the hero itself never treats its own report as a foreign hero to inherit from.
+  const rejudgedHero = evaluateProduction({workspace: f.workspace, brand: 'acme', productionPlanPath: f.productionPlanPath, renderPath: f.renderPath, evidencePath: f.evidencePath, reviewPath: f.reviewPath});
+  assert.equal(rejudgedHero.verdict, 'PASS');
+  assert.equal(rejudgedHero.perceptual.inherited, null);
+});
+
+const hash = (label) => sha256Json({label});
+
+test('perceptualReview inherits an approved hero review when plan and source bundle match and the hero report is a strict PASS', () => {
+  const planSha256 = hash('plan');
+  const sourceBundleSha256 = hash('bundle');
+  const heroRenderSha256 = hash('hero-render');
+  const review = {
+    type: 'production-visual-review', source: 'mission-control', action: 'approved',
+    reviewer: {name: 'Director D', role: 'director'},
+    planSha256, sourceBundleSha256, renderSha256: heroRenderSha256, evidenceSha256: hash('hero-evidence'),
+    attestations: {watchedFullRender: true, heardAudio: true}, wouldShare: true, scores: {}, defects: [],
+  };
+  const expected = {
+    planSha256, sourceBundleSha256, renderSha256: hash('row-render'), evidenceSha256: hash('row-evidence'),
+    hero: {renderSha256: heroRenderSha256, planSha256, sourceBundleSha256, verdict: 'PASS', path: 'marketing/assets/acme/marketing/judge-production.json'},
+  };
+  const result = perceptualReview([review], expected);
+  assert.deepEqual(result.findings, []);
+  assert.deepEqual(result.inherited, {inherited: true, from: heroRenderSha256, heroReport: expected.hero.path});
+});
+
+test('perceptualReview refuses to inherit when the row plan hash differs from the hero-bound review', () => {
+  const sourceBundleSha256 = hash('bundle');
+  const heroRenderSha256 = hash('hero-render');
+  const review = {
+    type: 'production-visual-review', source: 'mission-control', action: 'approved',
+    reviewer: {name: 'Director D', role: 'director'},
+    planSha256: hash('hero-plan'), sourceBundleSha256, renderSha256: heroRenderSha256, evidenceSha256: hash('hero-evidence'),
+    attestations: {watchedFullRender: true, heardAudio: true}, wouldShare: true, scores: {}, defects: [],
+  };
+  const expected = {
+    planSha256: hash('row-plan'), sourceBundleSha256, renderSha256: hash('row-render'), evidenceSha256: hash('row-evidence'),
+    hero: {renderSha256: heroRenderSha256, planSha256: hash('hero-plan'), sourceBundleSha256, verdict: 'PASS', path: 'marketing/assets/acme/marketing/judge-production.json'},
+  };
+  const result = perceptualReview([review], expected);
+  assert.equal(result.inherited, null);
+  assert.ok(result.findings.some((item) => item.level === 'INCOMPLETE' && /stale source, render, or sample evidence/.test(item.message)));
+});
+
+test('perceptualReview refuses to inherit when the hero report verdict is not PASS', () => {
+  const planSha256 = hash('plan');
+  const sourceBundleSha256 = hash('bundle');
+  const heroRenderSha256 = hash('hero-render');
+  const review = {
+    type: 'production-visual-review', source: 'mission-control', action: 'approved',
+    reviewer: {name: 'Director D', role: 'director'},
+    planSha256, sourceBundleSha256, renderSha256: heroRenderSha256, evidenceSha256: hash('hero-evidence'),
+    attestations: {watchedFullRender: true, heardAudio: true}, wouldShare: true, scores: {}, defects: [],
+  };
+  const expected = {
+    planSha256, sourceBundleSha256, renderSha256: hash('row-render'), evidenceSha256: hash('row-evidence'),
+    hero: {renderSha256: heroRenderSha256, planSha256, sourceBundleSha256, verdict: 'INCOMPLETE', path: 'marketing/assets/acme/marketing/judge-production.json'},
+  };
+  const result = perceptualReview([review], expected);
+  assert.equal(result.inherited, null);
+  assert.ok(result.findings.some((item) => item.level === 'INCOMPLETE' && /stale source, render, or sample evidence/.test(item.message)));
+});
+
+test('perceptualReview still passes a review directly bound to the row itself even when an unrelated hero report is present', () => {
+  const planSha256 = hash('plan');
+  const sourceBundleSha256 = hash('bundle');
+  const renderSha256 = hash('row-render');
+  const evidenceSha256 = hash('row-evidence');
+  const review = {
+    type: 'production-visual-review', source: 'mission-control', action: 'approved',
+    reviewer: {name: 'Director D', role: 'director'},
+    planSha256, sourceBundleSha256, renderSha256, evidenceSha256,
+    attestations: {watchedFullRender: true, heardAudio: true}, wouldShare: true, scores: {}, defects: [],
+  };
+  const expected = {
+    planSha256, sourceBundleSha256, renderSha256, evidenceSha256,
+    hero: {renderSha256: hash('unrelated-hero-render'), planSha256, sourceBundleSha256, verdict: 'PASS', path: 'marketing/assets/acme/marketing/judge-production.json'},
+  };
+  const result = perceptualReview([review], expected);
+  assert.deepEqual(result.findings, []);
+  assert.equal(result.inherited, null);
+});
+
+test('a row with no review and no hero report still reports INCOMPLETE', () => {
+  const result = perceptualReview([], {planSha256: hash('plan'), sourceBundleSha256: hash('bundle'), renderSha256: hash('row-render'), evidenceSha256: hash('row-evidence')});
+  assert.equal(result.review, null);
+  assert.ok(result.findings.some((item) => item.level === 'INCOMPLETE' && /No structured perceptual review/.test(item.message)));
+});
+
 test('a hand-authored or arbitrary-role perceptual score cannot pass', () => {
   const expected = {planSha256: 'a', sourceBundleSha256: 's', renderSha256: 'b', evidenceSha256: 'c'};
   const base = {
@@ -165,7 +288,25 @@ test('a hand-authored or arbitrary-role perceptual score cannot pass', () => {
   const result = perceptualReview([base], expected);
   assert.ok(result.findings.some((item) => /Mission Control/.test(item.message)));
   assert.ok(result.findings.some((item) => /trusted local director/.test(item.message)));
-  assert.ok(result.findings.some((item) => /observations/.test(item.message)));
+  // observations is no longer required by perceptualReview (one-click contract change, 2026-09-06).
+});
+
+// One-click contract (2026-09-06 redesign): reviewer identity plus a single approve click,
+// with no note, scores, or checkboxes, is a complete and passing review.
+test('a one-click approval with only reviewer identity and action is accepted and satisfies perceptualReview', () => {
+  const evidence = {
+    planSha256: 'a'.repeat(64), renderSha256: 'b'.repeat(64), sourceBundleSha256: 'c'.repeat(64),
+    samples: [{shotId: 'a'}, {shotId: 'b'}],
+  };
+  const minimal = {reviewerName: 'Operator O', reviewerRole: 'operator', action: 'approved'};
+  const result = createProductionReview(minimal, evidence);
+  assert.equal(result.status, 200);
+  const expected = {
+    planSha256: evidence.planSha256, renderSha256: evidence.renderSha256,
+    sourceBundleSha256: evidence.sourceBundleSha256, evidenceSha256: sha256Json(evidence),
+  };
+  const {findings} = perceptualReview([result.entry], expected);
+  assert.deepEqual(findings, []);
 });
 
 test('production sources require recorded hashes and fail when props or staged media changes', () => {

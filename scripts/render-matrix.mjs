@@ -6,7 +6,8 @@
 // platform and pass --props.
 //
 // Usage: node scripts/render-matrix.mjs <brand> [--comp LaunchVideo|SocialClip|WrapClip]
-//          [--only <platformId>] [--props <path>] [--stills-only] [--webm] [--production] [--verify-production]
+//          [--only <platformId>] [--props <path>] [--stills-only] [--webm] [--production]
+//          [--verify-production] [--master <path>]
 //   --stills-only   render a single text-bearing still per platform (layout proof,
 //                   no CPU for full video). Otherwise renders full .mp4 per platform.
 //   --only <id>     render just the one platform row matching scripts/platforms.json's
@@ -19,6 +20,12 @@
 //                   judge-production --strict on every final matrix row.
 //   --verify-production  with --production, re-run only the strict evidence gate
 //                   for existing matrix media; never re-render a review-pending file.
+//   --master <path> production rows only: after a row (and its -captioned sibling)
+//                   renders, replace its audio track with this file's audio — the
+//                   row's own render is Remotion's internal, unmastered VO+bed mix,
+//                   never scored. Defaults to <workspace>/launch-final.mp4 (the
+//                   scored hero cut); when that default is absent, rows are left
+//                   with their own unmastered audio and a log line says so.
 //
 // Outputs land in out/<brand>/matrix/<id>.mp4 (or .png for stills; plus <id>.webm when
 // --webm is supported). Every rendered mp4 is remuxed in place for faststart (moov atom
@@ -59,6 +66,8 @@ import {makeBaseLoader, productionHeroFrame, withBoundCaptions, withFormat} from
 import {matchBudget} from './check-budgets.mjs';
 import {evaluateProduction} from './judge-production.mjs';
 import {loadProductionBundle} from './lib/production-quality.mjs';
+import {muxMasterAudio} from './lib/master-audio-mux.mjs';
+import {ffmpeg, ffprobe, remotion} from './lib/remotion.mjs';
 import {projectArg, resolveWorkspace, resolveWorkspacePath} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
@@ -67,9 +76,6 @@ process.on('unhandledRejection', (reason) => {
 });
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const studio = join(root, 'studio');
-const remotionCli = join(studio, 'node_modules', '@remotion', 'cli', 'remotion-cli.js');
-const remotion = (args, options = {}) => execFileSync(process.execPath, [remotionCli, ...args], {cwd: studio, ...options});
 const REGISTERED_COMPOSITIONS = new Set([
   'ComponentGallery', 'StagedGallery', 'SocialClip', 'ProductDemo', 'LogoReveal',
   'LaunchVideo', 'PostflopFilm', 'DashClawFilm', 'AnimatedOG', 'StoreTile', 'Card',
@@ -94,9 +100,11 @@ const onlyIdx = args.indexOf('--only');
 const onlyFilter = onlyIdx >= 0 ? args[onlyIdx + 1] : null;
 const propsIdx = args.indexOf('--props');
 const propsOverrideArg = propsIdx >= 0 ? args[propsIdx + 1] : null;
+const masterIdx = args.indexOf('--master');
+const masterArg = masterIdx >= 0 ? args[masterIdx + 1] : null;
 
 if (!brand) {
-  console.error('usage: node scripts/render-matrix.mjs <brand> [--comp LaunchVideo|SocialClip|WrapClip] [--only <id>] [--props <path>] [--stills-only] [--webm] [--production]');
+  console.error('usage: node scripts/render-matrix.mjs <brand> [--comp LaunchVideo|SocialClip|WrapClip] [--only <id>] [--props <path>] [--stills-only] [--webm] [--production] [--master <path>]');
   process.exit(1);
 }
 const workspace = resolveWorkspace(root, {brand, project});
@@ -193,6 +201,27 @@ if (production) {
   }
 }
 
+// Production rows are silent Remotion renders (never mastered) — see the --master
+// header note. Resolve the scored master once, up front, so every row's replace step
+// shares one sha256 and one "no master" log line instead of repeating the probe.
+const masterAudioPath = masterArg
+  ? resolveWorkspacePath(workspace, masterArg)
+  : join(workspace.brandOut, 'launch-final.mp4');
+const masterAudioExists = productionDelivery && existsSync(masterAudioPath);
+const masterAudioSha8 = masterAudioExists ? sha256File(masterAudioPath).slice(0, 8) : null;
+if (productionDelivery && !existsSync(masterAudioPath)) {
+  console.log(`matrix: no scored master at ${portable(masterAudioPath)} — production rows keep their own (unmastered) audio`);
+}
+
+// Replace a rendered row's audio track with the scored master's, both streams stream
+// copied (the row and the master share the same timeline, so no offset). Called AFTER
+// the row's own remux/budget re-encode so the master's audio survives whichever bytes
+// ship, and BEFORE contact-sheet/judge so the hash-bound evidence records the final file.
+const replaceWithMasterAudio = (mp4Path) => {
+  muxMasterAudio(mp4Path, masterAudioPath);
+  console.log(`matrix: ${basename(mp4Path)} audio replaced with the scored master (${masterAudioSha8})`);
+};
+
 const productionRoute = (platform, captioned = false) => {
   const family = platform.id.startsWith('launch-') ? 'launch' : 'social';
   const route = productionPlan.exports[family];
@@ -255,7 +284,9 @@ const loadBase = makeBaseLoader(workspace, brand);
 // fails the run: unsupported means webm transcoding is skipped per-file, logged once.
 let webmSupported = false;
 if (webmFlag && !stillsOnly) {
-  const encoders = remotion(['ffmpeg', '-encoders'], {encoding: 'utf8'});
+  // loud: the probe reads ffmpeg's own encoder listing, so it keeps the bare
+  // argument list the detection was written against.
+  const encoders = ffmpeg(['-encoders'], {loud: true, capture: true});
   webmSupported = /libvpx-vp9/.test(encoders) && /libopus/.test(encoders);
   if (!webmSupported) {
     console.log('matrix: --webm requested but the bundled ffmpeg lacks libvpx-vp9/libopus — webm transcoding will be skipped for every file');
@@ -268,7 +299,7 @@ if (webmFlag && !stillsOnly) {
 // a partially-written file at the real path.
 const remuxFaststart = (mp4Path) => {
   const tmpPath = `${mp4Path}.faststart.tmp.mp4`;
-  remotion(['ffmpeg', '-y', '-i', mp4Path, '-c', 'copy', '-movflags', '+faststart', tmpPath], {stdio: 'inherit'});
+  ffmpeg(['-y', '-i', mp4Path, '-c', 'copy', '-movflags', '+faststart', tmpPath]);
   if (!existsSync(tmpPath)) {
     console.error(`FAILED: faststart remux did not produce ${tmpPath}`);
     process.exit(1);
@@ -286,13 +317,13 @@ const remuxFaststart = (mp4Path) => {
 // overhead and rate-control variance. Audio is fixed at 128kbps AAC. Never called
 // for files already under budget, so passing brands' output stays byte-identical.
 const reencodeToBudget = (mp4Path, maxBytes) => {
-  const durationOut = remotion(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', mp4Path], {encoding: 'utf8'});
+  const durationOut = ffprobe(['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', mp4Path]);
   const durationS = parseFloat(durationOut.trim());
   const audioBps = 128_000;
   const totalTargetBps = Math.floor((maxBytes * 8 * 0.9) / durationS);
   const videoBps = Math.max(totalTargetBps - audioBps, 200_000);
   const tmpPath = `${mp4Path}.budget.tmp.mp4`;
-  remotion(['ffmpeg', '-y', '-i', mp4Path, '-c:v', 'libx264', '-preset', 'slow', '-b:v', String(videoBps), '-maxrate', String(Math.round(videoBps * 1.15)), '-bufsize', String(videoBps * 2), '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', tmpPath], {stdio: 'inherit'});
+  ffmpeg(['-y', '-i', mp4Path, '-c:v', 'libx264', '-preset', 'slow', '-b:v', String(videoBps), '-maxrate', String(Math.round(videoBps * 1.15)), '-bufsize', String(videoBps * 2), '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', tmpPath]);
   if (!existsSync(tmpPath)) {
     console.error(`FAILED: budget re-encode did not produce ${tmpPath}`);
     process.exit(1);
@@ -303,7 +334,7 @@ const reencodeToBudget = (mp4Path, maxBytes) => {
 
 // Transcode an mp4 to VP9/Opus webm alongside it. Only called when webmSupported.
 const transcodeWebm = (mp4Path, webmPath) => {
-  remotion(['ffmpeg', '-y', '-i', mp4Path, '-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', '36', '-c:a', 'libopus', webmPath], {stdio: 'inherit'});
+  ffmpeg(['-y', '-i', mp4Path, '-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', '36', '-c:a', 'libopus', webmPath]);
   if (!existsSync(webmPath)) {
     console.error(`FAILED: webm transcode did not produce ${webmPath}`);
     process.exit(1);
@@ -330,7 +361,7 @@ const renderVariant = (id, comp, width, height, props) => {
     : ['render', comp, outFile, `--props=${propsPath}`, `--public-dir=${workspace.publicDir}`, ...(concurrency ? [`--concurrency=${concurrency}`] : [])];
   console.log(`matrix: ${id} (${width}x${height}) -> ${portable(outFile)}`);
   try {
-    remotion(renderArgs, {stdio: 'inherit'});
+    remotion(renderArgs);
   } catch (e) {
     // A mid-render death is nearly always the machine running out of memory for
     // the Chrome workers, and it arrives as a bare "Command failed" with no
@@ -340,7 +371,7 @@ const renderVariant = (id, comp, width, height, props) => {
     // fails identically the second time, so this cannot mask a real error.
     if (stillsOnly || concurrency === '1') throw e;
     console.error(`matrix: ${id} died mid-render; retrying once at --concurrency=1`);
-    remotion(['render', comp, outFile, `--props=${propsPath}`, `--public-dir=${workspace.publicDir}`, '--concurrency=1'], {stdio: 'inherit'});
+    remotion(['render', comp, outFile, `--props=${propsPath}`, `--public-dir=${workspace.publicDir}`, '--concurrency=1']);
   }
   if (!existsSync(outFile)) {
     console.error(`FAILED: ${outFile} was not produced`);
@@ -357,6 +388,7 @@ const renderVariant = (id, comp, width, height, props) => {
       remuxFaststart(outFile);
       console.log(`matrix: ${id} re-encoded to ${(statSync(outFile).size / (1024 * 1024)).toFixed(2)}MB`);
     }
+    if (masterAudioExists) replaceWithMasterAudio(outFile);
     if (webmFlag && webmSupported) {
       const webmFile = join(outDir, `${id}.webm`);
       const webmBytes = transcodeWebm(outFile, webmFile);

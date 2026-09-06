@@ -18,6 +18,7 @@ import {basename, dirname, join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {projectArg, resolveWorkspace, resolveWorkspacePath} from '../../scripts/lib/workspace.mjs';
+import {readEnvVar} from '../../scripts/lib/env.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const API = 'https://api.elevenlabs.io';
@@ -269,7 +270,16 @@ const main = async () => {
     return;
   }
 
-  const env = process.env;
+  // The error below has always said "not set in .env", but this feeder only ever read
+  // process.env, so a key that IS in the repo .env still exited 2 and shipped a silent
+  // film. scripts/lib/env.mjs is the repo's shared reader (process.env wins, values are
+  // never printed) and is what publish-bluesky/publish-youtube/fetch-results already use.
+  const brandVoiceKey = brand ? `ELEVENLABS_VOICE_ID_${brand.toUpperCase().replaceAll('-', '_')}` : null;
+  const env = {
+    ELEVENLABS_API_KEY: readEnvVar('ELEVENLABS_API_KEY'),
+    ELEVENLABS_VOICE_ID: readEnvVar('ELEVENLABS_VOICE_ID'),
+    ...(brandVoiceKey ? {[brandVoiceKey]: readEnvVar(brandVoiceKey)} : {}),
+  };
   const key = env.ELEVENLABS_API_KEY;
   if (!key) {
     console.error(

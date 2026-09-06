@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {formatFor} from './layout';
-import {headlineLayout, headlineLineWidth} from './typography';
+import {ctaSetting, headlineLayout, headlineLineWidth} from './typography';
 
 describe('headlineLayout', () => {
   it('preserves intentional line breaks', () => {
@@ -39,5 +39,26 @@ describe('headlineLayout', () => {
     expect(new Set([editorial.letterSpacing, precision.letterSpacing, playful.letterSpacing]).size).toBe(3);
     expect(editorial.maskLines).toBe(true);
     expect(precision.textAlign).toBe('left');
+  });
+});
+
+describe('ctaSetting', () => {
+  const fonts = {display: 'DisplayFace', mono: 'MonoFace'};
+  const cta = 'Open the demo and watch a missed call become a booked window. No signup, nothing sent.';
+
+  it('sets a sentence-casing CTA in the display face with the props copy untouched', () => {
+    const setting = ctaSetting(cta, 'sentence', fonts);
+    expect(setting.text).toBe(cta);
+    expect(setting.fontFamily).toBe(fonts.display);
+    expect(setting.fontWeight).toBe(800);
+    expect(setting.letterSpacing).toBe('-0.01em');
+  });
+
+  it('keeps the tracked uppercase mono treatment for every other direction', () => {
+    const setting = ctaSetting(cta, 'upper', fonts);
+    expect(setting.text).toBe(cta.toUpperCase());
+    expect(setting.fontFamily).toBe(fonts.mono);
+    expect(setting.fontWeight).toBeUndefined();
+    expect(setting.letterSpacing).toBe('0.2em');
   });
 });

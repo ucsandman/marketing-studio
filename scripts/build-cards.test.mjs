@@ -8,7 +8,7 @@ import {mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync} from '
 import {tmpdir} from 'node:os';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
-import {cardsFor, splitClaim} from './build-cards.mjs';
+import {cardsFor, displaySource, splitClaim} from './build-cards.mjs';
 
 const script = join(dirname(fileURLToPath(import.meta.url)), 'build-cards.mjs');
 
@@ -104,4 +104,62 @@ test('a figureless proof point becomes a quote card, not a stat block', () => {
   );
   assert.equal(cards[0].props.kind, 'quote');
   assert.equal(cards[0].props.value, 'Solved strategies are bit-identical for every thread count');
+});
+
+test('displaySource replaces a Windows absolute path with a sanitized brand line', () => {
+  assert.equal(
+    displaySource('C:/Projects/tradesdesk/src/app/page.tsx (Get Truckside section)', 'Truckside'),
+    'Verified in the Truckside source',
+  );
+});
+
+test('displaySource replaces a repo-relative path with line numbers', () => {
+  assert.equal(
+    displaySource(
+      'src/vendor/callclaw/booking.ts lines 85-119 (walks business hours and the lead-time cutoff; no appointment query)',
+      'Truckside',
+    ),
+    'Verified in the Truckside source',
+  );
+});
+
+test('displaySource passes a plain human citation through unchanged', () => {
+  assert.equal(displaySource('measured, iPhone 15', 'Truckside'), 'measured, iPhone 15');
+});
+
+test('cardsFor with skipFigureless drops figureless proof points but keeps the hook', () => {
+  const cards = cardsFor(fixtureBrief, 'sidetap', {skipFigureless: true});
+  // fixtureBrief: '...1.4s...' carries a figure (kept); 'Drives every installed app' has none (dropped).
+  assert.deepEqual(cards.map((c) => c.id), ['stat-1', 'quote-hook']);
+});
+
+test('--skip-figureless drops every figureless proof point, reports the count, and leaves other brands unaffected without it', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'cards-'));
+  mkdirSync(join(dir, '.git'));
+  const briefPath = join(dir, 'brief.json');
+  writeFileSync(briefPath, JSON.stringify(fixtureBrief));
+  const outDir = join(dir, 'cards');
+  const stdout = execFileSync(
+    process.execPath,
+    [script, 'sidetap', '--project', dir, '--brief', briefPath, '--out', outDir, '--dry-run', '--skip-figureless'],
+    {encoding: 'utf8'},
+  );
+  assert.match(stdout, /skipped 1 figureless proof points/);
+  assert.deepEqual(readdirSync(outDir).sort(), ['quote-hook-props.json', 'stat-1-props.json']);
+  assert.match(stdout, /2 props written from 2 proof points/);
+});
+
+test('the CLI routes every card source through displaySource before writing props', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'cards-'));
+  mkdirSync(join(dir, '.git'));
+  const briefPath = join(dir, 'brief.json');
+  writeFileSync(briefPath, JSON.stringify(fixtureBrief));
+  const outDir = join(dir, 'cards');
+  execFileSync(
+    process.execPath,
+    [script, 'sidetap', '--project', dir, '--brief', briefPath, '--out', outDir, '--dry-run'],
+    {encoding: 'utf8'},
+  );
+  assert.equal(JSON.parse(readFileSync(join(outDir, 'stat-1-props.json'), 'utf8')).source, 'measured, iPhone 15');
+  assert.equal(JSON.parse(readFileSync(join(outDir, 'stat-2-props.json'), 'utf8')).source, 'Verified in the sidetap source');
 });

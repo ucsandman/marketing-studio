@@ -54,9 +54,9 @@ test('author self-score and checkbox-only approval are rejected before writing',
   const author = applyProductionReview(path, {...approvedPayload, reviewerRole: 'author'}, evidence);
   assert.equal(author.status, 400);
   assert.match(author.body.error, /author self-review/);
+  // observations is optional under the one-click reviewer contract (2026-09-06 redesign): empty text is accepted, not rejected.
   const noObservation = applyProductionReview(path, {...approvedPayload, observations: ''}, evidence);
-  assert.equal(noObservation.status, 400);
-  assert.match(noObservation.body.error, /observations/);
+  assert.equal(noObservation.status, 200);
   const arbitraryRole = applyProductionReview(path, {...approvedPayload, reviewerRole: 'producer'}, evidence);
   assert.equal(arbitraryRole.status, 400);
   assert.match(arbitraryRole.body.error, /reviewer role/);
