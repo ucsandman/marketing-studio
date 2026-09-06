@@ -21,7 +21,7 @@
 import {execFileSync} from 'node:child_process';
 import {existsSync, mkdirSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
-import {basename, dirname, join, relative} from 'node:path';
+import {dirname, join, relative} from 'node:path';
 import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -125,7 +125,10 @@ export function summarize(name, json) {
   const counts = `${findings.length} findings, ${fails} FAIL`;
   // judge-palette picks its own input file; report which one landed in the
   // gate's own report (input.path) so a reader never has to guess.
-  return name === 'palette' && json.input?.path ? {verdict, counts: `${counts}, input=${basename(json.input.path)}`} : {verdict, counts};
+  // The row shows the file name only. Split on either separator: the judge writes the
+  // path as the OS gave it, and a Windows path read on Linux CI has no '/' for basename.
+  const inputName = json.input?.path ? String(json.input.path).split(/[\\/]/).pop() : null;
+  return name === 'palette' && inputName ? {verdict, counts: `${counts}, input=${inputName}`} : {verdict, counts};
 }
 
 // Runs one gate as an isolated child process; never throws. Full stdout+
