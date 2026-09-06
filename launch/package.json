@@ -1,7 +1,13 @@
 {
   "name": "@marketing-studio/launch",
   "version": "0.1.0",
-  "description": "Reusable launch engine: takes a developed project end-to-end through domain, hosting, payments, comms, and multi-platform distribution.",
+  "description": "Local launch CLI and dashboard for research, validated copy, dry-run previews, and guarded multi-platform distribution.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ucsandman/marketing-studio.git",
+    "directory": "launch"
+  },
+  "license": "MIT",
   "type": "module",
   "engines": {
     "node": ">=24"

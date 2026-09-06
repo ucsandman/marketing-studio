@@ -1,6 +1,8 @@
 {
   "name": "diagram-feeder",
+  "description": "Brand-aware D2 diagram renderer for Marketing Studio assets.",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "test": "node --test"

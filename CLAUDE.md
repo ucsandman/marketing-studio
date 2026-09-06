@@ -1,7 +1,9 @@
 # animations: agent-driven marketing studio
 
-Remotion (studio/) renders all final video for ALL products/brands; assets are copied
-out to the product's repo at the end. brands/<id>.json holds per-product tokens
+Remotion (studio/) renders all final video for ALL products/brands. Production inputs,
+evidence, renders, and delivery assets live in the owning product repo under
+`marketing/assets/<brand>/`; the engine clone is not a production destination.
+brands/<id>.json holds per-product tokens
 (zod-validated via studio/src/lib/brand.ts; mark components in studio/src/brands/marks.ts);
 templates resolve getBrand(brandId) and never hardcode brand values. Feeders:
 feeders/blender (headless bpy), feeders/capture (Playwright), feeders/comfy (ComfyUI,
@@ -43,15 +45,16 @@ Rules:
 - Seven mechanical gates run per brand: six judges (judge-av-sync, judge-demo-pacing,
   judge-palette, judge-motion, judge-drift, check-budgets) plus check-audio. The
   judges are advisors: exit 0 unless --strict; check-budgets and check-audio are hard.
-  **judge-drift runs LAST** — it scores out/<brand>/ as a SET, so running it before
+  **judge-drift runs LAST** — it scores the product's `marketing/assets/<brand>/` as a SET, so running it before
   everything has rendered scores an incomplete set and the number means nothing. It
   has no absolute threshold on purpose (nobody publishes one); calibrate with
   `--ref <dir>` against approved assets, never by inventing a constant.
 - Generated props JSON is edited only via its builder script (scripts/build-*-props.mjs).
-- Asset copy traces to out/<brand>/marketing/brief.json (agent-synthesized, gated by
+- Asset copy traces to `<product>/marketing/assets/<brand>/marketing/brief.json` (agent-synthesized, gated by
   scripts/lint-copy.mjs and the storyboard approval); builders overlay brief copy —
   never hand-edit copy into generated props.
-- out/, assets/, studio/public/*/ are gitignored build products.
+- Engine-local out/, assets/, props/, examples/, and studio/public/*/ are gitignored
+  build products, never production workspaces.
 - Blender via BLENDER_PATH in .env; ComfyUI on :8000/:8188 with documented fallback.
 - Unreal via UNREAL_PATH in .env (feeders/unreal, PLAYBOOK "Unreal Engine 5.8"); plates
   are PNG sequences staged like Blender output.

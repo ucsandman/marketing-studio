@@ -53,7 +53,7 @@ broad reach, not loyalty deepening.
 block exist — every asset in a launch reuses the SAME mark, palette, motion feel,
 and music bed so exposures compound instead of resetting. judge-palette and
 judge-motion enforce it mechanically per asset, and judge-drift enforces it ACROSS
-the campaign — it scores out/<brand>/ as one set, which is the only way to catch the
+the campaign — it scores `<product>/marketing/assets/<brand>/` as one set, which is the only way to catch the
 failure this finding is actually about: assets that are each individually on-brand
 but collectively fragment into three or four different-looking brands, so exposures
 stop compounding even though no single file looks wrong. Distribute wide (all

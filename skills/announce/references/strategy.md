@@ -66,7 +66,8 @@ re-run the full pipeline for a patch note.
 ## Measurement closes the loop
 
 After publishing, record post URLs + variant ids in
-out/<brand>/marketing/posts.json and run `node scripts/fetch-results.mjs <brand>`
+`<product>/marketing/assets/<brand>/marketing/posts.json` and run
+`node scripts/fetch-results.mjs <brand> --project <product>`
 (X metrics via API, LinkedIn entered manually). Mission Control shows engagement
 per hook variant; the winning CATEGORY (not just the winning sentence) feeds the
 next brief's hook.strategies choice.

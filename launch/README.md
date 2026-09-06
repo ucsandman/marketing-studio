@@ -75,31 +75,31 @@ this repo.
 ## Marketing assets (post kits)
 
 A **post kit** is a folder of rendered marketing assets (`manifest.json` + per-platform
-video/caption/alt files) produced by the animations studio at `C:\Projects\animations`
-(`/marketing` or `node scripts/build-postkit.mjs <brand>`), usually at
-`animations/out/<brand>/postkit`.
+video/caption/alt files) produced by `/marketing` or
+`node scripts/build-postkit.mjs <brand> --project <product>`. It lives with the product
+that owns it at `<product>/marketing/assets/<brand>/postkit`.
 
 Wire a kit to a target either by setting `postkitDir` in `<target>/.launch/launch.config.json`
 (the dashboard's **marketing** tab does this with a folder picker) or by passing
 `launch post <dir> --kit <path>` (overrides `config.postkitDir` for that run). Once wired:
 
-- `launch post` attaches the kit's video to **X and LinkedIn** posts automatically; no other
-  platform auto-attaches.
-- A kit with no video for a given platform posts **text-only**; that's expected for a partial kit.
+- `launch post` attaches kit video automatically to **X, Bluesky, LinkedIn, and YouTube**.
+  Bluesky reuses the X draft and 16:9 clip; YouTube reuses the LinkedIn draft and launch video.
+- X, Bluesky, and LinkedIn can fall back to **text-only** when their kit entry has no
+  video. YouTube is video-only and is skipped when no media is available.
 - A **missing or corrupt manifest**, or a manifest that promises a video file that isn't on disk,
   makes the post **refuse before any network call** (exit 1). Fix by re-running
   `render-matrix.mjs` + `build-postkit.mjs` in the animations repo, or clear `postkitDir`.
-- `--dry-run` previews show the actual upload sequence: X's chunked media upload, LinkedIn's
-  initialize/PUT-parts/finalize sequence.
+- `--dry-run` previews show the actual upload sequence for X, Bluesky, LinkedIn, and YouTube.
 - Before any upload (dry-run included), each kit video is probed for duration and file size
-  against the target platform's real caps — X standard tier 0.5–140s / 512 MB, LinkedIn
-  3s–15min / 5 GB. An over-limit or unreadable video makes the post **refuse**, never a silent
-  downgrade to text-only; the dashboard's marketing and post tabs flag it in red before you try.
+  against the target platform's caps. An over-limit or unreadable video makes the post
+  **refuse**, never a silent downgrade to text-only; the dashboard's marketing and post tabs
+  flag it in red before you try.
 
-TikTok, Shorts, YouTube, and Instagram have no safe write API here. The kit still produces a
-ready-to-upload folder and checklist for those; open it from the dashboard's marketing tab.
+TikTok, Shorts, and Instagram remain ready-to-upload folders with checklists; open them from
+the dashboard's marketing tab.
 
-The `/ship-it` skill (`.claude/skills/ship-it/SKILL.md`) chains rendering (animations studio) and
+The [`/ship-it` skill](../skills/ship-it/SKILL.md) chains rendering (animations studio) and
 distribution (this engine) into one flow.
 
 ## Provider setup guides
@@ -115,8 +115,7 @@ Launch day: [docs/launch-runbook.md](docs/launch-runbook.md)
 
 ```bash
 npm run build           # vite (dashboard → dist/ui) + tsc (CLI → dist/)
-npm test                # vitest run (251 tests; HTTP mocked except one live read against
-                        # ssl.bing.com that proves the Bing fault shape — it self-skips offline)
+npm test                # vitest run; provider writes are mocked
 npm run lint            # eslint (CLI + dashboard sources)
 npm run dev:ui          # vite dev loop for the dashboard (proxies /api to a running `launch ui`)
 npx playwright test     # browser smoke suite (after `npx playwright install chromium`)

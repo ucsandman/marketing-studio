@@ -20,6 +20,12 @@ is not production-capable until migrated.
 default to the installed engine. Move any still-needed legacy `out/` artifact into its
 product workspace before using it as production evidence.
 
+**Documentation retro, 2026-09-05:** the workspace migration updated the root workflow
+but missed sub-package READMEs and skill references. When a workspace, provider, or
+package contract changes, search active READMEs, agent instructions, templates, skills,
+package metadata, help text, and release notes in the same change. Historical incident
+notes may keep old paths when they are clearly labeled as provenance.
+
 | Piece | Where | Run |
 |---|---|---|
 | Remotion studio (all final video) | `studio/` | `npx remotion render <Comp> <product-output> --props=<product-props> --public-dir=<product>/marketing/assets/<brand>/public` |

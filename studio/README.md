@@ -1,54 +1,47 @@
-# Remotion video
+# Marketing Studio renderer
 
-<p align="center">
-  <a href="https://github.com/remotion-dev/logo">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://github.com/remotion-dev/logo/raw/main/animated-logo-banner-dark.apng">
-      <img alt="Animated Remotion Logo" src="https://github.com/remotion-dev/logo/raw/main/animated-logo-banner-light.gif">
-    </picture>
-  </a>
-</p>
+This private Remotion package renders the video and static compositions used by
+Marketing Studio. It is the shared engine behind product demos, launch films, social
+clips, OG assets, store tiles, campaign cards, wrap clips, and scripted agent sessions.
 
-Welcome to your Remotion project!
+Production inputs and outputs belong to the product that owns them under
+`<product>/marketing/assets/<brand>/`. The renderer source stays here; `studio/public/`
+and engine-local output folders are staging areas only.
 
-## Commands
+## Setup
 
-**Install Dependencies**
+From this directory:
 
-```console
-npm i
-```
-
-**Start Preview**
-
-```console
+```bash
+npm ci
 npm run dev
 ```
 
-**Render video**
+The Remotion Studio lists 13 compositions. The reusable compositions are
+`SocialClip`, `ProductDemo`, `LogoReveal`, `LaunchVideo`, `AnimatedOG`, `StoreTile`,
+`Card`, `WrapClip`, and `AgentSession`. `PostflopFilm` and `DashClawFilm` are bespoke
+films; `ComponentGallery` and `StagedGallery` are review surfaces.
 
-```console
-npx remotion render
+## Commands
+
+```bash
+npm run dev       # open Remotion Studio
+npm run build     # create a Remotion bundle
+npm test          # run composition, schema, timing, layout, and motion tests
+npm run lint      # run ESLint and TypeScript checks
 ```
 
-**Upgrade Remotion**
+Render production assets through the repository scripts from the repository root so
+workspace ownership, props routing, evidence, and review gates stay intact. For example:
 
-```console
-npx remotion upgrade
+```bash
+node scripts/render-matrix.mjs <brand> --project <product> --production --stills-only
 ```
 
-## Docs
+See the root [README](../README.md), [production quality contract](../docs/production-quality.md),
+and [playbook](../docs/PLAYBOOK.md) for the complete workflow.
 
-Get started with Remotion by reading the [fundamentals page](https://www.remotion.dev/docs/the-fundamentals).
+## Licence
 
-## Help
-
-We provide help on our [Discord server](https://discord.gg/6VzzNDwUwV).
-
-## Issues
-
-Found an issue with Remotion? [File an issue here](https://github.com/remotion-dev/remotion/issues/new).
-
-## License
-
-Note that for some entities a company license is needed. [Read the terms here](https://github.com/remotion-dev/remotion/blob/main/LICENSE.md).
+This package is part of the MIT-licensed Marketing Studio repository. Remotion has
+separate licence terms for some commercial users; see the root README before use.

@@ -1,9 +1,13 @@
 {
   "name": "studio",
   "version": "1.0.0",
-  "description": "My Remotion video",
-  "repository": {},
-  "license": "UNLICENSED",
+  "description": "Remotion rendering engine for Marketing Studio launch videos, demos, social clips, and OG assets.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ucsandman/marketing-studio.git",
+    "directory": "studio"
+  },
+  "license": "MIT",
   "private": true,
   "dependencies": {
     "@remotion/cli": "4.0.486",

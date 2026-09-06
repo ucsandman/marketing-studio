@@ -2,7 +2,10 @@
 
 [![verify](https://github.com/ucsandman/marketing-studio/actions/workflows/verify.yml/badge.svg)](https://github.com/ucsandman/marketing-studio/actions/workflows/verify.yml)
 
-An agent-driven marketing studio for Claude Code. You type `/marketing` in your product's repo; the agent onboards your brand, films your app, and writes the complete asset suite and its review evidence into that product repo. Then `/launch` takes the product public: domain, payments, comms, and posting to X, LinkedIn, Facebook, Reddit, Bluesky and YouTube with the rendered videos attached, dry-run by default.
+An agent-driven local marketing studio. The bundled Claude Code plugin adds `/marketing`
+and `/launch`: the agent onboards your brand, films your app, writes the asset suite and
+review evidence into that product repo, then prepares guarded distribution to X,
+LinkedIn, Facebook, Reddit, Bluesky, and YouTube. Publishing is dry-run by default.
 
 ## The one command
 
@@ -67,7 +70,16 @@ The creative acceptance contract, product-owned workspace, baseline evidence, an
 
 ## Requirements
 
-Required: [Claude Code](https://claude.com/claude-code), Node 22+ for the studio and Node 24+ for `launch/` (the versions CI exercises), Python 3.10+, and **ffmpeg on your PATH** (26 scripts shell out to `ffmpeg`/`ffprobe` directly).
+The engine requires Node 22+ for the studio, Node 24+ for `launch/` (the versions CI
+exercises), Python 3.10+, and **ffmpeg on your PATH**. The engine does not require a
+particular agent host. Its Python and Node commands can be run by a human or any agent
+with local command access.
+
+The packaged slash-command integration is currently specific to
+[Claude Code](https://claude.com/claude-code): the plugin manifest, installer destination,
+and `${CLAUDE_SKILL_DIR}` paths all use its skill layout. Codex can operate the underlying
+engine and can use these skills when an external harness installs them, but this repository
+does not yet provide or test native Codex, OpenClaw, or Hermes installers.
 
 Optional: Blender for 3D plates, an ElevenLabs API key for voiceover and music, and ComfyUI for AI backdrops. A workflow must select an explicit fallback before treating any missing optional tool as non-blocking.
 
@@ -75,7 +87,7 @@ Optional: Blender for 3D plates, an ElevenLabs API key for voiceover and music, 
 
 ## Install
 
-### As a plugin
+### As a Claude Code plugin
 
 ```
 /plugin marketplace add ucsandman/marketing-studio
@@ -84,30 +96,44 @@ Optional: Blender for 3D plates, an ElevenLabs API key for voiceover and music, 
 
 Plugin skills are namespaced, so the commands are `/marketing-studio:marketing`, `/marketing-studio:logo-reveal`, and so on.
 
-The current plugin version is **2.0.0**. Migrating from 1.x requires a product
+The plugin manifests declare version **2.0.0**. Migrating from 1.x requires a product
 repository for every production run: pass `--project <product-repo>` (or invoke a
 supported tool from that product worktree). Generated inputs and outputs no longer
 default to the installed engine or its legacy `out/` tree.
+See the [changelog](CHANGELOG.md) for the release status and migration notes.
 
 The engine ships with the plugin, but its npm dependencies do not. Bootstrap once by asking Claude to *"bootstrap the marketing studio engine"*, or run it yourself against the installed plugin directory:
 
-```bash
-python <plugin-dir>/launch.py --bootstrap
+```powershell
+$pluginDir = "C:\path\to\marketing-studio"
+python "$pluginDir\launch.py" --bootstrap
+npm --prefix "$pluginDir\feeders\diagram" install
+npm --prefix "$pluginDir\launch" install
+npm --prefix "$pluginDir\launch" run build
 ```
 
-That installs the studio and capture-feeder dependencies and then prints a toolchain report. Copy `.env.example` to `.env` in the same directory if you have a Blender path or an ElevenLabs key.
+The bootstrap command installs the studio and capture-feeder dependencies and then prints
+a toolchain report. The two npm commands install the separate diagram and distribution
+packages. Replace `$pluginDir` with the installed plugin directory. Copy `.env.example`
+to `.env` there if you have a Blender path or an ElevenLabs key.
 
 ### From source
 
 ```bash
 git clone git@github.com:ucsandman/marketing-studio.git
 cd marketing-studio
-python launch.py --bootstrap    # installs npm deps, then verifies the toolchain
+python launch.py --bootstrap    # installs studio + capture deps, then checks the toolchain
+npm --prefix feeders/diagram ci # optional diagram feeder
+npm --prefix launch ci          # distribution CLI + dashboard
+npm --prefix launch run build
 cp .env.example .env            # set BLENDER_PATH / ELEVENLABS_API_KEY if you have them
 node scripts/install-skills.mjs # installs /marketing and friends into ~/.claude/skills
 ```
 
-Installing from source gives you unnamespaced commands (`/marketing` rather than `/marketing-studio:marketing`). Renderer source stays in the clone; production inputs and outputs still belong to the selected product repository. Use this path if you intend to work on the engine itself.
+The included installer puts unnamespaced commands in `~/.claude/skills` (`/marketing`
+rather than `/marketing-studio:marketing`). Renderer source stays in the clone; production
+inputs and outputs still belong to the selected product repository. Other agent hosts can
+run the engine commands directly, but need their own compatible skill installation layer.
 
 Then, from your product's repo:
 
@@ -186,7 +212,7 @@ node scripts/build-captions.mjs <brand> --project <product> --check
 node scripts/mission-control.mjs <brand> --project <product>
 node scripts/master-audio.mjs <product>/marketing/assets/<brand>/launch.mp4 --project <product>
 node scripts/verify-cue.mjs <product>/marketing/assets/<brand>/launch.mp4 2 1.5
-node scripts/judge-motion.mjs <brand>                  # motion-craft + motion/grade token bands
+node scripts/judge-motion.mjs <brand> --project <product> # motion-craft + motion/grade token bands
 node scripts/judge-drift.mjs <brand> --project <product>
 node scripts/build-postkit.mjs <brand> --project <product> --production
 node launch/dist/index.js post <product-dir> --all      # preview every platform post with the kit attached (dry-run is the default)

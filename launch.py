@@ -2,7 +2,7 @@
 
 python launch.py              health checks, then start Remotion Studio
 python launch.py --check      health checks only (exit 1 on any FAIL)
-python launch.py --bootstrap  install npm deps, then health checks
+python launch.py --bootstrap  install core studio/capture deps, then health checks
 """
 
 import shutil
@@ -52,10 +52,10 @@ def comfy_running() -> bool:
 
 
 def bootstrap() -> int:
-    """Install the npm deps the engine needs. Idempotent."""
+    """Install the core studio and capture npm dependencies. Idempotent."""
     npm = shutil.which("npm")
     if npm is None:
-        print("[FAIL] npm not on PATH; install Node.js 20+ first")
+        print("[FAIL] npm not on PATH; install Node.js 22+ first")
         return 1
     for label, path in (
         ("studio", STUDIO),
@@ -87,7 +87,7 @@ def main() -> int:
     npm = shutil.which("npm")  # resolves npm.cmd on Windows; lets us avoid shell=True
     ok &= check("Node.js", node is not None, node or "not on PATH")
     ok &= check("npm", npm is not None, npm or "not on PATH")
-    # 26 scripts/feeders shell out to bare ffmpeg/ffprobe, so both must be on PATH.
+    # Rendering and media scripts shell out to bare ffmpeg/ffprobe, so both must be on PATH.
     ffmpeg = shutil.which("ffmpeg")
     ffprobe = shutil.which("ffprobe")
     ok &= check("ffmpeg", ffmpeg is not None, ffmpeg or "not on PATH")

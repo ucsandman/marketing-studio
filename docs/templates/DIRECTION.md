@@ -5,7 +5,7 @@ colors. Fill this out BEFORE storyboarding or building any composition.
 
 Write **three** directions, one page each, deliberately different. Then kill two using the
 kill questions below. The survivor + its signature move go into
-`out/<brand>/marketing/direction.md`.
+`<product>/marketing/assets/<brand>/marketing/direction.md`.
 
 ## Direction template (copy this block three times)
 
@@ -55,7 +55,8 @@ killed.
 4. Can it survive a bad day? A direction that only works if every frame is perfect is a
    direction you will abandon at 2am.
 
-Kill two. Write the survivor into `out/<brand>/marketing/direction.md` along with its
+Kill two. Write the survivor into
+`<product>/marketing/assets/<brand>/marketing/direction.md` along with its
 signature move. Then stop being creative — execute the chosen direction with total
 consistency.
 
