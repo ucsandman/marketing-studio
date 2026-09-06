@@ -11,9 +11,9 @@
 // use the two-pass palettegen/paletteuse pattern from
 // render-dashclaw-readme-gif.mjs / render-costclaw-statics.mjs.
 import {mkdirSync, statSync, unlinkSync, writeFileSync} from 'node:fs';
-import {execSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {ffmpeg, remotion} from './lib/remotion.mjs';
 import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
@@ -25,8 +25,6 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const workspace = resolveWorkspace(root, {brand: 'sidetap', project: projectArg(process.argv.slice(2))});
 const outDir = workspace.brandRoot;
 mkdirSync(outDir, {recursive: true});
-
-const studioDir = join(root, 'studio');
 
 const baseProps = {
   brandId: 'sidetap',
@@ -50,23 +48,27 @@ writeFileSync(staticPropsPath, JSON.stringify({...baseProps, showFloatBar: false
 const propsPath = join(outDir, 'og-props.json');
 writeFileSync(propsPath, JSON.stringify(baseProps));
 
-console.log('still: og.png (1200x630)');
-execSync(
-  `npx remotion still AnimatedOG "${join(outDir, 'og.png')}" --props="${staticPropsPath}" --public-dir="${workspace.publicDir}" --width=1200 --height=630`,
-  {cwd: studioDir, stdio: 'inherit'},
-);
+remotion([
+  'still',
+  'AnimatedOG',
+  join(outDir, 'og.png'),
+  `--props=${staticPropsPath}`,
+  `--public-dir=${workspace.publicDir}`,
+  '--width=1200',
+  '--height=630',
+]);
 
-console.log('render: og.mp4');
-execSync(`npx remotion render AnimatedOG "${join(outDir, 'og.mp4')}" --props="${propsPath}" --public-dir="${workspace.publicDir}"`, {
-  cwd: studioDir,
-  stdio: 'inherit',
-});
+remotion(['render', 'AnimatedOG', join(outDir, 'og.mp4'), `--props=${propsPath}`, `--public-dir=${workspace.publicDir}`]);
 
-console.log('render: og.gif');
-execSync(
-  `npx remotion render AnimatedOG "${join(outDir, 'og.gif')}" --props="${propsPath}" --public-dir="${workspace.publicDir}" --codec=gif --every-nth-frame=2`,
-  {cwd: studioDir, stdio: 'inherit'},
-);
+remotion([
+  'render',
+  'AnimatedOG',
+  join(outDir, 'og.gif'),
+  `--props=${propsPath}`,
+  `--public-dir=${workspace.publicDir}`,
+  '--codec=gif',
+  '--every-nth-frame=2',
+]);
 
 // README GIF: cut from the real product-demo footage (out/sidetap/demo.mp4,
 // live iPhone captured through the viewer -- NOT this composition). Segment
@@ -91,14 +93,22 @@ const demoSrc = join(outDir, 'demo.mp4');
 const palettePath = join(outDir, 'readme-gif-palette.png');
 const readmeGifPath = join(outDir, 'readme.gif');
 
-execSync(
-  `npx remotion ffmpeg -ss ${README_GIF_START} -t ${README_GIF_DURATION} -i "${demoSrc}" -vf "scale=${README_GIF_WIDTH}:-1:flags=lanczos,palettegen" -y "${palettePath}"`,
-  {cwd: studioDir, stdio: 'inherit'},
-);
-execSync(
-  `npx remotion ffmpeg -ss ${README_GIF_START} -t ${README_GIF_DURATION} -i "${demoSrc}" -i "${palettePath}" -filter_complex "[0:v]scale=${README_GIF_WIDTH}:-1:flags=lanczos[s];[s][1:v]paletteuse" -r ${README_GIF_FPS} -y "${readmeGifPath}"`,
-  {cwd: studioDir, stdio: 'inherit'},
-);
+ffmpeg([
+  '-ss', `${README_GIF_START}`,
+  '-t', `${README_GIF_DURATION}`,
+  '-i', demoSrc,
+  '-vf', `scale=${README_GIF_WIDTH}:-1:flags=lanczos,palettegen`,
+  '-y', palettePath,
+]);
+ffmpeg([
+  '-ss', `${README_GIF_START}`,
+  '-t', `${README_GIF_DURATION}`,
+  '-i', demoSrc,
+  '-i', palettePath,
+  '-filter_complex', `[0:v]scale=${README_GIF_WIDTH}:-1:flags=lanczos[s];[s][1:v]paletteuse`,
+  '-r', `${README_GIF_FPS}`,
+  '-y', readmeGifPath,
+]);
 unlinkSync(palettePath);
 
 const readmeGifBytes = statSync(readmeGifPath).size;

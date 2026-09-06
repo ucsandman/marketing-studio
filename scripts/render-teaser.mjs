@@ -10,12 +10,12 @@
 //     [--showName=false] [--still] [--gif] [--date=2026-09-01]
 //
 // --still renders one frame (frame 60) to still.png for inspection and exits.
-import {execSync} from 'node:child_process';
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {dirname, extname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 // Color math lives in lib/ so it is covered by `node --test scripts/lib/*.test.mjs`
 // instead of hiding behind this script's fetch + execSync side effects.
+import {remotion} from './lib/remotion.mjs';
 import {groundFromLogoFills, norm, teaserColors} from './lib/teaser-colors.mjs';
 import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
@@ -104,16 +104,16 @@ const propsPath = join(outDir, 'og-props.json');
 writeFileSync(propsPath, JSON.stringify(props, null, 1));
 writeFileSync(join(outDir, 'brand.json'), JSON.stringify(brand, null, 1));
 
-const run = (cmd) => execSync(`${cmd} --public-dir="${workspace.publicDir}"`, {cwd: join(root, 'studio'), stdio: 'inherit'});
+const run = (args) => remotion([...args, `--public-dir=${workspace.publicDir}`]);
 const t0 = Date.now();
 if (args.still === 'true') {
   const still = join(outDir, 'still.png');
-  run(`npx remotion still AnimatedOG "${still}" --props="${propsPath}" --frame=60`);
+  run(['still', 'AnimatedOG', still, `--props=${propsPath}`, '--frame=60']);
   console.log(`still OK: ${still} (${Math.round((Date.now() - t0) / 1000)}s)`);
   process.exit(0);
 }
-run(`npx remotion render AnimatedOG "${join(outDir, 'og.mp4')}" --props="${propsPath}"`);
+run(['render', 'AnimatedOG', join(outDir, 'og.mp4'), `--props=${propsPath}`]);
 if (args.gif === 'true') {
-  run(`npx remotion render AnimatedOG "${join(outDir, 'og.gif')}" --props="${propsPath}" --codec=gif --every-nth-frame=2 --scale=0.5`);
+  run(['render', 'AnimatedOG', join(outDir, 'og.gif'), `--props=${propsPath}`, '--codec=gif', '--every-nth-frame=2', '--scale=0.5']);
 }
 console.log(`teaser OK: ${outDir} (${Math.round((Date.now() - t0) / 1000)}s)`);

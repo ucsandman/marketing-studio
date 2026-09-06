@@ -33,6 +33,7 @@ import {existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync}
 import {fileURLToPath} from 'node:url';
 import {dirname, join, resolve} from 'node:path';
 import {checkCache, cacheKey, storeCache} from './lib/cache.mjs';
+import {ffmpeg} from './lib/remotion.mjs';
 import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
@@ -41,7 +42,6 @@ process.on('unhandledRejection', (reason) => {
 });
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const STUDIO = join(ROOT, 'studio');
 const BRAND = 'magnetic';
 let WORKSPACE;
 let FOOTAGE_DIR;
@@ -94,8 +94,6 @@ const VO_LINES = [
 const PAUSES_MS = [2500, 2300];
 
 const run = (cmd, cwd = ROOT, timeout) => execSync(cmd, {cwd, stdio: 'inherit', ...(timeout ? {timeout} : {})});
-
-const runCapture = (cmd, cwd = ROOT) => execSync(cmd, {cwd, encoding: 'utf8'});
 
 const variantConfig = (variant) => ({
   brand: BRAND,
@@ -252,10 +250,12 @@ function encodeClip(variant) {
   }
 
   console.log(`encode clip-${variant.id}: -> ${outMp4}`);
-  run(
-    `npx remotion ffmpeg -y -framerate ${FPS} -i "${join(framesDir, 'frame_%04d.png')}" -c:v libx264 -pix_fmt yuv420p -movflags +faststart "${outMp4}"`,
-    STUDIO,
-  );
+  ffmpeg([
+    '-y',
+    '-framerate', String(FPS),
+    '-i', join(framesDir, 'frame_%04d.png'),
+    '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', outMp4,
+  ]);
   if (!existsSync(outMp4)) throw new Error(`encode clip-${variant.id}: did not produce ${outMp4}`);
 
   storeCache(WORKSPACE, `clip-${variant.id}`, key, [outMp4]);
@@ -318,12 +318,12 @@ function sapiSpeak(text, outWavPath) {
 // Normalizes one segment to 44.1kHz mono PCM WAV so it concatenates cleanly with
 // the generated silence beds regardless of source codec (ElevenLabs mp3 vs SAPI wav).
 function normalizeToWav(srcPath, destPath) {
-  run(`npx remotion ffmpeg -y -i "${srcPath}" -ar 44100 -ac 1 "${destPath}"`, STUDIO);
+  ffmpeg(['-y', '-i', srcPath, '-ar', '44100', '-ac', '1', destPath]);
   if (!existsSync(destPath)) throw new Error(`normalize did not produce ${destPath}`);
 }
 
 function generateSilence(ms, destPath) {
-  run(`npx remotion ffmpeg -y -f lavfi -i anullsrc=r=44100:cl=mono -t ${(ms / 1000).toFixed(3)} "${destPath}"`, STUDIO);
+  ffmpeg(['-y', '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=mono', '-t', (ms / 1000).toFixed(3), destPath]);
   if (!existsSync(destPath)) throw new Error(`silence generation did not produce ${destPath}`);
 }
 
@@ -354,7 +354,7 @@ function buildTakeAudio(segmentPaths) {
   writeFileSync(listPath, parts.map((p) => `file '${resolve(p).replace(/\\/g, '/')}'`).join('\n') + '\n');
 
   console.log('take-audio: concatenating seg1 + pause + seg2 + pause + seg3...');
-  run(`npx remotion ffmpeg -y -f concat -safe 0 -i "${listPath}" -c copy "${takeWav}"`, STUDIO);
+  ffmpeg(['-y', '-f', 'concat', '-safe', '0', '-i', listPath, '-c', 'copy', takeWav]);
   if (!existsSync(takeWav)) throw new Error(`concat did not produce ${takeWav}`);
 
   storeCache(WORKSPACE, 'take-audio', key, [takeWav]);
@@ -370,10 +370,12 @@ function buildTakeAudio(segmentPaths) {
 function muxVoiceoverTake(clipAPath, takeAudioPath) {
   const outMp4 = join(OUT_DIR, 'voiceover-take.mp4');
   console.log(`voiceover-take: muxing ${clipAPath} (looped) + ${takeAudioPath} -> ${outMp4}`);
-  run(
-    `npx remotion ffmpeg -y -stream_loop -1 -i "${clipAPath}" -i "${takeAudioPath}" -c:v libx264 -pix_fmt yuv420p -movflags +faststart -c:a aac -shortest "${outMp4}"`,
-    STUDIO,
-  );
+  ffmpeg([
+    '-y',
+    '-stream_loop', '-1', '-i', clipAPath,
+    '-i', takeAudioPath,
+    '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-c:a', 'aac', '-shortest', outMp4,
+  ]);
   if (!existsSync(outMp4)) throw new Error(`mux did not produce ${outMp4}`);
   return outMp4;
 }
@@ -385,10 +387,13 @@ function verifySilences(mp4Path) {
   // -vn + explicit pcm_s16le: Remotion's trimmed ffmpeg lacks wrapped_avframe
   // (the null muxer's default video encoder), so a bare `-f null -` errors with
   // "Encoder not found". Audio-only with an encoder it does ship works.
-  const out = runCapture(
-    `npx remotion ffmpeg -i "${mp4Path}" -vn -af silencedetect=noise=-35dB:d=1.5 -c:a pcm_s16le -f null - 2>&1`,
-    STUDIO,
-  );
+  // loud + capture 'both': silencedetect reports on ffmpeg's stderr at info level,
+  // so the runner must neither add -loglevel error nor drop stderr (this replaces
+  // the old shell `2>&1` merge).
+  const out = ffmpeg(['-i', mp4Path, '-vn', '-af', 'silencedetect=noise=-35dB:d=1.5', '-c:a', 'pcm_s16le', '-f', 'null', '-'], {
+    loud: true,
+    capture: 'both',
+  });
   console.log('voiceover-take: silencedetect output --');
   for (const line of out.split('\n')) {
     if (line.includes('silence_start') || line.includes('silence_end')) console.log(`  ${line.trim()}`);

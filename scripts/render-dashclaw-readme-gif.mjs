@@ -11,14 +11,13 @@
 // -ss/-t (container-level seek, not a filter), decimate frame rate via the legacy
 // `-r` OUTPUT option (not the `fps` filter node), and use the two-pass
 // palettegen/paletteuse (both enabled) instead of a naive single-pass palette.
-import {execSync} from 'node:child_process';
 import {statSync, unlinkSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {ffmpeg} from './lib/remotion.mjs';
 import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const studioDir = join(root, 'studio');
 const outDir = resolveWorkspace(root, {brand: 'dashclaw', project: projectArg(process.argv.slice(2))}).brandRoot;
 const src = join(outDir, 'demo.mp4');
 const palette = join(outDir, 'readme-demo-palette.png');
@@ -30,17 +29,25 @@ const WIDTH = 760; // matches the README's <img width="760">
 const FPS = 10;
 const BUDGET_BYTES = 5 * 1024 * 1024; // README gif budget (docs/PLAYBOOK.md / check-budgets.mjs)
 
-const run = (cmd) => execSync(cmd, {cwd: studioDir, stdio: 'inherit'});
-
 console.log('pass 1/2: palettegen');
-run(
-  `npx remotion ffmpeg -ss ${START} -t ${DURATION} -i "${src}" -vf "scale=${WIDTH}:-1:flags=lanczos,palettegen" -y "${palette}"`,
-);
+ffmpeg([
+  '-ss', `${START}`,
+  '-t', `${DURATION}`,
+  '-i', src,
+  '-vf', `scale=${WIDTH}:-1:flags=lanczos,palettegen`,
+  '-y', palette,
+]);
 
 console.log('pass 2/2: paletteuse');
-run(
-  `npx remotion ffmpeg -ss ${START} -t ${DURATION} -i "${src}" -i "${palette}" -filter_complex "[0:v]scale=${WIDTH}:-1:flags=lanczos[s];[s][1:v]paletteuse" -r ${FPS} -y "${out}"`,
-);
+ffmpeg([
+  '-ss', `${START}`,
+  '-t', `${DURATION}`,
+  '-i', src,
+  '-i', palette,
+  '-filter_complex', `[0:v]scale=${WIDTH}:-1:flags=lanczos[s];[s][1:v]paletteuse`,
+  '-r', `${FPS}`,
+  '-y', out,
+]);
 
 unlinkSync(palette);
 

@@ -11,10 +11,10 @@
 // showed the Windows user name unmasked, which is why they could not be reused.
 //
 // Usage: node scripts/build-sidetap-social-opens.mjs --project <repo>
-import {execFileSync} from 'node:child_process';
 import {existsSync, mkdirSync, statSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {ffmpeg} from './lib/remotion.mjs';
 import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
@@ -23,8 +23,6 @@ process.on('unhandledRejection', (reason) => {
 });
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const studio = join(root, 'studio');
-const remotionCli = join(studio, 'node_modules', '@remotion', 'cli', 'remotion-cli.js');
 const workspace = resolveWorkspace(root, {brand: 'sidetap', project: projectArg(process.argv.slice(2))});
 const dest = join(workspace.publicDir, 'sidetap');
 const capture = join(dest, 'demo.webm');
@@ -46,10 +44,10 @@ for (const {name, ss, t} of clips) {
   // and the clip would open on a frozen frame. Arg-array invocation with the win32
   // shell hop, same as build-sidetap-feature-stills.mjs.
   const args = [
-    'ffmpeg', '-y', '-ss', ss, '-t', t, '-i', capture,
+    '-y', '-ss', ss, '-t', t, '-i', capture,
     '-c:v', 'libvpx', '-b:v', '2M', '-deadline', 'good', '-cpu-used', '2', '-an', out,
   ];
-  execFileSync(process.execPath, [remotionCli, ...args], {cwd: studio, stdio: 'ignore'});
+  ffmpeg(args);
   if (!existsSync(out) || statSync(out).size === 0) {
     console.error(`build-sidetap-social-opens: ffmpeg produced no output for ${name}`);
     process.exit(1);

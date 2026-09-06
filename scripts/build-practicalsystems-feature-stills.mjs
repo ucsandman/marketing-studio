@@ -19,10 +19,10 @@
 // product-owned public/practicalsystems/feature-*.png.
 //
 // Usage: node scripts/build-practicalsystems-feature-stills.mjs --project <repo>
-import {execFileSync} from 'node:child_process';
 import {existsSync, mkdirSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {ffmpeg} from './lib/remotion.mjs';
 import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
@@ -31,8 +31,6 @@ process.on('unhandledRejection', (reason) => {
 });
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const studio = join(root, 'studio');
-const remotionCli = join(studio, 'node_modules', '@remotion', 'cli', 'remotion-cli.js');
 const workspace = resolveWorkspace(root, {brand: 'practicalsystems', project: projectArg(process.argv.slice(2))});
 const dest = join(workspace.publicDir, 'practicalsystems');
 const capture = join(dest, 'demo.webm');
@@ -52,8 +50,8 @@ mkdirSync(dest, {recursive: true});
 for (const {name, crop, ss} of shots) {
   const out = join(dest, name);
   // Arg-array invocation with the win32 shell hop, same as build-sidetap-feature-stills.
-  const args = ['ffmpeg', '-y', '-ss', ss, '-i', capture, '-frames:v', '1', '-update', '1', '-vf', `crop=${crop}`, out];
-  execFileSync(process.execPath, [remotionCli, ...args], {cwd: studio, stdio: 'ignore'});
+  const args = ['-y', '-ss', ss, '-i', capture, '-frames:v', '1', '-update', '1', '-vf', `crop=${crop}`, out];
+  ffmpeg(args);
   if (!existsSync(out)) {
     console.error(`build-practicalsystems-feature-stills: ffmpeg produced no output for ${name}`);
     process.exit(1);

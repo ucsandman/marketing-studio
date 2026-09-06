@@ -16,9 +16,9 @@
 // use the two-pass palettegen/paletteuse pattern from
 // render-dashclaw-readme-gif.mjs / render-magnetic-statics.mjs.
 import {mkdirSync, statSync, unlinkSync, writeFileSync} from 'node:fs';
-import {execSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {ffmpeg, remotion} from './lib/remotion.mjs';
 import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
@@ -30,8 +30,6 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const workspace = resolveWorkspace(root, {brand: 'costclaw', project: projectArg(process.argv.slice(2))});
 const outDir = workspace.brandRoot;
 mkdirSync(outDir, {recursive: true});
-
-const studioDir = join(root, 'studio');
 
 const baseProps = {
   brandId: 'costclaw',
@@ -54,11 +52,15 @@ const animatedPropsPath = join(outDir, 'og-props.json');
 writeFileSync(animatedPropsPath, JSON.stringify(baseProps));
 
 const still = (out, width, height) => {
-  console.log(`still: ${out} (${width}x${height})`);
-  execSync(
-    `npx remotion still AnimatedOG "${join(outDir, out)}" --props="${staticPropsPath}" --public-dir="${workspace.publicDir}" --width=${width} --height=${height}`,
-    {cwd: studioDir, stdio: 'inherit'},
-  );
+  remotion([
+    'still',
+    'AnimatedOG',
+    join(outDir, out),
+    `--props=${staticPropsPath}`,
+    `--public-dir=${workspace.publicDir}`,
+    `--width=${width}`,
+    `--height=${height}`,
+  ]);
 };
 
 // Delivery targets: OG image (native size), Twitter card crop, GitHub social
@@ -67,17 +69,17 @@ still('og.png', 1200, 630); // native AnimatedOG size
 still('twitter-card.png', 1200, 600);
 still('github-social-preview.png', 1280, 640); // GitHub repo social card
 
-console.log('render: og.mp4');
-execSync(`npx remotion render AnimatedOG "${join(outDir, 'og.mp4')}" --props="${animatedPropsPath}" --public-dir="${workspace.publicDir}"`, {
-  cwd: studioDir,
-  stdio: 'inherit',
-});
+remotion(['render', 'AnimatedOG', join(outDir, 'og.mp4'), `--props=${animatedPropsPath}`, `--public-dir=${workspace.publicDir}`]);
 
-console.log('render: og.gif');
-execSync(
-  `npx remotion render AnimatedOG "${join(outDir, 'og.gif')}" --props="${animatedPropsPath}" --public-dir="${workspace.publicDir}" --codec=gif --every-nth-frame=2`,
-  {cwd: studioDir, stdio: 'inherit'},
-);
+remotion([
+  'render',
+  'AnimatedOG',
+  join(outDir, 'og.gif'),
+  `--props=${animatedPropsPath}`,
+  `--public-dir=${workspace.publicDir}`,
+  '--codec=gif',
+  '--every-nth-frame=2',
+]);
 
 // README GIF: cut from the real audit-run footage (out/costclaw/demo.mp4,
 // Playwright capture rendered via ProductDemo — NOT this composition). Segment
@@ -98,14 +100,22 @@ const demoSrc = join(outDir, 'demo.mp4');
 const palettePath = join(outDir, 'readme-gif-palette.png');
 const readmeGifPath = join(outDir, 'readme.gif');
 
-execSync(
-  `npx remotion ffmpeg -ss ${README_GIF_START} -t ${README_GIF_DURATION} -i "${demoSrc}" -vf "scale=${README_GIF_WIDTH}:-1:flags=lanczos,palettegen" -y "${palettePath}"`,
-  {cwd: studioDir, stdio: 'inherit'},
-);
-execSync(
-  `npx remotion ffmpeg -ss ${README_GIF_START} -t ${README_GIF_DURATION} -i "${demoSrc}" -i "${palettePath}" -filter_complex "[0:v]scale=${README_GIF_WIDTH}:-1:flags=lanczos[s];[s][1:v]paletteuse" -r ${README_GIF_FPS} -y "${readmeGifPath}"`,
-  {cwd: studioDir, stdio: 'inherit'},
-);
+ffmpeg([
+  '-ss', `${README_GIF_START}`,
+  '-t', `${README_GIF_DURATION}`,
+  '-i', demoSrc,
+  '-vf', `scale=${README_GIF_WIDTH}:-1:flags=lanczos,palettegen`,
+  '-y', palettePath,
+]);
+ffmpeg([
+  '-ss', `${README_GIF_START}`,
+  '-t', `${README_GIF_DURATION}`,
+  '-i', demoSrc,
+  '-i', palettePath,
+  '-filter_complex', `[0:v]scale=${README_GIF_WIDTH}:-1:flags=lanczos[s];[s][1:v]paletteuse`,
+  '-r', `${README_GIF_FPS}`,
+  '-y', readmeGifPath,
+]);
 unlinkSync(palettePath);
 
 const readmeGifBytes = statSync(readmeGifPath).size;

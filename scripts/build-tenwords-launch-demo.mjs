@@ -18,10 +18,10 @@
 //   props/tenwords-launch-demo.json   (both below the product workspace)
 //
 // Usage: node scripts/build-tenwords-launch-demo.mjs --project <repo>
-import {execFileSync} from 'node:child_process';
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {ffmpeg} from './lib/remotion.mjs';
 import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
@@ -30,8 +30,6 @@ process.on('unhandledRejection', (reason) => {
 });
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const studio = join(root, 'studio');
-const remotionCli = join(studio, 'node_modules', '@remotion', 'cli', 'remotion-cli.js');
 const workspace = resolveWorkspace(root, {brand: 'tenwords', project: projectArg(process.argv.slice(2))});
 const publicDir = join(workspace.publicDir, 'tenwords');
 const source = join(publicDir, 'demo.mp4');
@@ -65,7 +63,7 @@ const events = [
 ];
 
 const args = [
-  'ffmpeg', '-y', '-hide_banner', '-loglevel', 'error',
+  '-y', '-hide_banner', '-loglevel', 'error',
   '-ss', String(START_MS / 1000),
   '-to', String(END_MS / 1000),
   '-i', source,
@@ -75,7 +73,7 @@ const args = [
   '-an', '-movflags', '+faststart',
   target,
 ];
-execFileSync(process.execPath, [remotionCli, ...args], {cwd: studio, stdio: 'inherit'});
+ffmpeg(args, {loud: true});
 if (!existsSync(target)) {
   console.error('build-tenwords-launch-demo: ffmpeg produced no output');
   process.exit(1);

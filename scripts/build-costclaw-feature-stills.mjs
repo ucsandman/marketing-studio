@@ -8,10 +8,10 @@
 // screenshots).
 //
 // Usage: node scripts/build-costclaw-feature-stills.mjs --project <repo>
-import {execFileSync} from 'node:child_process';
 import {existsSync, mkdirSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {ffmpeg} from './lib/remotion.mjs';
 import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
@@ -20,8 +20,6 @@ process.on('unhandledRejection', (reason) => {
 });
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const studio = join(root, 'studio');
-const remotionCli = join(studio, 'node_modules', '@remotion', 'cli', 'remotion-cli.js');
 const workspace = resolveWorkspace(root, {brand: 'costclaw', project: projectArg(process.argv.slice(2))});
 const dest = join(workspace.publicDir, 'costclaw');
 
@@ -47,10 +45,10 @@ mkdirSync(dest, {recursive: true});
 for (const {name, src, crop, ss} of shots) {
   const out = join(dest, name);
   // Arg-array invocation with the win32 shell hop, same as judge-palette.mjs.
-  const args = ['ffmpeg', '-y'];
+  const args = ['-y'];
   if (ss) args.push('-ss', ss);
   args.push('-i', src, '-frames:v', '1', '-update', '1', '-vf', `crop=${crop}`, out);
-  execFileSync(process.execPath, [remotionCli, ...args], {cwd: studio, stdio: 'ignore'});
+  ffmpeg(args);
   if (!existsSync(out)) {
     console.error(`build-costclaw-feature-stills: ffmpeg produced no output for ${name}`);
     process.exit(1);

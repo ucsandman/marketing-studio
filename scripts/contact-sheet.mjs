@@ -34,11 +34,12 @@
 // MODULE_TYPELESS_PACKAGE_JSON note to stderr on Node's native TS loader;
 // studio/package.json is intentionally left untouched (out of scope here).
 
-import {execFileSync, execSync} from 'node:child_process';
+import {execFileSync} from 'node:child_process';
 import {existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join, relative} from 'node:path';
 import {loadProductionBundle, measurePng, sha256File} from './lib/production-quality.mjs';
+import {remotion} from './lib/remotion.mjs';
 import {projectArg, resolveWorkspace, resolveWorkspacePath} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
@@ -47,7 +48,6 @@ process.on('unhandledRejection', (reason) => {
 });
 
 const engineRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
-const studio = join(engineRoot, 'studio');
 
 const COMPS = new Set(['LaunchVideo', 'SocialClip', 'ProductDemo', 'LogoReveal', 'AnimatedOG']);
 
@@ -155,10 +155,7 @@ async function framePlan() {
 function compositionDuration() {
   let out;
   try {
-    out = execSync(`npx remotion compositions src/index.ts --props="${propsPath}"`, {
-      cwd: studio,
-      encoding: 'utf8',
-    });
+    out = remotion(['compositions', 'src/index.ts', `--props=${propsPath}`], {capture: true});
   } catch (err) {
     console.error(`contact-sheet: 'remotion compositions' failed: ${err.message}`);
     process.exit(1);
@@ -351,10 +348,7 @@ for (const {label, frame} of plan) {
   const file = `${comp}-${label}.png`;
   const outFile = join(stillsDir, file);
   console.log(`contact-sheet: ${comp} frame ${frame} (${label}) -> ${relToRoot(outFile)}`);
-  execSync(`npx remotion still ${comp} "${outFile}" --props="${propsPath}" --frame=${frame}`, {
-    cwd: studio,
-    stdio: 'inherit',
-  });
+  remotion(['still', comp, outFile, `--props=${propsPath}`, `--frame=${frame}`]);
   if (!existsSync(outFile)) {
     console.error(`FAILED: ${outFile} was not produced`);
     process.exit(1);

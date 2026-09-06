@@ -16,11 +16,11 @@
 //
 // Usage: node scripts/judge-demo-pacing.mjs <brand> [--strict] [--json]
 // Output: <product-repo>/marketing/assets/<brand>/marketing/judge-demo-pacing.json
-import {execFileSync} from 'node:child_process';
 import {existsSync, mkdirSync, readFileSync, writeFileSync, rmSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
 import {decodePng, meanAbsDelta} from './lib/png.mjs';
+import {ffmpeg} from './lib/remotion.mjs';
 import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
@@ -29,7 +29,6 @@ process.on('unhandledRejection', (reason) => {
 });
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const studio = join(root, 'studio');
 
 const DWELL_MS = 3500; // check A: activity gap over this = dwell warning
 const SAMPLE_MS = 1000; // check B: frame sampling interval inside a hold
@@ -101,11 +100,9 @@ function sampleTimes(hold) {
 function extractFrame(webm, ms, outPath) {
   // Accurate seek (-ss after -i decodes to the exact time) so consecutive
   // samples inside a hold are truly different frames, not the same keyframe.
-  execFileSync(
-    'npx',
-    ['remotion', 'ffmpeg', '-i', webm, '-ss', (ms / 1000).toFixed(3), '-frames:v', '1', '-update', '1', '-pix_fmt', 'rgb24', outPath, '-y'],
-    {cwd: studio, stdio: 'pipe', shell: process.platform === 'win32'},
-  );
+  ffmpeg(['-i', webm, '-ss', (ms / 1000).toFixed(3), '-frames:v', '1', '-update', '1', '-pix_fmt', 'rgb24', outPath, '-y'], {
+    quiet: true,
+  });
 }
 
 async function main() {

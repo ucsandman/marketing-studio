@@ -20,9 +20,9 @@
 // native 1200x630 (Root.tsx), so the plain `still` command below delivers
 // the exact OG size with no flag.
 import {mkdirSync, statSync, writeFileSync} from 'node:fs';
-import {execSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {remotion} from './lib/remotion.mjs';
 import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
@@ -34,8 +34,6 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const workspace = resolveWorkspace(root, {brand: 'practicalsystems', project: projectArg(process.argv.slice(2))});
 const outDir = workspace.brandRoot;
 mkdirSync(outDir, {recursive: true});
-
-const studioDir = join(root, 'studio');
 
 const baseProps = {
   brandId: 'practicalsystems',
@@ -58,28 +56,30 @@ const propsPath = join(outDir, 'og-props.json');
 writeFileSync(propsPath, JSON.stringify(baseProps));
 
 console.log('still: og.png (native 1200x630 -- no --width/--height, no-op flags per PLAYBOOK.md)');
-execSync(`npx remotion still AnimatedOG "${join(outDir, 'og.png')}" --props="${staticPropsPath}" --public-dir="${workspace.publicDir}"`, {
-  cwd: studioDir,
-  stdio: 'inherit',
-});
+remotion(['still', 'AnimatedOG', join(outDir, 'og.png'), `--props=${staticPropsPath}`, `--public-dir=${workspace.publicDir}`]);
 
-console.log('render: og.mp4');
-execSync(`npx remotion render AnimatedOG "${join(outDir, 'og.mp4')}" --props="${propsPath}" --public-dir="${workspace.publicDir}"`, {
-  cwd: studioDir,
-  stdio: 'inherit',
-});
+remotion(['render', 'AnimatedOG', join(outDir, 'og.mp4'), `--props=${propsPath}`, `--public-dir=${workspace.publicDir}`]);
 
-console.log('render: og.gif');
-execSync(
-  `npx remotion render AnimatedOG "${join(outDir, 'og.gif')}" --props="${propsPath}" --public-dir="${workspace.publicDir}" --codec=gif --every-nth-frame=2`,
-  {cwd: studioDir, stdio: 'inherit'},
-);
+remotion([
+  'render',
+  'AnimatedOG',
+  join(outDir, 'og.gif'),
+  `--props=${propsPath}`,
+  `--public-dir=${workspace.publicDir}`,
+  '--codec=gif',
+  '--every-nth-frame=2',
+]);
 
-console.log('render: readme.gif');
-execSync(
-  `npx remotion render AnimatedOG "${join(outDir, 'readme.gif')}" --props="${propsPath}" --public-dir="${workspace.publicDir}" --codec=gif --every-nth-frame=2 --scale=0.5`,
-  {cwd: studioDir, stdio: 'inherit'},
-);
+remotion([
+  'render',
+  'AnimatedOG',
+  join(outDir, 'readme.gif'),
+  `--props=${propsPath}`,
+  `--public-dir=${workspace.publicDir}`,
+  '--codec=gif',
+  '--every-nth-frame=2',
+  '--scale=0.5',
+]);
 
 const README_GIF_BUDGET_BYTES = 5 * 1024 * 1024; // scripts/check-budgets.mjs hard gate
 const readmeGifBytes = statSync(join(outDir, 'readme.gif')).size;

@@ -18,11 +18,11 @@
 //
 // Usage: node scripts/judge-palette.mjs <brand> <video-or-png> [--frames N] [--mask-region x,y,w,h] [--strict] [--json]
 // Output: <product-repo>/marketing/assets/<brand>/marketing/judge-palette.json
-import {execFileSync} from 'node:child_process';
 import {existsSync, mkdirSync, readFileSync, writeFileSync, rmSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join, extname} from 'node:path';
 import {decodePng, quantize, rgbToHsv, hexToRgb, colorDistance} from './lib/png.mjs';
+import {ffmpeg} from './lib/remotion.mjs';
 import {projectArg, resolveWorkspace, resolveWorkspacePath} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
@@ -31,7 +31,6 @@ process.on('unhandledRejection', (reason) => {
 });
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const studio = join(root, 'studio');
 
 const SAT_THRESHOLD = 0.35; // ignore washed-out/near-gray pixels
 const MIN_VALUE = 0.15; // ignore near-black pixels
@@ -102,11 +101,10 @@ function extractVideoFrames(videoPath, n, framesDir) {
   // Parse duration from ffmpeg's stderr (it prints "Duration: HH:MM:SS.ss").
   let durSec = 0;
   try {
-    execFileSync('npx', ['remotion', 'ffmpeg', '-hide_banner', '-i', videoPath], {
-      cwd: studio,
-      stdio: 'pipe',
-      shell: process.platform === 'win32',
-    });
+    // loud: -loglevel error would suppress the "Duration:" line this parses.
+    // quiet: ffmpeg with no output file always exits non-zero here — an expected
+    // failure, so the runner must not print its tail.
+    ffmpeg(['-hide_banner', '-i', videoPath], {loud: true, quiet: true});
   } catch (err) {
     const stderr = (err.stderr || '').toString();
     const m = stderr.match(/Duration:\s*(\d+):(\d+):(\d+\.\d+)/);
@@ -119,11 +117,9 @@ function extractVideoFrames(videoPath, n, framesDir) {
   for (let i = 0; i < n; i++) {
     const t = (durSec * (i + 0.5)) / n; // evenly spaced, avoid the exact 0/end
     const p = join(framesDir, `f${i}.png`);
-    execFileSync(
-      'npx',
-      ['remotion', 'ffmpeg', '-i', videoPath, '-ss', t.toFixed(3), '-frames:v', '1', '-update', '1', '-pix_fmt', 'rgb24', p, '-y'],
-      {cwd: studio, stdio: 'pipe', shell: process.platform === 'win32'},
-    );
+    ffmpeg(['-i', videoPath, '-ss', t.toFixed(3), '-frames:v', '1', '-update', '1', '-pix_fmt', 'rgb24', p, '-y'], {
+      quiet: true,
+    });
     imgs.push({timeMs: Math.round(t * 1000), img: decodePng(readFileSync(p))});
   }
   return imgs;

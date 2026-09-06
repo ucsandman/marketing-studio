@@ -42,11 +42,11 @@
 //
 // Outputs: out/<brand>/thumbs/thumb-<aspect>.jpg (falls back to .png if the
 // installed Remotion CLI still build rejects --image-format=jpeg).
-import {execSync} from 'node:child_process';
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join, resolve} from 'node:path';
 import {makeBaseLoader, withFormat} from './lib/matrix-props.mjs';
+import {remotion} from './lib/remotion.mjs';
 import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
@@ -55,7 +55,6 @@ process.on('unhandledRejection', (reason) => {
 });
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const studio = join(root, 'studio');
 
 // --- pure helpers (exported for scripts/extract-thumbs.test.mjs) ---
 
@@ -212,21 +211,25 @@ async function main() {
     writeFileSync(propsPath, JSON.stringify(props));
     const {frame, source} = pickPosterFrame(aspect, p.comp, base, timingLookup);
     const outFile = join(outDir, `thumb-${aspect}.jpg`);
-    const cmd = `npx remotion still ${p.comp} "${outFile}" --props="${propsPath}" --public-dir="${workspace.publicDir}" --frame=${frame} --image-format=jpeg`;
     console.log(
       `thumbs: ${aspect} (${p.width}x${p.height}) frame ${frame} [${source}] -> out/${brand}/thumbs/thumb-${aspect}.jpg`,
     );
     try {
-      execSync(cmd, {cwd: studio, stdio: 'inherit'});
+      remotion([
+        'still',
+        p.comp,
+        outFile,
+        `--props=${propsPath}`,
+        `--public-dir=${workspace.publicDir}`,
+        `--frame=${frame}`,
+        '--image-format=jpeg',
+      ]);
     } catch (err) {
       // --image-format=jpeg not supported by the installed Remotion CLI: fall back
       // to png (documented fallback, one log line, not a hard failure).
       console.log(`thumbs: --image-format=jpeg failed, falling back to png: ${err.message}`);
       const pngFile = join(outDir, `thumb-${aspect}.png`);
-      execSync(
-        `npx remotion still ${p.comp} "${pngFile}" --props="${propsPath}" --public-dir="${workspace.publicDir}" --frame=${frame}`,
-        {cwd: studio, stdio: 'inherit'},
-      );
+      remotion(['still', p.comp, pngFile, `--props=${propsPath}`, `--public-dir=${workspace.publicDir}`, `--frame=${frame}`]);
       if (!existsSync(pngFile)) {
         console.error(`FAILED: ${pngFile} was not produced`);
         process.exit(1);

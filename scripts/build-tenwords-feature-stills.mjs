@@ -18,6 +18,7 @@ import {execFileSync} from 'node:child_process';
 import {existsSync, mkdirSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {ffmpeg} from './lib/remotion.mjs';
 import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
@@ -27,7 +28,6 @@ process.on('unhandledRejection', (reason) => {
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const studio = join(root, 'studio');
-const remotionCli = join(studio, 'node_modules', '@remotion', 'cli', 'remotion-cli.js');
 const workspace = resolveWorkspace(root, {brand: 'tenwords', project: projectArg(process.argv.slice(2))});
 const dest = join(workspace.publicDir, 'tenwords');
 const capture = join(dest, 'demo.mp4');
@@ -79,10 +79,7 @@ for (const {name, src, crop, vf, ss, plainFfmpeg} of shots) {
     execFileSync('ffmpeg', ffArgs, {cwd: studio, stdio: 'inherit'});
   } else {
     // The bundled binary handles the capture-only crops without a system dependency.
-    execFileSync(process.execPath, [remotionCli, 'ffmpeg', ...ffArgs], {
-      cwd: studio,
-      stdio: 'inherit',
-    });
+    ffmpeg(ffArgs, {loud: true});
   }
   if (!existsSync(out)) {
     console.error(`build-tenwords-feature-stills: ffmpeg produced no output for ${name}`);

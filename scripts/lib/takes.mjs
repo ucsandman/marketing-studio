@@ -3,7 +3,6 @@
 // subset via Remotion's `--frames` flag — registered as a candidate variant in
 // Mission Control's run.json so the operator picks the winner from the browser
 // (radio buttons + selectedVariant, mission-control.mjs's existing contract).
-import {execFileSync} from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
@@ -12,12 +11,9 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import {fileURLToPath} from 'node:url';
 import {basename, dirname, join} from 'node:path';
+import {ffmpeg, remotion} from './remotion.mjs';
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const studio = join(root, 'studio');
-const remotionCli = join(studio, 'node_modules', '@remotion', 'cli', 'remotion-cli.js');
 const compositions = new Set(['LaunchVideo', 'LogoReveal']);
 
 const stripExt = (p) => basename(p).replace(/\.[^.]+$/, '');
@@ -37,7 +33,7 @@ export function renderTake({comp, outPath, props, frames, publicDir}) {
   const propsPath = join(propsDir, `${stripExt(outPath)}.json`);
   writeFileSync(propsPath, JSON.stringify(props));
   console.log(`takes: rendering ${comp} -> ${outPath}${frames ? ` (frames ${frames})` : ''}`);
-  execFileSync(process.execPath, [remotionCli, 'render', comp, outPath, `--props=${propsPath}`, `--public-dir=${publicDir}`, ...(frames ? [`--frames=${frames}`] : [])], {cwd: studio, stdio: 'inherit'});
+  remotion(['render', comp, outPath, `--props=${propsPath}`, `--public-dir=${publicDir}`, ...(frames ? [`--frames=${frames}`] : [])]);
   if (!existsSync(outPath)) {
     console.error(`FAILED: ${outPath} was not produced`);
     process.exit(1);
@@ -50,10 +46,7 @@ export function renderTake({comp, outPath, props, frames, publicDir}) {
 // Returns the poster's absolute path (same dir, .jpg extension).
 export function posterFor(videoPath) {
   const posterPath = videoPath.replace(/\.[^.]+$/, '.jpg');
-  execFileSync(process.execPath, [remotionCli, 'ffmpeg', '-y', '-i', videoPath, '-frames:v', '1', posterPath], {
-    cwd: studio,
-    stdio: 'inherit',
-  });
+  ffmpeg(['-y', '-i', videoPath, '-frames:v', '1', posterPath]);
   if (!existsSync(posterPath)) {
     console.error(`FAILED: poster was not produced for ${videoPath}`);
     process.exit(1);

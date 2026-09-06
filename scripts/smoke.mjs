@@ -1,8 +1,8 @@
-import {execFileSync} from 'node:child_process';
 import {existsSync, mkdirSync, mkdtempSync, readFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {remotion} from './lib/remotion.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
@@ -28,21 +28,12 @@ console.log(`smoke coverage: registry=${registered.length} smoke=${compositions.
 const scratch = mkdtempSync(join(tmpdir(), 'marketing-studio-smoke-'));
 const publicDir = join(scratch, 'public');
 const bundleDir = join(scratch, 'bundle');
-const studioDir = join(root, 'studio');
-const remotionCli = join(studioDir, 'node_modules', '@remotion', 'cli', 'remotion-cli.js');
 mkdirSync(publicDir, {recursive: true});
-execFileSync(process.execPath, [remotionCli, 'bundle', 'src/index.ts', '--out-dir', bundleDir, '--public-dir', publicDir], {
-  cwd: studioDir,
-  stdio: 'inherit',
-});
+remotion(['bundle', 'src/index.ts', '--out-dir', bundleDir, '--public-dir', publicDir]);
 
 for (const id of compositions) {
   const out = join(outDir, `${id}.png`);
-  console.log(`smoke: rendering frame 0 of ${id}`);
-  execFileSync(process.execPath, [remotionCli, 'still', bundleDir, id, out, '--frame=0'], {
-    cwd: studioDir,
-    stdio: 'inherit',
-  });
+  remotion(['still', bundleDir, id, out, '--frame=0']);
   if (!existsSync(out)) {
     console.error(`smoke FAILED: ${out} was not produced`);
     process.exit(1);

@@ -5,9 +5,9 @@
 // props read by StoreTile's calculateMetadata (Root.tsx) -- the render-matrix
 // pattern, since this Remotion version has no --width/--height CLI flags.
 import {mkdirSync, writeFileSync} from 'node:fs';
-import {execSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {remotion} from './lib/remotion.mjs';
 import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
@@ -20,7 +20,6 @@ const workspace = resolveWorkspace(root, {brand: 'tenwords', project: projectArg
 const outDir = join(workspace.brandRoot, 'store');
 mkdirSync(outDir, {recursive: true});
 
-const studioDir = join(root, 'studio');
 const propsDir = outDir;
 
 const tiles = [
@@ -53,11 +52,7 @@ for (const tile of tiles) {
     }),
   );
   const outFile = join(outDir, `${tile.id}.png`);
-  console.log(`still: ${tile.id}.png (${tile.formatWidth}x${tile.formatHeight})`);
-  execSync(`npx remotion still StoreTile "${outFile}" --props="${propsPath}" --public-dir="${workspace.publicDir}"`, {
-    cwd: studioDir,
-    stdio: 'inherit',
-  });
+  remotion(['still', 'StoreTile', outFile, `--props=${propsPath}`, `--public-dir=${workspace.publicDir}`]);
 }
 
 console.log('store tiles OK: tile-small.png, tile-marquee.png in out/tenwords/store/');
