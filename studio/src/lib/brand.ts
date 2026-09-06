@@ -146,6 +146,9 @@ export const brandSchema = z.object({
       to: z.enum(['brand', 'profit', 'safe', 'loss', 'info', 'rare', 'ink', 'ink2', 'line']),
     })
     .default({from: 'brand', to: 'profit'}),
+  // FloatBar is CS2 product language, not universal progress decoration. Brands
+  // opt into that treatment explicitly; omission keeps shared templates bar-free.
+  progressTreatment: z.enum(['none', 'cs2-wear']).default('none'),
   voice: z.string().min(1),
   // How the brand's coined name is SPOKEN, when that differs from how it is
   // written. Whisper cannot transcribe a coined word it has never seen (measured:

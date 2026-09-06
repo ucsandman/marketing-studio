@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 // scripts/verify-og-wired.mjs — prove the link preview actually changed: fetch the
 // LIVE page, parse its og:image/twitter:image meta tags, fetch the image they point
-// at, and compare its dimensions against the DELIVERED asset — out/<brand>/og.png or
-// out/<brand>/og-image.png (the per-brand statics scripts disagree on the name; see
+// at, and compare its dimensions against the DELIVERED asset in the product's
+// marketing/assets/<brand>/og.png or og-image.png (the per-brand statics scripts
+// disagree on the name; see
 // scripts/render-*-statics.mjs). A green judge on the generated file proves nothing
 // about what a visitor's browser actually fetches — this checks the wire, not the
 // build output.
 //
-// Usage: node scripts/verify-og-wired.mjs <brand> [url] [--strict]
+// Usage: node scripts/verify-og-wired.mjs <brand> --project <product-repo> [url] [--strict]
 // url defaults to https:// + brands/<brand>.json's `url` field (a bare host).
 // Advisory like the other judges: exit 0 with a PASS/FAIL verdict; --strict exits 1
 // on FAIL. Exits 0 and SKIPS (no verdict) when the brand has no url configured and
@@ -17,6 +18,7 @@ import {existsSync, readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
 import {decodePng} from './lib/png.mjs';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -52,7 +54,7 @@ function matchMetaContent(html, metaName) {
 // Decide PASS/FAIL for one meta tag given what the live page and the delivered
 // asset actually say. remote: null (tag absent) | {error} (fetch/decode failed) |
 // {contentType, width, height} (width/height null when not decodable as PNG).
-// local: null (neither out/<brand>/{og.png,og-image.png} exists) | {path, width,
+// local: null (neither product asset exists) | {path, width,
 // height}. expectedPaths: the file(s) probed, for the "expected file" callout.
 export function compareOgAsset({tagName, tagValue, remote, local, expectedPaths}) {
   const expected = expectedPaths.join(' or ');
@@ -135,9 +137,9 @@ async function fetchImageMeta(imageUrl) {
 
 // Probes both names the statics scripts use and returns {path, bytes, width,
 // height} for whichever exists first (og.png before og-image.png), or null.
-function findLocalAsset(brand) {
+export function findLocalAsset(workspace) {
   for (const name of ['og.png', 'og-image.png']) {
-    const p = join(root, 'out', brand, name);
+    const p = join(workspace.brandRoot, name);
     if (!existsSync(p)) continue;
     const buf = readFileSync(p);
     try {
@@ -155,12 +157,13 @@ function findLocalAsset(brand) {
 async function main() {
   const argv = process.argv.slice(2);
   const strict = argv.includes('--strict');
-  const positional = argv.filter((a) => !a.startsWith('--'));
+  const positional = argv.filter((a, i) => !a.startsWith('--') && argv[i - 1] !== '--project');
   const [brand, urlArg] = positional;
   if (!brand) {
-    console.error('usage: node scripts/verify-og-wired.mjs <brand> [url] [--strict]');
+    console.error('usage: node scripts/verify-og-wired.mjs <brand> --project <product-repo> [url] [--strict]');
     process.exit(1);
   }
+  const workspace = resolveWorkspace(root, {brand, project: projectArg(argv)});
 
   let pageUrl = urlArg;
   if (!pageUrl) {
@@ -186,8 +189,8 @@ async function main() {
   }
 
   const {ogImage, twitterImage} = parseMetaImages(html);
-  const expectedPaths = [`out/${brand}/og.png`, `out/${brand}/og-image.png`];
-  const local = findLocalAsset(brand);
+  const expectedPaths = [join(workspace.brandRoot, 'og.png'), join(workspace.brandRoot, 'og-image.png')];
+  const local = findLocalAsset(workspace);
 
   console.log(`page    ${pageUrl}`);
   console.log(`og:image       ${ogImage ?? '(absent)'}`);

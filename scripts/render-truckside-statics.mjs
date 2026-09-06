@@ -7,8 +7,10 @@ import {mkdirSync, writeFileSync} from 'node:fs';
 import {execSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const workspace = resolveWorkspace(root, {brand: 'truckside', project: projectArg(process.argv.slice(2))});
 
 const props = {
   brandId: 'truckside',
@@ -19,22 +21,22 @@ const props = {
   loopSequence: null,
   loopFrames: 1,
 };
-const propsPath = join(root, 'out', 'truckside', 'og-props.json');
+const propsPath = join(workspace.brandRoot, 'og-props.json');
 mkdirSync(dirname(propsPath), {recursive: true});
 writeFileSync(propsPath, JSON.stringify(props));
 
-const outDir = join(root, 'out', 'truckside');
+const outDir = workspace.brandRoot;
 const still = (frame, out) => {
   console.log(`still: ${out} @${frame}`);
   execSync(
-    `npx remotion still AnimatedOG "${join(outDir, out)}" --props="${propsPath}" --frame=${frame}`,
+    `npx remotion still AnimatedOG "${join(outDir, out)}" --props="${propsPath}" --public-dir="${workspace.publicDir}" --frame=${frame}`,
     {cwd: join(root, 'studio'), stdio: 'inherit'},
   );
 };
 const render = (args, out) => {
   console.log(`render: ${out}`);
   execSync(
-    `npx remotion render AnimatedOG "${join(outDir, out)}" --props="${propsPath}" ${args}`,
+    `npx remotion render AnimatedOG "${join(outDir, out)}" --props="${propsPath}" --public-dir="${workspace.publicDir}" ${args}`,
     {cwd: join(root, 'studio'), stdio: 'inherit'},
   );
 };

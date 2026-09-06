@@ -1,5 +1,6 @@
 import React from 'react';
 import {AbsoluteFill, Easing, interpolate, useCurrentFrame} from 'remotion';
+import type {CameraState, Viewport} from '../lib/camera';
 
 // Two-node camera rig (docs/product-launch-motion-adoption.md, Phase C). A
 // whole-shot rotation and a mid-shot scale must live on DIFFERENT elements —
@@ -39,6 +40,8 @@ const dollyScale = (frame: number, moves: DollyMove[]): number => {
 };
 
 export const CameraRig: React.FC<{
+  camera?: CameraState | null;
+  cameraViewport?: Viewport;
   turn?: CameraTurn | null;
   // Dolly origin as a CSS percentage pair — compute it from the pushed-toward
   // control's center: (targetX / stageWidth, targetY / stageHeight). Before
@@ -47,7 +50,7 @@ export const CameraRig: React.FC<{
   dollyOrigin?: string;
   dolly?: DollyMove[];
   children: React.ReactNode;
-}> = ({turn = null, dollyOrigin = '50% 50%', dolly = [], children}) => {
+}> = ({camera = null, cameraViewport = {width: 1600, height: 900}, turn = null, dollyOrigin = '50% 50%', dolly = [], children}) => {
   const frame = useCurrentFrame();
   const scale = dollyScale(frame, dolly);
   const turnTransform = turn
@@ -62,7 +65,7 @@ export const CameraRig: React.FC<{
         return `perspective(${turn.perspective ?? 2600}px) rotateY(${ry}deg) rotateX(${rx}deg)`;
       })()
     : '';
-  return (
+  const rig = (
     <AbsoluteFill
       style={{
         transform: scale === 1 ? undefined : `scale(${scale})`,
@@ -78,6 +81,14 @@ export const CameraRig: React.FC<{
       >
         {children}
       </AbsoluteFill>
+    </AbsoluteFill>
+  );
+  if (!camera) return rig;
+  const tx = cameraViewport.width / 2 - camera.originX;
+  const ty = cameraViewport.height / 2 - camera.originY;
+  return (
+    <AbsoluteFill style={{transform: `scale(${camera.scale}) translate(${tx}px, ${ty}px)`}}>
+      {rig}
     </AbsoluteFill>
   );
 };

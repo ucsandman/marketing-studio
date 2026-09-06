@@ -13,6 +13,7 @@
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -21,13 +22,15 @@ process.on('unhandledRejection', (reason) => {
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
-const brand = args.find((a) => !a.startsWith('--'));
+const brand = args.find((a, i) => !a.startsWith('--') && args[i - 1] !== '--project');
+const project = projectArg(args);
 const check = args.includes('--check');
 
 if (!brand) {
-  console.error('usage: node scripts/build-captions.mjs <brand> [--check]');
+  console.error('usage: node scripts/build-captions.mjs <brand> --project <product-repo> [--check]');
   process.exit(1);
 }
+const workspace = resolveWorkspace(root, {brand, project});
 
 // --- launchTiming.ts mirror (constants must match the TS source) ---
 const FPS = 30;
@@ -80,7 +83,7 @@ const captionCues = (lines, timing) =>
   });
 
 // --- inputs ---
-const audioPath = join(root, 'props', `${brand}-audio.json`);
+const audioPath = join(workspace.propsDir, `${brand}-audio.json`);
 if (!existsSync(audioPath)) {
   console.error(`build-captions: missing audio props ${audioPath} — run scripts/build-${brand}-audio.mjs first`);
   process.exit(1);
@@ -89,7 +92,7 @@ const audio = JSON.parse(readFileSync(audioPath, 'utf8'));
 
 // Act timing needs the launch feature count + demo telemetry length; both live in
 // the generated launch props.
-const launchPath = join(root, 'props', `${brand}-launch.json`);
+const launchPath = join(workspace.propsDir, `${brand}-launch.json`);
 if (!existsSync(launchPath)) {
   console.error(`build-captions: missing launch props ${launchPath} — run scripts/build-launch-props.mjs first`);
   process.exit(1);
@@ -131,7 +134,7 @@ const toVtt = (cs) =>
     .join('\n\n') +
   '\n';
 
-const outDir = join(root, 'out', brand, 'captions');
+const outDir = workspace.captionsDir;
 const srtPath = join(outDir, 'launch.srt');
 const vttPath = join(outDir, 'launch.vtt');
 

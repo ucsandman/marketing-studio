@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {mkdtempSync, mkdirSync, writeFileSync, rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {resolveBaseProps, makeBaseLoader, withFormat} from './matrix-props.mjs';
+import {productionHeroFrame, resolveBaseProps, makeBaseLoader, withBoundCaptions, withFormat} from './matrix-props.mjs';
 
 const LAUNCH = {brandId: 'b', headline: 'bare launch props'};
 const AUDIO = {track: 'music.mp3', lines: [{act: 'hook', durationMs: 4000, words: [{}]}]};
@@ -14,40 +14,38 @@ const SOCIAL = {brandId: 'b', headline: 'social props'};
 // scripts/merge-launch-audio.mjs writes to out/<brand>/launch-audio-props.json.
 function fixture(brand, {merged}) {
   const root = mkdtempSync(join(tmpdir(), 'matrix-props-test-'));
-  mkdirSync(join(root, 'props'), {recursive: true});
-  writeFileSync(join(root, 'props', `${brand}-launch.json`), JSON.stringify(LAUNCH));
-  writeFileSync(join(root, 'props', `${brand}-social-launch.json`), JSON.stringify(SOCIAL));
+  const brandRoot = join(root, 'marketing', 'assets', brand);
+  const propsDir = join(brandRoot, 'props');
+  mkdirSync(propsDir, {recursive: true});
+  writeFileSync(join(propsDir, `${brand}-launch.json`), JSON.stringify(LAUNCH));
+  writeFileSync(join(propsDir, `${brand}-social-launch.json`), JSON.stringify(SOCIAL));
   if (merged) {
-    mkdirSync(join(root, 'out', brand), {recursive: true});
-    writeFileSync(
-      join(root, 'out', brand, 'launch-audio-props.json'),
-      JSON.stringify({...LAUNCH, audio: AUDIO}),
-    );
+    writeFileSync(join(brandRoot, 'launch-audio-props.json'), JSON.stringify({...LAUNCH, audio: AUDIO}));
   }
-  return root;
+  return {root, workspace: {brandRoot, propsDir}};
 }
 
 test('LaunchVideo resolves to the merged audio props when they exist', () => {
-  const root = fixture('withaudio', {merged: true});
+  const {root, workspace} = fixture('withaudio', {merged: true});
   try {
     assert.equal(
-      resolveBaseProps(root, 'withaudio', 'LaunchVideo'),
-      join(root, 'out', 'withaudio', 'launch-audio-props.json'),
+      resolveBaseProps(workspace, 'withaudio', 'LaunchVideo'),
+      join(workspace.brandRoot, 'launch-audio-props.json'),
     );
-    assert.deepEqual(makeBaseLoader(root, 'withaudio')('LaunchVideo'), {...LAUNCH, audio: AUDIO});
+    assert.deepEqual(makeBaseLoader(workspace, 'withaudio')('LaunchVideo'), {...LAUNCH, audio: AUDIO});
   } finally {
     rmSync(root, {recursive: true, force: true});
   }
 });
 
 test('SocialClip stays on the social props even when merged launch audio exists', () => {
-  const root = fixture('withaudio', {merged: true});
+  const {root, workspace} = fixture('withaudio', {merged: true});
   try {
     assert.equal(
-      resolveBaseProps(root, 'withaudio', 'SocialClip'),
-      join(root, 'props', 'withaudio-social-launch.json'),
+      resolveBaseProps(workspace, 'withaudio', 'SocialClip'),
+      join(workspace.propsDir, 'withaudio-social-launch.json'),
     );
-    const base = makeBaseLoader(root, 'withaudio')('SocialClip');
+    const base = makeBaseLoader(workspace, 'withaudio')('SocialClip');
     assert.deepEqual(base, SOCIAL);
     assert.equal('audio' in base, false, 'SocialClip has no audio track by design');
   } finally {
@@ -56,13 +54,13 @@ test('SocialClip stays on the social props even when merged launch audio exists'
 });
 
 test('LaunchVideo without the merged file resolves exactly as before', () => {
-  const root = fixture('noaudio', {merged: false});
+  const {root, workspace} = fixture('noaudio', {merged: false});
   try {
     assert.equal(
-      resolveBaseProps(root, 'noaudio', 'LaunchVideo'),
-      join(root, 'props', 'noaudio-launch.json'),
+      resolveBaseProps(workspace, 'noaudio', 'LaunchVideo'),
+      join(workspace.propsDir, 'noaudio-launch.json'),
     );
-    assert.deepEqual(makeBaseLoader(root, 'noaudio')('LaunchVideo'), LAUNCH);
+    assert.deepEqual(makeBaseLoader(workspace, 'noaudio')('LaunchVideo'), LAUNCH);
   } finally {
     rmSync(root, {recursive: true, force: true});
   }
@@ -77,15 +75,27 @@ test('withFormat overlays the dimension props on whichever base was resolved', (
   });
 });
 
+test('caption props require timing from the selected props audio', () => {
+  assert.throws(() => withBoundCaptions('LaunchVideo', LAUNCH, null), /audio\.lines inside the selected props/);
+  assert.deepEqual(withBoundCaptions('LaunchVideo', LAUNCH, AUDIO), {...LAUNCH, audio: AUDIO, burnCaptions: true});
+  assert.deepEqual(withBoundCaptions('SocialClip', SOCIAL, AUDIO).voLines, [{act: 'hook', text: undefined, durationMs: 4000}]);
+});
+
+test('production stills use the directed hero midpoint and clamp to the timeline', () => {
+  assert.equal(productionHeroFrame({total: 780, shots: [{from: 216, len: 170, hero: true}]}, 240), 301);
+  assert.equal(productionHeroFrame({total: 300, shots: [{from: 290, len: 40, hero: true}]}, 240), 299);
+  assert.equal(productionHeroFrame({shots: [{from: 20, len: 30}]}, 240), 240);
+});
+
 test('a portrait SocialClip row prefers <brand>-social-vertical.json (the file that carries videoCropRegion)', () => {
-  const root = fixture('crop', {merged: false});
+  const {root, workspace} = fixture('crop', {merged: false});
   const VERTICAL = {...SOCIAL, videoCropRegion: {x: 300, y: 400, w: 1350, h: 620, sourceWidth: 1920, sourceHeight: 1080}};
-  writeFileSync(join(root, 'props', 'crop-social-vertical.json'), JSON.stringify(VERTICAL));
-  writeFileSync(join(root, 'props', 'crop-social-linkedin.json'), JSON.stringify(SOCIAL));
+  writeFileSync(join(workspace.propsDir, 'crop-social-vertical.json'), JSON.stringify(VERTICAL));
+  writeFileSync(join(workspace.propsDir, 'crop-social-linkedin.json'), JSON.stringify(SOCIAL));
   try {
-    assert.equal(resolveBaseProps(root, 'crop', 'SocialClip', {portrait: true}), join(root, 'props', 'crop-social-vertical.json'));
-    assert.equal(resolveBaseProps(root, 'crop', 'SocialClip'), join(root, 'props', 'crop-social-launch.json'));
-    const load = makeBaseLoader(root, 'crop');
+    assert.equal(resolveBaseProps(workspace, 'crop', 'SocialClip', {portrait: true}), join(workspace.propsDir, 'crop-social-vertical.json'));
+    assert.equal(resolveBaseProps(workspace, 'crop', 'SocialClip'), join(workspace.propsDir, 'crop-social-launch.json'));
+    const load = makeBaseLoader(workspace, 'crop');
     assert.deepEqual(load('SocialClip', {portrait: true}), VERTICAL);
     assert.deepEqual(load('SocialClip'), SOCIAL, 'landscape rows are unchanged and not served from the portrait cache entry');
   } finally {
@@ -94,9 +104,9 @@ test('a portrait SocialClip row prefers <brand>-social-vertical.json (the file t
 });
 
 test('a portrait row with no vertical file falls back exactly as before', () => {
-  const root = fixture('novert', {merged: false});
+  const {root, workspace} = fixture('novert', {merged: false});
   try {
-    assert.equal(resolveBaseProps(root, 'novert', 'SocialClip', {portrait: true}), join(root, 'props', 'novert-social-launch.json'));
+    assert.equal(resolveBaseProps(workspace, 'novert', 'SocialClip', {portrait: true}), join(workspace.propsDir, 'novert-social-launch.json'));
   } finally {
     rmSync(root, {recursive: true, force: true});
   }

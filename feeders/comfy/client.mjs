@@ -3,12 +3,14 @@
  * ComfyUI feeder client. NON-LOAD-BEARING: if the server is unreachable the
  * studio falls back to procedural backgrounds (documented fallback, exit 2).
  *
- * Usage: node feeders/comfy/client.mjs hero [--out DIR] [--seed N]
+ * Usage: node feeders/comfy/client.mjs hero --project REPO [--brand noban] [--out DIR] [--seed N]
  */
 import {mkdirSync, readFileSync, writeFileSync} from 'node:fs';
-import {dirname, join, resolve} from 'node:path';
+import {tmpdir} from 'node:os';
+import {dirname, isAbsolute, join, relative, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {randomUUID} from 'node:crypto';
+import {projectArg, resolveWorkspace, resolveWorkspacePath} from '../../scripts/lib/workspace.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '..', '..');
@@ -37,6 +39,36 @@ export const firstCheckpoint = (objectInfo) =>
 
 export const imagesFromHistory = (history, promptId) =>
   Object.values(history?.[promptId]?.outputs ?? {}).flatMap((node) => node.images ?? []);
+
+const flagValue = (args, name) => {
+  const index = args.indexOf(name);
+  if (index >= 0) return args[index + 1] ?? null;
+  const prefix = `${name}=`;
+  return args.find((arg) => arg.startsWith(prefix))?.slice(prefix.length) || null;
+};
+
+const inside = (parent, child) => {
+  const rel = relative(parent, child);
+  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
+};
+
+export const resolveHeroOutput = (args) => {
+  const project = projectArg(args);
+  const brand = flagValue(args, '--brand') || 'noban';
+  const out = flagValue(args, '--out');
+  if (args.includes('--out') && !out) throw new Error('--out requires a path');
+  if (args.includes('--diagnostic-temp')) {
+    if (project) throw new Error('--diagnostic-temp cannot be combined with --project');
+    const tempRoot = resolve(tmpdir());
+    const outDir = out ? resolve(tempRoot, out) : join(tempRoot, 'marketing-studio-diagnostics', 'comfy', brand);
+    if (!inside(tempRoot, outDir)) throw new Error(`diagnostic output must stay inside ${tempRoot}`);
+    return {brand, outDir, workspace: null};
+  }
+  if (!project) throw new Error('production hero requires --project <external-product-repo>');
+  const workspace = resolveWorkspace(ROOT, {brand, project});
+  const outDir = out ? resolveWorkspacePath(workspace, out) : join(workspace.assetsDir, 'comfy');
+  return {brand, outDir, workspace};
+};
 
 const probe = async () => {
   for (const port of PORTS) {
@@ -125,12 +157,17 @@ const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(imp
 if (isMain) {
   const args = process.argv.slice(2);
   if (args[0] !== 'hero') {
-    console.error('usage: node feeders/comfy/client.mjs hero [--out DIR] [--seed N]');
+    console.error('usage: node feeders/comfy/client.mjs hero --project REPO [--brand noban] [--out DIR] [--seed N]');
     process.exit(1);
   }
-  const outIdx = args.indexOf('--out');
   const seedIdx = args.indexOf('--seed');
-  const outDir = outIdx >= 0 ? resolve(args[outIdx + 1]) : join(ROOT, 'assets', 'noban', 'comfy');
+  let outDir;
+  try {
+    ({outDir} = resolveHeroOutput(args));
+  } catch (error) {
+    console.error(`invalid output workspace: ${error.message}`);
+    process.exit(1);
+  }
   const seed = seedIdx >= 0 ? Number(args[seedIdx + 1]) : 47;
   await runHero(outDir, seed);
 }

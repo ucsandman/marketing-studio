@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// Source of truth for props/magnetic-demo.json (ProductDemo composition,
+// Source of truth for product-owned magnetic-demo.json (ProductDemo composition,
 // studio/src/templates/ProductDemo.tsx / productDemoSchema).
 //
-// Reads studio/public/magnetic/telemetry.json (Task 7's recorded demo: 8 step,
-// 13 click, 6 focus events, durationMs 31985) and out/magnetic/marketing/brief.json
+// Reads the product public workspace's magnetic/telemetry.json (8 step,
+// 13 click, 6 focus events, durationMs 31985) and product-owned brief.json
 // (the approved Content Brief) and emits ProductDemo's props.
 //
 // Repo rule: captions never come from telemetry step labels. Task 7's raw labels
@@ -26,14 +26,17 @@
 // they don't get a caption here; LaunchVideo carries the full feature set.
 //
 // Fail loudly, deterministic output (no timestamps, no randomness).
-import {readFileSync, writeFileSync} from 'node:fs';
+import {readFileSync, mkdirSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const argv = process.argv.slice(2);
+const workspace = resolveWorkspace(root, {brand: 'magnetic', project: projectArg(argv)});
 
-const telemetryPath = join(root, 'studio', 'public', 'magnetic', 'telemetry.json');
-const briefPath = join(root, 'out', 'magnetic', 'marketing', 'brief.json');
+const telemetryPath = join(workspace.publicDir, 'magnetic', 'telemetry.json');
+const briefPath = join(workspace.marketingDir, 'brief.json');
 
 const telemetry = readJson(telemetryPath, 'telemetry');
 const brief = readJson(briefPath, 'brief');
@@ -88,8 +91,10 @@ const props = {
   telemetry: {...telemetry, events},
 };
 
-writeFileSync(join(root, 'props', 'magnetic-demo.json'), JSON.stringify(props, null, 2) + '\n');
-console.log('wrote props/magnetic-demo.json');
+mkdirSync(workspace.propsDir, {recursive: true});
+const outPath = join(workspace.propsDir, 'magnetic-demo.json');
+writeFileSync(outPath, JSON.stringify(props, null, 2) + '\n');
+console.log(`wrote ${outPath}`);
 
 function readJson(path, label) {
   let raw;

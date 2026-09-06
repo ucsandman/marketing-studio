@@ -12,14 +12,15 @@
 // unavailable) takes precedence over everything — see docs/superpowers/specs/
 // 2026-08-12-judge-audio-design.md "Error handling".
 //
-// Usage: node scripts/judge-audio.mjs <brand> [--asset launch-final] [--strict] [--json]
-// Output: out/<brand>/marketing/judge-audio.json, out/<brand>/marketing/judge-audio.png
+// Usage: node scripts/judge-audio.mjs <brand> --project <product-repo> [--asset launch-final] [--strict] [--json]
+// Output: <product-repo>/marketing/assets/<brand>/marketing/judge-audio.{json,png}
 import {spawnSync} from 'node:child_process';
 import {existsSync, mkdirSync, readFileSync, statSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
-import {dirname, join} from 'node:path';
+import {dirname, join, relative} from 'node:path';
 import {TARGET_I, CHAIN_TP, TARGET_LRA} from './master-audio.mjs';
 import {FADE_IN, FADE_OUT} from '../studio/src/lib/audioMix.ts';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -607,16 +608,23 @@ async function main() {
   const assetIdx = argv.indexOf('--asset');
   const asset = assetIdx >= 0 ? argv[assetIdx + 1] : 'launch-final';
   const skip = new Set(assetIdx >= 0 ? [assetIdx, assetIdx + 1] : []);
-  const brand = argv.find((a, i) => !skip.has(i) && !a.startsWith('--'));
+  const brand = argv.find((a, i) => !skip.has(i) && !a.startsWith('--') && argv[i - 1] !== '--project');
   if (!brand) {
-    console.error('usage: node scripts/judge-audio.mjs <brand> [--asset launch-final] [--strict] [--json]');
+    console.error('usage: node scripts/judge-audio.mjs <brand> --project <product-repo> [--asset launch-final] [--strict] [--json]');
+    process.exit(1);
+  }
+  let ws;
+  try {
+    ws = resolveWorkspace(root, {brand, project: projectArg(argv)});
+  } catch (err) {
+    console.error(`judge-audio: ${err.message}`);
     process.exit(1);
   }
 
-  const assetPathAbs = join(root, 'out', brand, `${asset}.mp4`);
-  const audioPath = join(root, 'props', `${brand}-audio.json`);
-  const launchPath = join(root, 'props', `${brand}-launch.json`);
-  const demoPath = join(root, 'props', `${brand}-demo.json`);
+  const assetPathAbs = join(ws.brandOut, `${asset}.mp4`);
+  const audioPath = join(ws.propsDir, `${brand}-audio.json`);
+  const launchPath = join(ws.propsDir, `${brand}-launch.json`);
+  const demoPath = join(ws.propsDir, `${brand}-demo.json`);
   if (!existsSync(assetPathAbs)) {
     console.error(`judge-audio: missing ${assetPathAbs}`);
     process.exit(1);
@@ -664,7 +672,7 @@ async function main() {
   const stream = parseFfprobeStreams(ffprobeParsed);
   const videoDurationS = stream.videoDurationS;
 
-  const outDir = join(root, 'out', brand, 'marketing');
+  const outDir = ws.marketingDir;
   mkdirSync(outDir, {recursive: true});
   const cachePath = join(outDir, `heard-${asset}.json`);
   // Whisper cannot transcribe a coined brand word it has never seen ("SideTap" ->
@@ -749,10 +757,10 @@ async function main() {
     generatedAt: new Date().toISOString(),
     verdict,
     inputs: {
-      video: `out/${brand}/${asset}.mp4`,
-      manifest: `props/${brand}-audio.json`,
-      launch: `props/${brand}-launch.json`,
-      transcriptCache: `out/${brand}/marketing/heard-${asset}.json`,
+      video: relative(ws.projectRoot, assetPathAbs).replaceAll('\\', '/'),
+      manifest: relative(ws.projectRoot, audioPath).replaceAll('\\', '/'),
+      launch: relative(ws.projectRoot, launchPath).replaceAll('\\', '/'),
+      transcriptCache: relative(ws.projectRoot, cachePath).replaceAll('\\', '/'),
     },
     summary: {
       linesInManifest: lines.length,
@@ -772,8 +780,8 @@ async function main() {
   } else {
     console.log(`judge-audio [${brand}/${asset}]: ${verdict} (${findings.length} finding(s))`);
     for (const f of findings) console.log(`  [${f.level}] ${f.check}${f.act ? ` (${f.act})` : ''}: ${f.message}`);
-    console.log(`  report -> out/${brand}/marketing/judge-audio.json`);
-    console.log(`  picture -> out/${brand}/marketing/judge-audio.png`);
+    console.log(`  report -> ${outPath}`);
+    console.log(`  picture -> ${outPngAbs}`);
   }
 
   if (!transcript.available) process.exit(2);

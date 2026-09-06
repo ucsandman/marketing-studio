@@ -6,7 +6,7 @@
  *   cd C:\Projects\wallpaper-ad && python scripts/launch.py --no-desktop --demo --port 3777
  * (DEV_AUTH=1 stub signs in automatically; no tokens or credentials needed.)
  *
- * Output: ../../studio/public/paperroute/demo.webm + ../../props/paperroute-demo.json
+ * Output: <project>/marketing/assets/paperroute/{assets,public,props}/
  *
  * Camera focus rects are MEASURED from each target element's real boundingBox
  * (viewport px == webm px because recordVideo.size == viewport), never derived
@@ -19,24 +19,28 @@ import {fileURLToPath} from 'node:url';
 import {Recorder} from './recorder.mjs';
 import {cacheKey, checkCache, storeCache} from '../../scripts/lib/cache.mjs';
 import {captureKeyParts} from './capture-cache.mjs';
+import {projectArg, resolveWorkspace} from '../../scripts/lib/workspace.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const argv = process.argv.slice(2);
 const PORT = process.env.PR_PORT ?? '3777';
 // Product repo: the app is reached over the port, but the cache must fingerprint
 // the source it films. Default matches the launch command in this file's header.
-const PR_ROOT = process.env.PR_ROOT ?? 'C:/Projects/wallpaper-ad';
+const workspace = resolveWorkspace(ROOT, {brand: 'paperroute', project: projectArg(argv) ?? process.env.PR_ROOT ?? 'C:/Projects/wallpaper-ad'});
+const PR_ROOT = workspace.projectRoot;
 const base = `http://localhost:${PORT}`;
 const VIEWPORT = {width: 1440, height: 900};
 const VIEW_HOLD_MS = 4000;
 const SETTLE_MS = 700; // let entrance animations / scroll settle before measuring
 
 // --- Footage cache gate (before the app-reachability check or browser launch) ---
-const argv = process.argv.slice(2);
 const FORCE = argv.includes('--force');
 const CHECK_ONLY = argv.includes('--cache-check-only');
-const videoOut = join(ROOT, 'studio', 'public', 'paperroute', 'demo.webm');
-const propsOut = join(ROOT, 'props', 'paperroute-demo.json');
-const CACHE_ARTIFACTS = [videoOut, propsOut];
+const publicDir = join(workspace.publicDir, 'paperroute');
+const videoOut = join(publicDir, 'demo.webm');
+const assetOut = join(workspace.assetsDir, 'demo.webm');
+const propsOut = join(workspace.propsDir, 'paperroute-demo.json');
+const CACHE_ARTIFACTS = [videoOut, assetOut, propsOut];
 const keyParts = captureKeyParts({
   repo: PR_ROOT,
   scriptPath: fileURLToPath(import.meta.url),
@@ -46,14 +50,14 @@ const CACHE_KEY = cacheKey(keyParts);
 const CACHE_ENABLED = keyParts.productHead !== null; // null => product repo unresolvable, cannot verify inputs
 
 if (CHECK_ONLY) {
-  const {hit} = CACHE_ENABLED ? checkCache('paperroute', 'capture', CACHE_KEY, CACHE_ARTIFACTS) : {hit: false};
+  const {hit} = CACHE_ENABLED ? checkCache(workspace, 'capture', CACHE_KEY, CACHE_ARTIFACTS) : {hit: false};
   console.log(hit ? 'HIT' : 'MISS');
   process.exit(0);
 }
 if (!CACHE_ENABLED) {
   console.log(`capture cache: product git state unavailable at ${PR_ROOT} — caching disabled this run`);
 } else if (!FORCE) {
-  const {hit} = checkCache('paperroute', 'capture', CACHE_KEY, CACHE_ARTIFACTS);
+  const {hit} = checkCache(workspace, 'capture', CACHE_KEY, CACHE_ARTIFACTS);
   if (hit) {
     console.log(`capture cache hit — reusing ${videoOut}`);
     process.exit(0);
@@ -94,7 +98,7 @@ const clampFocus = (box, {padX = 48, padY = 48} = {}) => {
   return {x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h)};
 };
 
-const videoDir = join(ROOT, 'out', 'capture');
+const videoDir = join(workspace.assetsDir, '.capture');
 mkdirSync(videoDir, {recursive: true});
 let browser;
 try {
@@ -160,9 +164,10 @@ try {
   await context.close(); // flushes the webm
   const src = await video.path();
 
-  const destDir = join(ROOT, 'studio', 'public', 'paperroute');
-  mkdirSync(destDir, {recursive: true});
-  copyFileSync(src, join(destDir, 'demo.webm'));
+  for (const destDir of [workspace.assetsDir, publicDir]) {
+    mkdirSync(destDir, {recursive: true});
+    copyFileSync(src, join(destDir, 'demo.webm'));
+  }
 
   const props = {
     brandId: 'paperroute',
@@ -170,10 +175,11 @@ try {
     cta: 'Put the idle corner to work · paperroute.gg',
     telemetry,
   };
-  writeFileSync(join(ROOT, 'props', 'paperroute-demo.json'), JSON.stringify(props, null, 2) + '\n');
-  if (CACHE_ENABLED) storeCache('paperroute', 'capture', CACHE_KEY, CACHE_ARTIFACTS, {productRepo: PR_ROOT, productHead: keyParts.productHead});
+  mkdirSync(workspace.propsDir, {recursive: true});
+  writeFileSync(propsOut, JSON.stringify(props, null, 2) + '\n');
+  if (CACHE_ENABLED) storeCache(workspace, 'capture', CACHE_KEY, CACHE_ARTIFACTS, {productRepo: PR_ROOT, productHead: keyParts.productHead});
   console.log(`capture OK: ${telemetry.durationMs}ms, ${telemetry.events.length} events`);
-  console.log('wrote studio/public/paperroute/demo.webm and props/paperroute-demo.json');
+  console.log(`wrote ${assetOut}, ${videoOut}, and ${propsOut}`);
 } catch (err) {
   console.error(String(err?.message ?? err));
   process.exitCode = 1;

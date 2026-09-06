@@ -21,18 +21,19 @@
 // verified: frame 1 rendered via --frame vs via a chunked --animation range is
 // pixel-identical (max channel diff 0/255).
 //
-// Usage: node scripts/build-magnetic-demo-media.mjs [--stage <name>]
+// Usage: node scripts/build-magnetic-demo-media.mjs --project <repo> [--stage <name>]
 //   --stage render-a|render-b|render-c  render that clip's PNG frames (resumable)
 //   --stage encode                      encode all three frame dirs to mp4
 //   --stage vo                          VO take: speech + pauses muxed over clip-a
 //   --stage all                         everything in order (default)
-// Output (staged, gitignored):
-//   out/magnetic/demo-media/{clip-a,clip-b,clip-c,voiceover-take}.mp4
+// Output (product-owned, gitignored):
+//   <repo>/marketing/assets/magnetic/assets/demo-media/{clip-a,clip-b,clip-c,voiceover-take}.mp4
 import {execSync, spawnSync} from 'node:child_process';
 import {existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join, resolve} from 'node:path';
 import {checkCache, cacheKey, storeCache} from './lib/cache.mjs';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -42,9 +43,10 @@ process.on('unhandledRejection', (reason) => {
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const STUDIO = join(ROOT, 'studio');
 const BRAND = 'magnetic';
-const FOOTAGE_DIR = join(ROOT, 'assets', 'magnetic', 'footage');
-const VO_DIR = join(ROOT, 'assets', 'magnetic', 'vo');
-const OUT_DIR = join(ROOT, 'out', 'magnetic', 'demo-media');
+let WORKSPACE;
+let FOOTAGE_DIR;
+let VO_DIR;
+let OUT_DIR;
 const FPS = 30;
 const FRAME_COUNT = 240; // 8s @ 30fps: plenty for filmstrip/skim footage, and the
 // picture loops seamlessly (background_loop's whole-cycle phase drift), so longer
@@ -118,6 +120,16 @@ export function frameInventory(names) {
   while (present.has(prefix + 1)) prefix += 1;
   const strays = nums.filter((n) => n > prefix).sort((x, y) => x - y);
   return {prefix, strays};
+}
+
+/** Product-owned paths shared with record-magnetic-demo.mjs. */
+export function magneticMediaPaths(workspace) {
+  const mediaDir = join(workspace.assetsDir, 'demo-media');
+  return {
+    mediaDir,
+    footageDir: join(mediaDir, 'frames'),
+    voDir: join(mediaDir, 'vo'),
+  };
 }
 
 // Key-order-insensitive config equality (render-config.json provenance checks).
@@ -197,7 +209,7 @@ function renderStage(variant) {
     const end = Math.min(next + CHUNK_FRAMES - 1, FRAME_COUNT);
     console.log(`render-${variant.id}: chunk ${next}-${end}`);
     run(
-      `python feeders/blender/render.py feeders/blender/scenes/background_loop.py --out "${framesDir}" --timeout ${CHUNK_TIMEOUT_S} --animation --brand ${BRAND} --frame-count ${FRAME_COUNT} --scale ${variant.scale} --distortion ${variant.distortion} --detail ${variant.detail} --phase-start ${variant.phaseStart} --accent "${variant.accent}" --accent-strength ${variant.accentStrength} --shadow-strength ${variant.shadowStrength} --start-frame ${next} --end-frame ${end}`,
+      `python feeders/blender/render.py feeders/blender/scenes/background_loop.py --project "${WORKSPACE.projectRoot}" --out "${framesDir}" --timeout ${CHUNK_TIMEOUT_S} --animation --brand ${BRAND} --frame-count ${FRAME_COUNT} --scale ${variant.scale} --distortion ${variant.distortion} --detail ${variant.detail} --phase-start ${variant.phaseStart} --accent "${variant.accent}" --accent-strength ${variant.accentStrength} --shadow-strength ${variant.shadowStrength} --start-frame ${next} --end-frame ${end}`,
       ROOT,
       CHUNK_TIMEOUT_MS,
     );
@@ -220,7 +232,7 @@ function encodeClip(variant) {
   const framesDir = join(FOOTAGE_DIR, variant.id);
   const config = variantConfig(variant);
   const key = cacheKey({stage: `clip-${variant.id}`, ...config});
-  const {hit} = checkCache(BRAND, `clip-${variant.id}`, key, [outMp4]);
+  const {hit} = checkCache(WORKSPACE, `clip-${variant.id}`, key, [outMp4]);
   if (hit) {
     console.log(`encode clip-${variant.id}: cache hit, skipping (${outMp4})`);
     return outMp4;
@@ -246,7 +258,7 @@ function encodeClip(variant) {
   );
   if (!existsSync(outMp4)) throw new Error(`encode clip-${variant.id}: did not produce ${outMp4}`);
 
-  storeCache(BRAND, `clip-${variant.id}`, key, [outMp4]);
+  storeCache(WORKSPACE, `clip-${variant.id}`, key, [outMp4]);
   return outMp4;
 }
 
@@ -320,7 +332,7 @@ function generateSilence(ms, destPath) {
 function buildTakeAudio(segmentPaths) {
   const takeWav = join(VO_DIR, 'take.wav');
   const key = cacheKey({stage: 'take-audio', lines: VO_LINES, pausesMs: PAUSES_MS});
-  const {hit} = checkCache(BRAND, 'take-audio', key, [takeWav]);
+  const {hit} = checkCache(WORKSPACE, 'take-audio', key, [takeWav]);
   if (hit) {
     console.log(`take-audio: cache hit, skipping (${takeWav})`);
     return takeWav;
@@ -345,7 +357,7 @@ function buildTakeAudio(segmentPaths) {
   run(`npx remotion ffmpeg -y -f concat -safe 0 -i "${listPath}" -c copy "${takeWav}"`, STUDIO);
   if (!existsSync(takeWav)) throw new Error(`concat did not produce ${takeWav}`);
 
-  storeCache(BRAND, 'take-audio', key, [takeWav]);
+  storeCache(WORKSPACE, 'take-audio', key, [takeWav]);
   return takeWav;
 }
 
@@ -392,7 +404,7 @@ function voStage() {
   // CURRENT variant-a config (cache key covers the full knob set and the cache
   // layer re-checks the artifact exists non-empty on disk).
   const key = cacheKey({stage: 'clip-a', ...variantConfig(VARIANTS[0])});
-  const {hit} = checkCache(BRAND, 'clip-a', key, [clipA]);
+  const {hit} = checkCache(WORKSPACE, 'clip-a', key, [clipA]);
   if (!hit) {
     throw new Error('vo: clip-a.mp4 missing or not built from the current variant-a config — run --stage encode first');
   }
@@ -411,8 +423,14 @@ const STAGES = {
 };
 
 async function main() {
-  const stageIdx = process.argv.indexOf('--stage');
-  const stage = stageIdx >= 0 ? process.argv[stageIdx + 1] : 'all';
+  const argv = process.argv.slice(2);
+  WORKSPACE = resolveWorkspace(ROOT, {brand: BRAND, project: projectArg(argv)});
+  const paths = magneticMediaPaths(WORKSPACE);
+  FOOTAGE_DIR = paths.footageDir;
+  VO_DIR = paths.voDir;
+  OUT_DIR = paths.mediaDir;
+  const stageIdx = argv.indexOf('--stage');
+  const stage = stageIdx >= 0 ? argv[stageIdx + 1] : 'all';
   if (stage !== 'all' && !STAGES[stage]) {
     throw new Error(`unknown --stage "${stage}" (expected ${Object.keys(STAGES).join('|')}|all)`);
   }

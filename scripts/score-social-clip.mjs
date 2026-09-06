@@ -10,11 +10,12 @@
 // after a short lead, and the result goes through master-audio.mjs so it lands on
 // the same -14 LUFS as the launch film.
 //
-// Usage: node scripts/score-social-clip.mjs <brand> <clipId> --vo <act> [--out <path>]
-//   <clipId>  out/<brand>/<clipId>.mp4 (e.g. social-x)
-//   --vo      act id from props/<brand>-audio.json (e.g. hook, feature-2); the line
+// Usage: node scripts/score-social-clip.mjs <brand> <clipId> --vo <act>
+//        --project <product-repo> [--out <path>]
+//   <clipId>  product-owned source clip (e.g. social-x)
+//   --vo      act id from product marketing props/<brand>-audio.json; the line
 //             must be shorter than the clip minus VO_LEAD_MS, or the script exits 1
-//   default out: out/<brand>/<clipId>-scored.mp4
+//   default out: product marketing <clipId>-scored.mp4
 //
 // Shells to plain `ffmpeg` on PATH (Remotion's bundled build lacks the filters).
 
@@ -22,6 +23,7 @@ import {spawnSync} from 'node:child_process';
 import {existsSync, readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join, resolve} from 'node:path';
+import {projectArg, resolveWorkspace, resolveWorkspacePath} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -68,16 +70,18 @@ function main() {
     const i = argv.indexOf(name);
     return i >= 0 ? argv[i + 1] : undefined;
   };
-  const positional = argv.filter((a, i) => !a.startsWith('--') && !['--vo', '--out'].includes(argv[i - 1]));
+  const positional = argv.filter((a, i) => !a.startsWith('--') && !['--vo', '--out', '--project'].includes(argv[i - 1]));
   const [brand, clipId] = positional;
   const voAct = flag('--vo');
-  if (!brand || !clipId || !voAct) {
-    console.error('usage: node scripts/score-social-clip.mjs <brand> <clipId> --vo <act> [--out <path>]');
+  const project = projectArg(argv);
+  if (!brand || !clipId || !voAct || !project) {
+    console.error('usage: node scripts/score-social-clip.mjs <brand> <clipId> --vo <act> --project <product-repo> [--out <path>]');
     process.exit(1);
   }
+  const workspace = resolveWorkspace(root, {brand, project});
 
-  const clip = join(root, 'out', brand, `${clipId}.mp4`);
-  const audioPath = join(root, 'props', `${brand}-audio.json`);
+  const clip = join(workspace.brandRoot, `${clipId}.mp4`);
+  const audioPath = join(workspace.propsDir, `${brand}-audio.json`);
   if (!existsSync(clip)) {
     console.error(`score-social-clip: missing ${clip}`);
     process.exit(1);
@@ -92,7 +96,7 @@ function main() {
     console.error(`score-social-clip: no VO line for act "${voAct}" in ${audioPath}`);
     process.exit(1);
   }
-  const publicDir = join(root, 'studio', 'public');
+  const publicDir = workspace.publicDir;
   const music = join(publicDir, audio.music.src);
   const vo = join(publicDir, line.src);
   for (const f of [music, vo]) {
@@ -112,7 +116,13 @@ function main() {
     process.exit(1);
   }
 
-  const out = resolve(flag('--out') ?? join(root, 'out', brand, `${clipId}-scored.mp4`));
+  const out = flag('--out')
+    ? resolveWorkspacePath(workspace, flag('--out'))
+    : join(workspace.brandRoot, `${clipId}-scored.mp4`);
+  if (existsSync(out)) {
+    console.error(`score-social-clip: refusing to overwrite ${out}; score into a new version`);
+    process.exit(1);
+  }
   const args = [
     '-hide_banner', '-y',
     '-i', clip, '-i', music, '-i', vo,
@@ -128,7 +138,7 @@ function main() {
     process.exit(1);
   }
   console.log(`score-social-clip OK: ${clipId} + bed + VO "${voAct}" (${line.durationMs}ms in ${clipDurMs}ms) -> ${out}`);
-  console.log(`next: node scripts/master-audio.mjs ${out} --out out/${brand}/${clipId}-final.mp4`);
+  console.log(`next: node scripts/master-audio.mjs "${out}" --project "${workspace.projectRoot}" --out "${join(workspace.brandRoot, `${clipId}-final.mp4`)}"`);
 }
 
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]);

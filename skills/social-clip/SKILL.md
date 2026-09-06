@@ -7,25 +7,26 @@ description: Use when the user wants a short social media video / feature announ
 
 **REQUIRED BACKGROUND:** marketing-studio skill. Work in `${CLAUDE_SKILL_DIR}/../..`.
 
-Produces: `out/<brand>/<name>.mp4` — 10s, 1920x1080, three acts:
-headline word-spring -> screenshot panel + feature lines -> end card.
+Produces a scored short-form asset in `<product>/marketing/assets/<brand>/`. Its opening,
+aspect-specific composition, and CTA must serve the platform rather than repeat the
+launch film's end card by default.
 
 ## Recipe
 
 1. Toolchain + brand check per marketing-studio.
-2. Screenshot: copy the product screenshot into `studio/public/<brand>/` (create a
-   `fetch-<brand>-assets.mjs` if repeatable). The SocialClip panel zooms into it —
+2. Put approved capture/source media under the product workspace's `public/<brand>/`
+   tree using a repeatable product-aware feeder. The SocialClip panel zooms into it —
    tune the `zoom {from,to,origin}` so the crop ends BEFORE any app-side clipped edge
    and the money-shot column/element is the rightmost thing in frame.
-3. Props file `props/<brand>-<name>.json` matching `socialClipSchema`
+3. Product-owned props file matching `socialClipSchema`
    ({brandId, kicker, headline, lines (1-4), screenshot, cta}). Copy: terse, factual,
    brand voice, no em dashes.
 4. Proof stills at frames 45/150/280 (headline / panel+lines / end card), Read each,
    iterate copy + zoom until intentional.
-5. `npx remotion render SocialClip out/<brand>/<name>.mp4 --props=<props>`.
+5. Render into the product workspace with the product props and
+   `--public-dir=<product>/marketing/assets/<brand>/public`.
 6. Score it (mandatory: SocialClip renders silent and a silent clip is not
-   deliverable): `node scripts/score-social-clip.mjs <brand> <name> --vo <act>` with the
-   ONE VO line from props/<brand>-audio.json that matches the plate. Output
-   `out/<brand>/<name>-final.mp4`; build-postkit prefers it over the matrix row.
-7. `node scripts/check-audio.mjs <brand>` exits 0, then deliver the `-final` file per
+   deliverable): run `score-social-clip` with `--project <product>` and the one narration
+   line that matches the plate. Cuts alone do not justify generic SFX.
+7. `node scripts/check-audio.mjs <brand> --project <product>` exits 0, then deliver the scored file per
    marketing-studio.

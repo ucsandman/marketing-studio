@@ -20,12 +20,13 @@
 // green run on zero files reads as what it is.
 //
 // Usage: node scripts/check-audio.mjs <brand> [--json]
-// Output: out/<brand>/marketing/check-audio.json
+// Output: <product-repo>/marketing/assets/<brand>/marketing/check-audio.json
 import {spawnSync} from 'node:child_process';
 import {existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {basename, dirname, join, relative} from 'node:path';
 import {TARGET_I} from './master-audio.mjs';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -94,12 +95,19 @@ function probe(file) {
 
 function main() {
   const argv = process.argv.slice(2);
-  const brand = argv.find((a) => !a.startsWith('--'));
+  const brand = argv.find((a, i) => !a.startsWith('--') && argv[i - 1] !== '--project');
   if (!brand) {
-    console.error('usage: node scripts/check-audio.mjs <brand> [--json]');
+    console.error('usage: node scripts/check-audio.mjs <brand> --project <product-repo> [--json]');
     process.exit(2);
   }
-  const outDir = join(root, 'out', brand);
+  let ws;
+  try {
+    ws = resolveWorkspace(root, {brand, project: projectArg(argv)});
+  } catch (err) {
+    console.error(`check-audio: ${err.message}`);
+    process.exit(2);
+  }
+  const outDir = ws.brandOut;
   const files = walk(join(outDir, 'postkit')).concat(
     existsSync(outDir) ? readdirSync(outDir).map((n) => join(outDir, n)).filter((p) => statSync(p).isFile()) : [],
   ).filter((p) => p.endsWith('.mp4'));
@@ -122,8 +130,8 @@ function main() {
   const failed = results.filter((r) => r.verdict === 'FAIL').length + (film && film.verdict === 'FAIL' ? 1 : 0);
   const checked = results.length + (film ? 1 : 0);
   const report = {brand, checked, failed, skipped, targetI: TARGET_I, band: I_BAND, files: results, film};
-  mkdirSync(join(outDir, 'marketing'), {recursive: true});
-  writeFileSync(join(outDir, 'marketing', 'check-audio.json'), JSON.stringify(report, null, 2) + '\n');
+  mkdirSync(ws.marketingDir, {recursive: true});
+  writeFileSync(join(ws.marketingDir, 'check-audio.json'), JSON.stringify(report, null, 2) + '\n');
   if (argv.includes('--json')) console.log(JSON.stringify(report, null, 2));
   for (const r of results) console.log(`  ${r.verdict.padEnd(4)} ${r.file}${r.reason ? '  ' + r.reason : ''}${r.I ? `  (I ${r.I})` : ''}`);
   if (film) console.log(`  ${film.verdict.padEnd(4)} film/film-v${film.version}.mp4  ${film.reason}`);

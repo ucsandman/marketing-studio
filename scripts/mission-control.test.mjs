@@ -11,6 +11,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {latestVerdictsByAsset,
   runCliScript,
+  workspaceCliArgs,
   applyPosted,
   readJudges,
   snapshotApproved,
@@ -98,12 +99,13 @@ test('runCliScript: failing child process -> {ok: false, error} carries stderr v
   );
 });
 
-test('runCliScript: forwards args to the child process', () => {
+test('runCliScript: forwards the exact brand and product workspace args to the child process', () => {
   const script = join(tmp, 'echo-args.mjs');
   writeFileSync(script, "console.log(JSON.stringify(process.argv.slice(2)));\n");
-  const result = runCliScript(script, ['dashclaw']);
+  const productRoot = 'C:\\fixtures\\tradesdesk';
+  const result = runCliScript(script, workspaceCliArgs('truckside', productRoot));
   assert.equal(result.ok, true);
-  assert.deepEqual(JSON.parse(result.stdout), ['dashclaw']);
+  assert.deepEqual(JSON.parse(result.stdout), ['truckside', '--project', productRoot]);
 });
 
 test('runCliScript: a hung child is killed at the timeout and reported loud, not waited on forever', () => {

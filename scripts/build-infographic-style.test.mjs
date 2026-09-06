@@ -3,9 +3,11 @@
 // Run: node --test scripts/build-infographic-style.test.mjs
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync, writeFileSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
+import {mkdtempSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
-import {join} from 'node:path';
+import {dirname, join} from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {
   TEMPLATE_HEADINGS,
   CHART_SLOTS,
@@ -15,6 +17,8 @@ import {
   validateBrand,
   voiceRules,
 } from './build-infographic-style.mjs';
+
+const script = join(dirname(fileURLToPath(import.meta.url)), 'build-infographic-style.mjs');
 
 // Fixture brand: hexes are deliberately unique so "every brand hex appears" is a
 // real assertion, and the voice carries a forbidden color plus a text rule.
@@ -169,4 +173,13 @@ test('fontLink names all three families with + for spaces', () => {
 test('the voice section quotes the brand voice string verbatim', () => {
   const doc = buildStyleDoc(readBrand(fixtureFile()));
   assert.ok(doc.includes(`> ${FIXTURE.voice}`), 'voice section does not quote the voice string');
+});
+
+test('CLI writes the style only inside an explicit product workspace', () => {
+  const project = mkdtempSync(join(tmpdir(), 'infographic-product-'));
+  mkdirSync(join(project, '.git'));
+  const stdout = execFileSync(process.execPath, [script, 'noban', '--project', project], {encoding: 'utf8'});
+  const out = join(project, 'marketing', 'assets', 'noban', 'marketing', 'infographic-style.md');
+  assert.match(readFileSync(out, 'utf8'), /^# /);
+  assert.match(stdout, /build-infographic-style OK/);
 });

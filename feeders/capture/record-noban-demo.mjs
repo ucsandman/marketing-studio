@@ -5,7 +5,7 @@
  * Prereq: noban stack running with sim data on screen:
  *   cd C:\Projects\noban-gg && pnpm start
  *
- * Output: ../../studio/public/noban/demo.webm + ../../props/noban-demo.json
+ * Output: <project>/marketing/assets/noban/{assets,public,props}/
  */
 import {chromium} from '@playwright/test';
 import {copyFileSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
@@ -14,9 +14,12 @@ import {fileURLToPath} from 'node:url';
 import {Recorder} from './recorder.mjs';
 import {cacheKey, checkCache, storeCache} from '../../scripts/lib/cache.mjs';
 import {captureKeyParts} from './capture-cache.mjs';
+import {projectArg, resolveWorkspace} from '../../scripts/lib/workspace.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const NOBAN = process.env.NOBAN_ROOT ?? 'C:/Projects/noban-gg';
+const argv = process.argv.slice(2);
+const workspace = resolveWorkspace(ROOT, {brand: 'noban', project: projectArg(argv) ?? process.env.NOBAN_ROOT ?? 'C:/Projects/noban-gg'});
+const NOBAN = workspace.projectRoot;
 const VIEWPORT = {width: 1720, height: 1000}; // wide enough for the full opportunities table
 const VIEW_HOLD_MS = 3600;
 
@@ -32,12 +35,13 @@ const VIEWS_META = [
 ];
 
 // --- Footage cache gate (before any .env read or browser launch) ---
-const argv = process.argv.slice(2);
 const FORCE = argv.includes('--force');
 const CHECK_ONLY = argv.includes('--cache-check-only');
-const videoOut = join(ROOT, 'studio', 'public', 'noban', 'demo.webm');
-const propsOut = join(ROOT, 'props', 'noban-demo.json');
-const CACHE_ARTIFACTS = [videoOut, propsOut];
+const publicDir = join(workspace.publicDir, 'noban');
+const videoOut = join(publicDir, 'demo.webm');
+const assetOut = join(workspace.assetsDir, 'demo.webm');
+const propsOut = join(workspace.propsDir, 'noban-demo.json');
+const CACHE_ARTIFACTS = [videoOut, assetOut, propsOut];
 const keyParts = captureKeyParts({
   repo: NOBAN,
   scriptPath: fileURLToPath(import.meta.url),
@@ -47,14 +51,14 @@ const CACHE_KEY = cacheKey(keyParts);
 const CACHE_ENABLED = keyParts.productHead !== null; // null => product repo unresolvable, cannot verify inputs
 
 if (CHECK_ONLY) {
-  const {hit} = CACHE_ENABLED ? checkCache('noban', 'capture', CACHE_KEY, CACHE_ARTIFACTS) : {hit: false};
+  const {hit} = CACHE_ENABLED ? checkCache(workspace, 'capture', CACHE_KEY, CACHE_ARTIFACTS) : {hit: false};
   console.log(hit ? 'HIT' : 'MISS');
   process.exit(0);
 }
 if (!CACHE_ENABLED) {
   console.log(`capture cache: product git state unavailable at ${NOBAN} — caching disabled this run`);
 } else if (!FORCE) {
-  const {hit} = checkCache('noban', 'capture', CACHE_KEY, CACHE_ARTIFACTS);
+  const {hit} = checkCache(workspace, 'capture', CACHE_KEY, CACHE_ARTIFACTS);
   if (hit) {
     console.log(`capture cache hit — reusing ${videoOut}`);
     process.exit(0);
@@ -85,7 +89,7 @@ try {
   process.exit(1);
 }
 
-const videoDir = join(ROOT, 'out', 'capture');
+const videoDir = join(workspace.assetsDir, '.capture');
 mkdirSync(videoDir, {recursive: true});
 let browser;
 try {
@@ -130,9 +134,10 @@ try {
   await context.close(); // flushes the webm
   const src = await video.path();
 
-  const destDir = join(ROOT, 'studio', 'public', 'noban');
-  mkdirSync(destDir, {recursive: true});
-  copyFileSync(src, join(destDir, 'demo.webm'));
+  for (const destDir of [workspace.assetsDir, publicDir]) {
+    mkdirSync(destDir, {recursive: true});
+    copyFileSync(src, join(destDir, 'demo.webm'));
+  }
 
   const props = {
     brandId: 'noban',
@@ -140,10 +145,11 @@ try {
     cta: 'Simulate free at noban.gg',
     telemetry,
   };
-  writeFileSync(join(ROOT, 'props', 'noban-demo.json'), JSON.stringify(props, null, 2) + '\n');
-  if (CACHE_ENABLED) storeCache('noban', 'capture', CACHE_KEY, CACHE_ARTIFACTS, {productRepo: NOBAN, productHead: keyParts.productHead});
+  mkdirSync(workspace.propsDir, {recursive: true});
+  writeFileSync(propsOut, JSON.stringify(props, null, 2) + '\n');
+  if (CACHE_ENABLED) storeCache(workspace, 'capture', CACHE_KEY, CACHE_ARTIFACTS, {productRepo: NOBAN, productHead: keyParts.productHead});
   console.log(`capture OK: ${telemetry.durationMs}ms, ${telemetry.events.length} events`);
-  console.log('wrote studio/public/noban/demo.webm and props/noban-demo.json');
+  console.log(`wrote ${assetOut}, ${videoOut}, and ${propsOut}`);
 } catch (err) {
   console.error(redact(err).message);
   process.exitCode = 1;

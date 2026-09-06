@@ -4,13 +4,22 @@ import type {Brand} from '../lib/brand';
 // CS2 wear zones: FN 0-0.07, MW 0.07-0.15, FT 0.15-0.38, WW 0.38-0.45, BS 0.45-1.0
 const ZONES = [0.07, 0.15, 0.38, 0.45];
 
+export const floatBarGeometry = (progress: number, brand: Brand) => {
+  if (brand.progressTreatment !== 'cs2-wear') return null;
+  const marker = Math.max(0, Math.min(1, progress));
+  return {marker, zones: ZONES};
+};
+
 export const FloatBar: React.FC<{
   progress: number; // 0..1
   brand: Brand;
   width: number;
   height?: number;
 }> = ({progress, brand, width, height = 8}) => {
-  const clamped = Math.max(0, Math.min(1, progress));
+  const geometry = floatBarGeometry(progress, brand);
+  if (!geometry) return null;
+
+  const {marker, zones} = geometry;
   const {line, ink} = brand.colors;
   const fillFrom = brand.colors[brand.progressFill.from];
   const fillTo = brand.colors[brand.progressFill.to];
@@ -31,7 +40,7 @@ export const FloatBar: React.FC<{
         style={{
           position: 'absolute',
           inset: 0,
-          width: `${clamped * 100}%`,
+          width: `${marker * 100}%`,
           overflow: 'hidden',
           borderRadius: height / 2,
         }}
@@ -45,7 +54,7 @@ export const FloatBar: React.FC<{
         />
       </div>
       {/* zone ticks */}
-      {ZONES.map((z) => (
+      {zones.map((z) => (
         <div
           key={z}
           style={{
@@ -62,7 +71,7 @@ export const FloatBar: React.FC<{
       <div
         style={{
           position: 'absolute',
-          left: `${clamped * 100}%`,
+          left: `${marker * 100}%`,
           top: -6,
           transform: 'translateX(-50%)',
           width: 0,

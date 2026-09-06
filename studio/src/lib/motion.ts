@@ -45,6 +45,50 @@ const ZETA_LOOSE = 0.3; // damping ratio at exuberance 1
 
 const clamp01 = (v: number): number => Math.min(1, Math.max(0, v));
 
+/** Zero-slope progress at both ends for camera, cursor, and focus transitions. */
+export const smootherstep = (v: number): number => {
+  const t = clamp01(v);
+  return t * t * t * (t * (t * 6 - 15) + 10);
+};
+
+/**
+ * Restrained physical press: approach remains at rest, pressure builds after
+ * the real cue, then releases without a snap or spring overshoot.
+ */
+export const pressScaleAt = (
+  now: number,
+  cue: number,
+  options: {press: number; release: number; depth?: number},
+): number => {
+  const {press, release, depth = 0.1} = options;
+  const elapsed = now - cue;
+  if (elapsed < 0 || elapsed >= press + release) return 1;
+  if (elapsed <= press) return 1 - depth * smootherstep(elapsed / Math.max(1, press));
+  return 1 - depth * (1 - smootherstep((elapsed - press) / Math.max(1, release)));
+};
+
+export type PointerPhase = 'idle' | 'approach' | 'hover' | 'press' | 'release';
+
+/** Semantic pointer state derived only from authored/recorded click times. */
+export const pointerPhaseAt = (
+  cues: number[],
+  now: number,
+  options: {approach: number; hover: number; press: number; release: number},
+): PointerPhase => {
+  const previous = [...cues].reverse().find((cue) => cue <= now);
+  if (previous !== undefined) {
+    const elapsed = now - previous;
+    if (elapsed < options.press) return 'press';
+    if (elapsed < options.press + options.release) return 'release';
+  }
+  const next = cues.find((cue) => cue > now);
+  if (next === undefined) return 'idle';
+  const until = next - now;
+  if (until <= options.hover) return 'hover';
+  if (until <= options.approach) return 'approach';
+  return 'idle';
+};
+
 const dampingRatio = (exuberance: number, overshoot: number): number => {
   const e = clamp01(exuberance);
   const base = Math.pow(ZETA_STIFF, 1 - e) * Math.pow(ZETA_LOOSE, e);

@@ -23,6 +23,7 @@ import {execSync} from 'node:child_process';
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {requireAudioWorkspace} from './lib/sound-design.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -30,7 +31,8 @@ process.on('unhandledRejection', (reason) => {
 });
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const outDir = join(root, 'studio', 'public', 'tenwords', 'audio');
+const workspace = requireAudioWorkspace(root, 'tenwords');
+const outDir = join(workspace.publicDir, 'audio');
 
 // --force              regenerate every line (and music, when --music is on)
 // --force <id,id,...>  regenerate only the listed acts, e.g. --force hook,demo
@@ -106,11 +108,11 @@ const run = (cmd) => execSync(cmd, {cwd: root, encoding: 'utf8', stdio: ['ignore
 // VO: generate missing lines (or forced ones)
 const pending = LINES.filter((l) => shouldForce(l.id) || !existsSync(join(outDir, `${l.id}.mp3`)));
 if (pending.length > 0) {
-  const scriptPath = join(root, 'out', 'tenwords', 'vo-script.json');
+  const scriptPath = join(workspace.marketingDir, 'vo-script.json');
   mkdirSync(dirname(scriptPath), {recursive: true});
   writeFileSync(scriptPath, JSON.stringify({lines: pending}));
   const out = run(
-    `node feeders/audio/client.mjs vo --script "${scriptPath}" --out "${outDir}"${WANT_TIMESTAMPS ? ' --timestamps' : ''}`,
+    `node feeders/audio/client.mjs vo --project "${workspace.projectRoot}" --script "${scriptPath}" --out "${outDir}"${WANT_TIMESTAMPS ? ' --timestamps' : ''}`,
   );
   process.stdout.write(out);
   for (const m of out.matchAll(/vo OK: (.+)\.mp3 (\d+)ms/g)) durations[m[1]] = Number(m[2]);
@@ -141,7 +143,7 @@ for (const l of LINES) {
   if (!WANT_TIMESTAMPS) continue;
   if (!existsSync(join(outDir, `${l.id}.mp3`))) continue;
   const out = run(
-    `node feeders/audio/client.mjs words --file "${join(outDir, `${l.id}.mp3`)}" --text "${l.text.replaceAll('"', '\\"')}" --out "${sidecar}"`,
+      `node feeders/audio/client.mjs words --project "${workspace.projectRoot}" --file "${join(outDir, `${l.id}.mp3`)}" --text "${l.text.replaceAll('"', '\\"')}" --out "${sidecar}"`,
   );
   process.stdout.write(out);
   const j = JSON.parse(readFileSync(sidecar, 'utf8'));
@@ -157,11 +159,11 @@ if (missing.length > 0) {
 // same call Root.tsx's calculateMetadata makes, so a music track built to this
 // length matches the picture exactly.
 const {launchTiming} = await import(new URL('../studio/src/lib/launchTiming.ts', import.meta.url));
-const launchPath = join(root, 'props', 'tenwords-launch.json');
+const launchPath = join(workspace.propsDir, 'tenwords-launch.json');
 const actLengths = existsSync(launchPath)
   ? JSON.parse(readFileSync(launchPath, 'utf8')).actLengths ?? null
   : null;
-const telemetry = JSON.parse(readFileSync(join(root, 'props', 'tenwords-launch-demo.json'), 'utf8')).telemetry;
+const telemetry = JSON.parse(readFileSync(join(workspace.propsDir, 'tenwords-launch-demo.json'), 'utf8')).telemetry;
 const timing = launchTiming(telemetry.durationMs, 3, actLengths, {
   logo: durations.logo,
   hook: durations.hook,
@@ -176,7 +178,7 @@ if (WANT_MUSIC) {
   const musicFile = join(outDir, 'music.mp3');
   if (shouldForce('music') || !existsSync(musicFile)) {
     const out = run(
-      `node feeders/audio/client.mjs music --prompt "${MUSIC_PROMPT}" --length-ms ${totalMs} --out "${musicFile}"`,
+      `node feeders/audio/client.mjs music --project "${workspace.projectRoot}" --prompt "${MUSIC_PROMPT}" --length-ms ${totalMs} --out "${musicFile}"`,
     );
     process.stdout.write(out);
     durations.music = Number(out.match(/music OK: .+ (\d+)ms/)?.[1]);
@@ -186,14 +188,14 @@ if (WANT_MUSIC) {
     durations.music = Number(out.match(/probe OK: .+ (\d+)ms/)?.[1]);
   }
   if (!durations.music) throw new Error('no measured duration for music');
-  music = {src: 'tenwords/audio/music.mp3', durationMs: durations.music};
+  music = {src: 'audio/music.mp3', durationMs: durations.music};
 }
 
 const manifest = {
   music,
   lines: LINES.map((l) => ({
     act: l.id,
-    src: `tenwords/audio/${l.id}.mp3`,
+    src: `audio/${l.id}.mp3`,
     durationMs: durations[l.id],
     text: l.text,
     ...(wordTables[l.id] ? {words: wordTables[l.id].words} : {}),
@@ -205,14 +207,15 @@ const manifest = {
 // assets are staged. tenwords passes hookFold, so LaunchVideo's cueOverride replaces
 // the generic whoosh/tick/riser table with foldCues() (paper-tick + clunk only) —
 // gate on those two files, not the generic trio (direction.md forbids whoosh/riser).
-const sfxLib = ['paper-tick', 'clunk'].map((k) => join(root, 'studio', 'public', 'sfx', `${k}.mp3`));
+const sfxLib = ['paper-tick', 'clunk'].map((k) => join(workspace.publicDir, 'sfx', `${k}.mp3`));
 if (sfxLib.every((f) => existsSync(f))) {
   manifest.sfx = {enabled: true};
   console.log('sfx: library present -> manifest.sfx.enabled = true');
 }
 
-writeFileSync(join(root, 'props', 'tenwords-audio.json'), JSON.stringify(manifest, null, 2) + '\n');
+mkdirSync(workspace.propsDir, {recursive: true});
+writeFileSync(join(workspace.propsDir, 'tenwords-audio.json'), JSON.stringify(manifest, null, 2) + '\n');
 console.log(
-  `wrote props/tenwords-audio.json (${LINES.length} lines, VO-derived film ${timing.total} frames / ${totalMs}ms` +
+  `wrote ${join(workspace.propsDir, 'tenwords-audio.json')} (${LINES.length} lines, VO-derived film ${timing.total} frames / ${totalMs}ms` +
     `${music ? '' : ', music pending the audio-track pass'})`,
 );

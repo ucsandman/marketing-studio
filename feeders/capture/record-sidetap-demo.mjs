@@ -7,7 +7,7 @@
  *   python -c "import sys; sys.path.insert(0,'src'); from phone_harness import viewer; viewer.serve(open_browser=False)"
  * `GET /api/status` must report input:true (touch needs the re-signed WDA).
  *
- * Output: ../../studio/public/sidetap/demo.webm + ../../props/sidetap-demo.json
+ * Output: <project>/marketing/assets/sidetap/{assets,public,props}/
  *
  * The film has two actors. The AGENT drives the phone through phone-harness
  * (a child process, exactly how an LLM would), and the HUMAN drives the viewer
@@ -34,21 +34,25 @@ import {fileURLToPath} from 'node:url';
 import {Recorder} from './recorder.mjs';
 import {cacheKey, checkCache, storeCache} from '../../scripts/lib/cache.mjs';
 import {captureKeyParts} from './capture-cache.mjs';
+import {projectArg, resolveWorkspace} from '../../scripts/lib/workspace.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const PC_ROOT = process.env.PC_ROOT ?? 'C:/Projects/phone-claude';
+const argv = process.argv.slice(2);
+const workspace = resolveWorkspace(ROOT, {brand: 'sidetap', project: projectArg(argv) ?? process.env.PC_ROOT ?? 'C:/Projects/phone-claude'});
+const PC_ROOT = workspace.projectRoot;
 const PORT = process.env.PC_VIEWER_PORT ?? '8770';
 const base = `http://127.0.0.1:${PORT}`;
 const VIEWPORT = {width: 1600, height: 1000};
 const SETTLE_MS = 700;
 
 // --- Footage cache gate (before the app-reachability check or browser launch) ---
-const argv = process.argv.slice(2);
 const FORCE = argv.includes('--force');
 const CHECK_ONLY = argv.includes('--cache-check-only');
-const videoOut = join(ROOT, 'studio', 'public', 'sidetap', 'demo.webm');
-const propsOut = join(ROOT, 'props', 'sidetap-demo.json');
-const CACHE_ARTIFACTS = [videoOut, propsOut];
+const publicDir = join(workspace.publicDir, 'sidetap');
+const videoOut = join(publicDir, 'demo.webm');
+const assetOut = join(workspace.assetsDir, 'demo.webm');
+const propsOut = join(workspace.propsDir, 'sidetap-demo.json');
+const CACHE_ARTIFACTS = [videoOut, assetOut, propsOut];
 const keyParts = captureKeyParts({
   repo: PC_ROOT,
   scriptPath: fileURLToPath(import.meta.url),
@@ -58,14 +62,14 @@ const CACHE_KEY = cacheKey(keyParts);
 const CACHE_ENABLED = keyParts.productHead !== null;
 
 if (CHECK_ONLY) {
-  const {hit} = CACHE_ENABLED ? checkCache('sidetap', 'capture', CACHE_KEY, CACHE_ARTIFACTS) : {hit: false};
+  const {hit} = CACHE_ENABLED ? checkCache(workspace, 'capture', CACHE_KEY, CACHE_ARTIFACTS) : {hit: false};
   console.log(hit ? 'HIT' : 'MISS');
   process.exit(0);
 }
 if (!CACHE_ENABLED) {
   console.log(`capture cache: product git state unavailable at ${PC_ROOT} - caching disabled this run`);
 } else if (!FORCE) {
-  const {hit} = checkCache('sidetap', 'capture', CACHE_KEY, CACHE_ARTIFACTS);
+  const {hit} = checkCache(workspace, 'capture', CACHE_KEY, CACHE_ARTIFACTS);
   if (hit) {
     console.log(`capture cache hit - reusing ${videoOut}`);
     process.exit(0);
@@ -159,7 +163,7 @@ const union = (a, b) => ({
   height: Math.max(a.y + a.height, b.y + b.height) - Math.min(a.y, b.y),
 });
 
-const videoDir = join(ROOT, 'out', 'capture');
+const videoDir = join(workspace.assetsDir, '.capture');
 mkdirSync(videoDir, {recursive: true});
 let browser;
 try {
@@ -311,9 +315,10 @@ tap_text("Start"); time.sleep(1.2)
   await context.close(); // flushes the webm
   const src = await video.path();
 
-  const destDir = join(ROOT, 'studio', 'public', 'sidetap');
-  mkdirSync(destDir, {recursive: true});
-  copyFileSync(src, join(destDir, 'demo.webm'));
+  for (const destDir of [workspace.assetsDir, publicDir]) {
+    mkdirSync(destDir, {recursive: true});
+    copyFileSync(src, join(destDir, 'demo.webm'));
+  }
 
   const props = {
     brandId: 'sidetap',
@@ -321,15 +326,16 @@ tap_text("Start"); time.sleep(1.2)
     cta: 'Clone it free · github.com/ucsandman/sidetap',
     telemetry,
   };
+  mkdirSync(workspace.propsDir, {recursive: true});
   writeFileSync(propsOut, JSON.stringify(props, null, 2) + '\n');
   if (CACHE_ENABLED) {
-    storeCache('sidetap', 'capture', CACHE_KEY, CACHE_ARTIFACTS, {
+    storeCache(workspace, 'capture', CACHE_KEY, CACHE_ARTIFACTS, {
       productRepo: PC_ROOT,
       productHead: keyParts.productHead,
     });
   }
   console.log(`capture OK: ${telemetry.durationMs}ms, ${telemetry.events.length} events`);
-  console.log('wrote studio/public/sidetap/demo.webm and props/sidetap-demo.json');
+  console.log(`wrote ${assetOut}, ${videoOut}, and ${propsOut}`);
 } catch (err) {
   console.error(String(err?.message ?? err));
   process.exitCode = 1;

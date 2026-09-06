@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync, writeFileSync} from 'node:fs';
+import {mkdirSync, mkdtempSync, rmSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {loadBrand, pngWidth, renderDiagram, stylePrelude} from './render.mjs';
+import {loadBrand, pngWidth, renderDiagram, resolveDiagramPaths, stylePrelude} from './render.mjs';
 
 const COLORS = {
   bg: '#101418',
@@ -52,4 +52,39 @@ test('renders five nodes with brand fill, stroke and edge color at the requested
   assert.ok(svg.includes(COLORS.line), 'node stroke is colors.line');
   assert.ok(svg.includes(COLORS.brand), 'edge stroke is colors.brand');
   assert.equal(pngWidth(png), 900);
+});
+
+test('diagram paths default inside the explicit or inferred product repository', () => {
+  const project = mkdtempSync(join(tmpdir(), 'diagram-product-'));
+  mkdirSync(join(project, '.git'));
+  const spec = join(project, 'docs', 'pipeline.d2');
+  mkdirSync(join(project, 'docs'));
+  writeFileSync(spec, SPEC);
+  try {
+    const explicit = resolveDiagramPaths('fixture', spec, ['--project', project]);
+    assert.equal(explicit.specPath, spec);
+    assert.equal(explicit.outDir, join(project, 'marketing', 'assets', 'fixture', 'marketing', 'diagrams'));
+    assert.equal(resolveDiagramPaths('fixture', spec, [], project).workspace.projectSource, 'calling git worktree');
+  } finally {
+    rmSync(project, {recursive: true, force: true});
+  }
+});
+
+test('diagram paths reject product input and output escapes', () => {
+  const project = mkdtempSync(join(tmpdir(), 'diagram-product-'));
+  const outside = mkdtempSync(join(tmpdir(), 'diagram-outside-'));
+  mkdirSync(join(project, '.git'));
+  try {
+    assert.throws(
+      () => resolveDiagramPaths('fixture', join(outside, 'source.d2'), ['--project', project]),
+      /escapes product repository/,
+    );
+    assert.throws(
+      () => resolveDiagramPaths('fixture', 'source.d2', ['--project', project, '--out', outside]),
+      /escapes product repository/,
+    );
+  } finally {
+    rmSync(project, {recursive: true, force: true});
+    rmSync(outside, {recursive: true, force: true});
+  }
 });

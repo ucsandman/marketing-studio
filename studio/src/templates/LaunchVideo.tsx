@@ -2,8 +2,11 @@ import React from 'react';
 import {
   AbsoluteFill,
   Easing,
+  Img,
+  OffthreadVideo,
   Sequence,
   interpolate,
+  staticFile,
   useCurrentFrame,
   useVideoConfig,
 } from 'remotion';
@@ -17,9 +20,14 @@ import {parallaxOffset, settleOn, offsetTransform, settleTransform} from '../lib
 import {useFormat} from '../lib/layout';
 import {telemetrySchema, steps} from '../lib/telemetry';
 import {launchTiming, voTimingFrom} from '../lib/launchTiming';
+import {directionSpecSchema} from '../lib/direction';
+import type {Direction} from '../lib/direction';
+import {buildLaunchShotPlan, launchShotInputSchema} from '../lib/shotPlan';
+import type {LaunchShot} from '../lib/shotPlan';
+import {cameraAtCues} from '../lib/camera';
 import {alignPhraseCues, alignWordCues} from '../lib/wordCues';
 import {foldCues} from '../lib/sfxCues';
-import {audioSchema} from '../lib/audioMix';
+import {audioSchema, timingFromShots} from '../lib/audioMix';
 import {BackgroundLoop} from '../components/BackgroundLoop';
 import {PngSequence} from '../components/PngSequence';
 import {Headline} from '../components/Headline';
@@ -35,6 +43,7 @@ import {CaptionTrack} from '../components/CaptionTrack';
 import {FloatBar} from '../components/FloatBar';
 import {SoundTrack} from '../components/SoundTrack';
 import {FilmGrade} from '../components/FilmGrade';
+import {CameraRig} from '../components/CameraRig';
 import {captionCues} from '../lib/captionTiming';
 import {getMark} from '../brands/marks';
 
@@ -138,6 +147,10 @@ export const launchVideoSchema = z.object({
   // false pins the shared constants. Nullable, defaults null = auto, which engages
   // only when a manifest line carries `words`, so existing renders are unchanged.
   voTiming: z.boolean().nullable().default(null),
+  // New production uses a resolved direction plus an authored, repeatable-source
+  // shot list. Both stay nullable so historical props take the legacy act route.
+  direction: directionSpecSchema.nullable().default(null),
+  shots: z.array(launchShotInputSchema).nullable().default(null),
 });
 
 type Props = z.infer<typeof launchVideoSchema>;
@@ -351,7 +364,195 @@ const FeatureAct: React.FC<{
   );
 };
 
-export const LaunchVideo: React.FC<Props> = ({brandId, kicker, headline, demo, features, cta, command, assets, audio, burnCaptions, motionOverride, actLengths, voTiming, hookFold, hookStamp}) => {
+const DirectedTransition: React.FC<{shot: LaunchShot; direction: Direction; children: React.ReactNode}> = ({shot, direction, children}) => {
+  const frame = useCurrentFrame();
+  const frames = shot.transition.frames;
+  const p = frames === 0 ? 1 : interpolate(frame, [0, frames], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.inOut(Easing.cubic)});
+  const arrivalTransform = direction.edit.rhythm === 'syncopated'
+    ? `translateX(${(1 - p) * direction.motion.travel * 42}px)`
+    : direction.edit.rhythm === 'measured'
+      ? `translateY(${(1 - p) * direction.motion.settle * 22}px)`
+      : undefined;
+  const transitionStyle = shot.transition.kind === 'wipe'
+    ? {clipPath: `inset(0 ${(1 - p) * 100}% 0 0)`, transform: arrivalTransform}
+    : shot.transition.kind === 'dissolve'
+      ? {opacity: p, transform: arrivalTransform}
+      : undefined;
+  return (
+    <AbsoluteFill
+      style={{
+        ...transitionStyle,
+        overflow: 'hidden',
+      }}
+    >
+      {children}
+    </AbsoluteFill>
+  );
+};
+
+const DirectedHook: React.FC<{kicker: string; headline: string; brand: Brand; direction: Direction; copy?: LaunchShot['copy']}> = ({kicker, headline, brand, direction, copy}) => {
+  const {height} = useVideoConfig();
+  const fonts = loadBrandFonts(brand);
+  const treatment =
+    direction.typography.composition === 'instrument'
+      ? 'precision'
+      : direction.typography.composition === 'kinetic'
+        ? 'playful'
+        : 'editorial';
+  const title = direction.typography.casing === 'upper' ? (copy?.title ?? headline).toUpperCase() : copy?.title ?? headline;
+  return (
+    <AbsoluteFill style={{background: brand.colors.bg}}>
+      <Headline kicker={kicker} headline={title} brand={brand} treatment={treatment} footer={copy?.supporting ? <div style={{fontFamily: fonts.body, fontSize: height * 0.035, color: brand.colors.ink2}}>{copy.supporting}</div> : undefined} />
+    </AbsoluteFill>
+  );
+};
+
+const DirectedFeature: React.FC<{feature: Props['features'][number]; brand: Brand; direction: Direction; shot: LaunchShot}> = ({feature, brand, direction, shot}) => {
+  const frame = useCurrentFrame();
+  const {fps} = useVideoConfig();
+  const {width, height} = useVideoConfig();
+  const {orientation} = useFormat();
+  const sourceViewport = shot.sourceViewport ?? {width: 1600, height: 1000};
+  const focusFrames = shot.camera.cadence === 'locked' ? 1 : shot.camera.cadence === 'kinetic' ? 12 : 18;
+  const camera = shot.focus
+    // eslint-disable-next-line @remotion/non-pure-animation -- Timeline metadata, not a CSS transition
+    ? cameraAtCues([{at: 0, subject: shot.focus, scale: shot.scale, transition: focusFrames, hold: Math.max(0, shot.len - focusFrames)}], frame, sourceViewport)
+    : null;
+  const copyIn = brandSpring(frame, fps, brand.motion, {delayFrames: Math.round(direction.motion.stagger * 12)});
+  const treatment = direction.typography.composition === 'instrument' ? 'precision' : direction.typography.composition === 'kinetic' ? 'playful' : 'editorial';
+  const cropWidth = width * (orientation === 'portrait' ? 0.84 : orientation === 'square' ? 0.78 : 0.704);
+  const cropHeight = orientation === 'portrait' ? cropWidth * 0.235 : height * 0.296;
+  const cropLeft = orientation === 'landscape' ? width * 0.073 : (width - cropWidth) / 2;
+  const cropTop = height * (orientation === 'portrait' ? 0.28 : 0.22);
+  const stageScale = cropWidth / sourceViewport.width;
+  const stageTop = (cropHeight - sourceViewport.height * stageScale) / 2;
+  const title = direction.typography.casing === 'upper' ? (shot.copy?.title ?? feature.heading).toUpperCase() : shot.copy?.title ?? feature.heading;
+  const titleScale = (orientation === 'portrait' ? 0.66 : 0.72) * (direction.typography.density === 'compact' ? 1.08 : direction.typography.density === 'airy' ? 1 : 1.04);
+  const glass = direction.material.treatment === 'glass';
+  const shadowY = 10 + direction.material.depth * 56;
+  const shadowBlur = 24 + direction.material.depth * 90;
+  return (
+    <AbsoluteFill style={{background: brand.colors.bg}}>
+      <div style={{position: 'absolute', inset: 0, left: direction.typography.align === 'left' ? width * 0.04 : 0, opacity: copyIn, transform: `translateY(${(1 - copyIn) * direction.motion.travel * 24}px) scale(${titleScale})`, transformOrigin: direction.typography.align === 'left' ? 'top left' : 'top center'}}>
+        <Headline kicker="" headline={title} brand={brand} hideKicker topAlign treatment={treatment} />
+      </div>
+      <div
+        style={{
+          position: 'absolute',
+          top: cropTop,
+          left: cropLeft,
+          width: cropWidth,
+          height: cropHeight,
+          overflow: 'hidden',
+          border: glass ? `10px solid ${brand.colors.surface}${alphaHex(0.72)}` : `1px solid ${brand.colors.line}`,
+          borderTop: direction.material.edge === 'rule' ? `4px solid ${brand.colors.brand}` : undefined,
+          borderRadius: direction.material.edge === 'soft' ? 18 : 2,
+          boxShadow: glass
+            ? `inset 0 1px 0 #ffffff${alphaHex(0.72)}, 0 ${shadowY}px ${shadowBlur}px ${brand.colors.ink}${alphaHex(0.14)}`
+            : `0 ${shadowY}px ${shadowBlur}px ${brand.colors.ink}${alphaHex(0.12)}`,
+          backgroundColor: brand.colors.surface2,
+          backdropFilter: glass ? 'blur(16px)' : undefined,
+        }}
+      >
+        <div style={{position: 'absolute', top: stageTop, width: sourceViewport.width, height: sourceViewport.height, transform: `scale(${stageScale})`, transformOrigin: 'top left'}}>
+          <CameraRig camera={camera} cameraViewport={sourceViewport}>
+            {feature.screenshot ? <Img src={staticFile(feature.screenshot)} style={{width: sourceViewport.width, height: sourceViewport.height}} /> : null}
+          </CameraRig>
+        </div>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+const DirectedDemo: React.FC<{demo: Props['demo']; brand: Brand; shot: LaunchShot}> = ({demo, brand, shot}) => {
+  const {width, height, fps} = useVideoConfig();
+  const viewport = demo.telemetry?.viewport ?? {width: 1600, height: 1000};
+  const cover = Math.max(width / viewport.width, height / viewport.height);
+  const start = shot.source.kind === 'demo' ? shot.source.sourceStartFrame : 0;
+  const frame = useCurrentFrame();
+  return (
+    <AbsoluteFill style={{justifyContent: 'center', alignItems: 'center', background: brand.colors.bg}}>
+      <div style={{width: viewport.width, height: viewport.height, transform: `scale(${cover})`}}>
+        <Sequence from={-start} layout="none">
+          <DemoStage video={demo.video} telemetry={demo.telemetry} timeMs={((frame + start) / fps) * 1000} brand={brand} />
+        </Sequence>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+const DirectedAsset: React.FC<{shot: LaunchShot; brand: Brand}> = ({shot, brand}) => {
+  if (shot.source.kind !== 'asset') return null;
+  const mediaStyle: React.CSSProperties = {width: '100%', height: '100%', objectFit: shot.scale === 'wide' ? 'contain' : 'cover'};
+  return (
+    <AbsoluteFill style={{background: brand.colors.bg}}>
+      {shot.source.media === 'image' ? (
+        <Img src={staticFile(shot.source.path)} style={mediaStyle} />
+      ) : (
+        <Sequence from={-shot.source.sourceStartFrame} layout="none">
+          <OffthreadVideo src={staticFile(shot.source.path)} muted style={mediaStyle} />
+        </Sequence>
+      )}
+    </AbsoluteFill>
+  );
+};
+
+const DirectedEnd: React.FC<{cta: string; command: string | null; headline: string; brand: Brand; direction: Direction}> = ({cta, command, headline, brand, direction}) => {
+  const {height, width} = useVideoConfig();
+  const fonts = loadBrandFonts(brand);
+  const Mark = getMark(brand.id);
+  if (direction.outro.kind === 'command') return <EndCard cta={cta} command={command} brand={brand} />;
+  if (direction.outro.kind === 'lockup') {
+    return (
+      <AbsoluteFill style={{background: brand.colors.bg, justifyContent: 'center', alignItems: 'center', gap: height * 0.05}}>
+        <Mark size={Math.round(height * 0.28)} color={brand.colors.brand} />
+        <div style={{fontFamily: fonts.display, fontWeight: 800, fontSize: height * 0.065, color: brand.colors.ink, textAlign: 'center'}}>{cta}</div>
+      </AbsoluteFill>
+    );
+  }
+  return (
+    <AbsoluteFill style={{background: brand.colors.bg, justifyContent: 'center', padding: `0 ${width * 0.09}px`}}>
+      <div style={{width: width * 0.12, height: 5, background: brand.colors.brand, marginBottom: height * 0.045}} />
+      <div style={{fontFamily: fonts.mono, fontSize: height * 0.026, color: brand.colors.ink3, marginBottom: height * 0.025}}>{headline}</div>
+      <div style={{fontFamily: fonts.display, fontWeight: 800, fontSize: height * 0.078, lineHeight: 1, color: brand.colors.ink, maxWidth: width * 0.72}}>{cta}</div>
+    </AbsoluteFill>
+  );
+};
+
+const DirectedShotContent: React.FC<{shot: LaunchShot; props: Props; brand: Brand; direction: Direction}> = ({shot, props, brand, direction}) => {
+  const frame = useCurrentFrame();
+  const {width, height} = useVideoConfig();
+  const viewport = shot.sourceViewport ?? props.demo.telemetry?.viewport ?? {width: 1600, height: 1000};
+  const focusFrames = shot.camera.cadence === 'locked' ? 1 : shot.camera.cadence === 'kinetic' ? 12 : 18;
+  const camera = shot.focus
+    // eslint-disable-next-line @remotion/non-pure-animation -- Timeline metadata, not a CSS transition
+    ? cameraAtCues([{at: 0, subject: shot.focus, scale: shot.scale, transition: focusFrames, hold: Math.max(0, shot.len - focusFrames)}], frame, viewport)
+    : null;
+  const moving = shot.hero || shot.purpose === 'detail';
+  const turn = moving && shot.camera.cadence === 'kinetic' ? {fromY: -5, toY: -1.2, len: shot.len, perspective: 2600} : null;
+  const dolly = moving && shot.camera.cadence === 'measured' ? [{at: Math.round(shot.len * 0.16), dur: Math.round(shot.len * 0.62), to: 1.035}] : [];
+  const content = (() => {
+    if (shot.source.kind === 'logo') return <LogoAct assets={props.assets} len={shot.len} brand={brand} />;
+    if (shot.source.kind === 'hook') return <DirectedHook kicker={props.kicker} headline={props.headline} brand={brand} direction={direction} copy={shot.copy} />;
+    if (shot.source.kind === 'demo') return <DirectedDemo demo={props.demo} brand={brand} shot={shot} />;
+    if (shot.source.kind === 'feature') {
+      const feature = props.features[shot.source.index];
+      return feature ? <DirectedFeature feature={feature} brand={brand} direction={direction} shot={shot} /> : null;
+    }
+    if (shot.source.kind === 'asset') return <DirectedAsset shot={shot} brand={brand} />;
+    return <DirectedEnd cta={props.cta} command={props.command} headline={props.headline} brand={brand} direction={direction} />;
+  })();
+  return (
+    <DirectedTransition shot={shot} direction={direction}>
+      <CameraRig camera={shot.source.kind === 'feature' ? null : camera} cameraViewport={viewport} turn={shot.source.kind === 'feature' ? null : turn} dolly={shot.source.kind === 'feature' ? [] : dolly} dollyOrigin={`${width / 2}px ${height / 2}px`}>
+        {content}
+      </CameraRig>
+    </DirectedTransition>
+  );
+};
+
+export const LaunchVideo: React.FC<Props> = (props) => {
+  const {brandId, kicker, headline, demo, features, cta, command, assets, audio, burnCaptions, motionOverride, actLengths, voTiming, hookFold, hookStamp, direction, shots} = props;
   const frame = useCurrentFrame();
   const {durationInFrames, fps} = useVideoConfig();
   const {orientation, scale, safe} = useFormat();
@@ -365,6 +566,16 @@ export const LaunchVideo: React.FC<Props> = ({brandId, kicker, headline, demo, f
     actLengths,
     voTimingFrom(audio?.lines ?? null, features.length, {force: voTiming ?? null}),
   );
+  const shotPlan = buildLaunchShotPlan({
+    telemetryDurationMs: demo.telemetry?.durationMs ?? null,
+    featureCount: features.length,
+    lengths: actLengths,
+    vo: voTimingFrom(audio?.lines ?? null, features.length, {force: voTiming ?? null}),
+    direction,
+    shots,
+    fps,
+    demoViewport: demo.telemetry?.viewport ?? null,
+  });
   const cues = burnCaptions && audio ? captionCues(audio.lines, t, fps) : [];
   // Word-locked reveal cues (lib/wordCues). Built ONLY for an act whose manifest line
   // carries measured word times; every other act passes undefined and keeps its
@@ -384,6 +595,36 @@ export const LaunchVideo: React.FC<Props> = ({brandId, kicker, headline, demo, f
           leadFrames: 0,
         })
       : [null, null];
+  const directed = shotPlan.mode === 'directed' && shotPlan.direction;
+  if (directed) {
+    const directedTiming = timingFromShots(shotPlan.shots, audio?.lines.map((line) => line.act));
+    const directedCaptions = burnCaptions && audio ? captionCues(audio.lines, directedTiming, fps) : [];
+    const featureCueFrames = features.map((feature, i) => {
+      const line = cueLine(`feature-${i}`);
+      return line ? alignPhraseCues(feature.lines, line, fps) : [];
+    });
+    return (
+      <AbsoluteFill style={{backgroundColor: brand.colors.bg}}>
+        {shotPlan.shots.map((shot) => (
+          <Sequence key={shot.id} name={shot.id} from={shot.from} durationInFrames={shot.len}>
+            <DirectedShotContent shot={shot} props={props} brand={brand} direction={directed} />
+          </Sequence>
+        ))}
+        {audio ? (
+          <SoundTrack
+            audio={audio}
+            timing={directedTiming}
+            shots={shotPlan.shots}
+            featureLineCounts={features.map((feature) => feature.lines.length)}
+            featureCueFrames={featureCueFrames}
+            motion={m}
+          />
+        ) : null}
+        {directedCaptions.length ? <CaptionTrack cues={directedCaptions} brand={brand} /> : null}
+        <FilmGrade grade={brand.grade} accent={brand.colors.brand} />
+      </AbsoluteFill>
+    );
+  }
   // Three depth planes for the flat comp: the loop backdrop drifts most (far), the
   // wash sits mid, act content drifts least (near). Per-layer seeds keep the planes
   // from drifting in lockstep. At motion.parallax 0 every transform is '' and the

@@ -19,6 +19,7 @@ import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
 import {TOTAL} from '../studio/src/films/dashclaw/timeline.ts';
+import {requireAudioWorkspace} from './lib/sound-design.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -26,6 +27,7 @@ process.on('unhandledRejection', (reason) => {
 });
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const workspace = requireAudioWorkspace(root, 'dashclaw');
 const FPS = 30;
 
 // Narration, transcribed from film-spec.md's table. `at` is the film second the
@@ -74,7 +76,7 @@ const forceIdx = argv.indexOf('--force');
 const forceList = forceIdx >= 0 ? (argv[forceIdx + 1] && !argv[forceIdx + 1].startsWith('--') ? argv[forceIdx + 1].split(',') : ['*']) : [];
 const shouldForce = (id) => forceList.includes('*') || forceList.includes(id);
 
-const publicDir = join(root, 'studio', 'public', 'dashclaw', 'film-audio');
+const publicDir = join(workspace.publicDir, 'film-audio');
 mkdirSync(publicDir, {recursive: true});
 const run = (cmd) => execSync(cmd, {cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit']});
 
@@ -83,14 +85,14 @@ const pending = LINES.filter((l) => shouldForce(l.id) || !existsSync(join(public
 if (pending.length) {
   const scriptPath = join(publicDir, 'script.json');
   writeFileSync(scriptPath, JSON.stringify({lines: pending}));
-  const out = run(`node feeders/audio/client.mjs vo --script "${scriptPath}" --out "${publicDir}" --brand dashclaw --timestamps`);
+  const out = run(`node feeders/audio/client.mjs vo --project "${workspace.projectRoot}" --script "${scriptPath}" --out "${publicDir}" --brand dashclaw --timestamps`);
   process.stdout.write(out);
 }
 
 // Music: exact film length from the feeder.
 const musicFile = join(publicDir, 'music.mp3');
 if (shouldForce('music') || !existsSync(musicFile)) {
-  const out = run(`node feeders/audio/client.mjs music --prompt "${MUSIC_PROMPT}" --length-ms ${Math.round((TOTAL / FPS) * 1000)} --out "${musicFile}"`);
+  const out = run(`node feeders/audio/client.mjs music --project "${workspace.projectRoot}" --prompt "${MUSIC_PROMPT}" --length-ms ${Math.round((TOTAL / FPS) * 1000)} --out "${musicFile}"`);
   process.stdout.write(out);
 }
 
@@ -107,7 +109,7 @@ const lines = LINES.map((l) => {
   return {
     id: l.id,
     text: l.text,
-    src: `dashclaw/film-audio/${l.id}.mp3`,
+    src: `film-audio/${l.id}.mp3`,
     startMs: Math.round(l.at * 1000),
     durationMs: probeMs(join(publicDir, `${l.id}.mp3`)),
     words,
@@ -119,11 +121,12 @@ const manifest = {
   composition: 'DashClawFilm',
   fps: FPS,
   totalFrames: TOTAL,
-  music: {src: 'dashclaw/film-audio/music.mp3', durationMs: probeMs(musicFile)},
+  music: {src: 'film-audio/music.mp3', durationMs: probeMs(musicFile)},
   lines,
   sfx: SFX,
 };
-const outPath = join(root, 'props', 'dashclaw-film-audio.json');
+mkdirSync(workspace.propsDir, {recursive: true});
+const outPath = join(workspace.propsDir, 'dashclaw-film-audio.json');
 writeFileSync(outPath, JSON.stringify(manifest, null, 2) + '\n');
 console.log(`wrote ${outPath}: ${lines.length} VO lines, ${SFX.length} sfx cues, music ${manifest.music.durationMs}ms`);
 

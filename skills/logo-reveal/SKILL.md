@@ -8,8 +8,9 @@ description: Use when the user wants a logo reveal / logo animation / brand intr
 **REQUIRED BACKGROUND:** marketing-studio skill (engine location, brand onboarding,
 PLAYBOOK gotchas). Work happens in `${CLAUDE_SKILL_DIR}/../..`.
 
-Produces: `out/<brand>/logo-reveal.mp4` — 3s Blender 3D draw-on of the brand mark
-composited in Remotion over the brand backdrop with wordmark + CTA (5s total).
+Produces a product-owned logo animation under
+`<product>/marketing/assets/<brand>/`. The mark's construction, product verb, material,
+or environment determines the reveal; a generic glow-and-hold is not the default.
 
 ## Recipe
 
@@ -18,13 +19,13 @@ composited in Remotion over the brand backdrop with wordmark + CTA (5s total).
    `logo_reveal.py` (noban) and swap ONLY the geometry builders to the new mark's
    SVG shapes — materials/choreography/camera/alpha/args are brand-agnostic. Read the
    PLAYBOOK's Blender 5.1.2 gotchas FIRST (cleanup, emission 1.0, non-cyclic splines).
-3. Proof frames: `python feeders/blender/render.py <scene> --out assets/<brand>/logo-reveal --frame 20|55|90`,
+3. Proof frames: `python feeders/blender/render.py <scene> --brand <brand> --project <product> --frame 20|55|90`,
    Read each; verify draw-on progression + transparent alpha (corner pixel alpha 0).
 4. Animation render (`--animation`, ~30s), then
-   `node scripts/stage-blender-assets.mjs <brandId>` (stages every rendered sequence
-   under `assets/<brandId>/` into `studio/public/<brandId>/`).
+   `node scripts/stage-blender-assets.mjs <brand> --project <product>`; product assets
+   and public staging stay in the same product workspace.
 5. Composite: render the `LogoReveal` composition with
-   `--props='{"brandId":"<id>","sequence":"<id>/logo-reveal","frameCount":90,"cta":"<brand cta>"}'`.
+   product-owned props, output, and `--public-dir=<product>/marketing/assets/<brand>/public`.
    Inspect stills at frames 30/80/130 (mid-draw / wordmark in / full lockup, CTA in
    the brand's accent-positive color).
-6. Deliver per marketing-studio (copy into calling repo + send to user).
+6. Deliver the product-owned artifact per marketing-studio.

@@ -15,7 +15,7 @@ export const DemoStage: React.FC<{
 }> = ({video, telemetry, timeMs, brand}) => {
   const Mark = getMark(brand.id);
   const vp = telemetry?.viewport ?? {width: 1600, height: 1000};
-  const cam = cameraAt(telemetry ? focuses(telemetry) : [], timeMs, vp);
+  const cam = cameraAt(telemetry ? focuses(telemetry) : [], timeMs, vp, {scale: 'auto'});
   const clickList = telemetry ? clicks(telemetry) : [];
   return (
     <div

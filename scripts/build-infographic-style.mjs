@@ -7,8 +7,8 @@
 // invent a palette. This emits that file from brands/<id>.json instead, so an
 // infographic for a product renders on the product's own tokens.
 //
-// Usage: node scripts/build-infographic-style.mjs <brand> [--out path]
-// Output: out/<brand>/marketing/infographic-style.md (default)
+// Usage: node scripts/build-infographic-style.mjs <brand> --project <repo> [--out path]
+// Output: the product-owned marketing/infographic-style.md (default)
 //
 // VALIDATION: studio/src/lib/brand.ts cannot be imported from a plain script —
 // it statically imports the seven registered brands/*.json without the
@@ -21,6 +21,7 @@ import {readFileSync, mkdirSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join, resolve} from 'node:path';
 import {parseForbiddenColors} from './judge-palette.mjs';
+import {projectArg, resolveWorkspace, resolveWorkspacePath} from './lib/workspace.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -341,15 +342,17 @@ function main() {
   const outFlag = argv.indexOf('--out');
   const outPath = outFlag === -1 ? null : argv[outFlag + 1];
   if (outFlag !== -1 && !outPath) throw new Error('build-infographic-style: --out needs a path');
-  const brandId = argv.find((a, i) => !a.startsWith('--') && !(outFlag !== -1 && i === outFlag + 1));
+  const projectFlag = argv.indexOf('--project');
+  const brandId = argv.find((a, i) => !a.startsWith('--') && !(outFlag !== -1 && i === outFlag + 1) && !(projectFlag !== -1 && i === projectFlag + 1));
   if (!brandId) {
-    console.error('usage: node scripts/build-infographic-style.mjs <brand> [--out path]');
+    console.error('usage: node scripts/build-infographic-style.mjs <brand> --project <repo> [--out path]');
     process.exit(2);
   }
 
   const brand = readBrand(join(root, 'brands', `${brandId}.json`));
   const doc = buildStyleDoc(brand);
-  const dest = outPath ? resolve(outPath) : join(root, 'out', brandId, 'marketing', 'infographic-style.md');
+  const workspace = resolveWorkspace(root, {brand: brandId, project: projectArg(argv)});
+  const dest = outPath ? resolveWorkspacePath(workspace, outPath) : join(workspace.marketingDir, 'infographic-style.md');
   mkdirSync(dirname(dest), {recursive: true});
   writeFileSync(dest, doc, 'utf8');
 

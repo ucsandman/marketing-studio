@@ -2,11 +2,7 @@
 
 [![verify](https://github.com/ucsandman/marketing-studio/actions/workflows/verify.yml/badge.svg)](https://github.com/ucsandman/marketing-studio/actions/workflows/verify.yml)
 
-An agent-driven marketing studio for Claude Code. You type `/marketing` in your product's repo; the agent onboards your brand, films your app, renders a full marketing asset suite in this engine, and copies the finished files back to you. Then `/launch` takes the product public: domain, payments, comms, and posting to X, LinkedIn, Facebook, Reddit, Bluesky and YouTube with the rendered videos attached, dry-run by default.
-
-![Animated OG loop rendered by the studio](examples/sidetap/readme.gif)
-
-*An animated OG loop the studio rendered for a real product, from brand tokens alone. More in [`examples/`](examples/).*
+An agent-driven marketing studio for Claude Code. You type `/marketing` in your product's repo; the agent onboards your brand, films your app, and writes the complete asset suite and its review evidence into that product repo. Then `/launch` takes the product public: domain, payments, comms, and posting to X, LinkedIn, Facebook, Reddit, Bluesky and YouTube with the rendered videos attached, dry-run by default.
 
 ## The one command
 
@@ -25,7 +21,7 @@ One run produces, in order:
 | 5 | Social clips per platform (X, LinkedIn, TikTok) | `/social-clip` |
 | 6 | OG image, animated OG loop, README GIF | `/og-assets` |
 
-The order is deliberate: the cheapest composition renders first so brand-token bugs surface before the expensive assets, the demo is filmed once and its footage feeds everything downstream, and audio is scored only after the launch video is picture-locked. The run keeps a manifest on disk, so a died session resumes where it stopped instead of starting over.
+The order is deliberate: the cheapest composition renders first so brand-token bugs surface before the expensive assets, and the demo is filmed once so its footage can feed downstream work. Audio starts during direction with a scratch voice/music animatic; the final mix is scored against the approved picture. The run keeps a manifest on disk, so a died session resumes where it stopped instead of starting over.
 
 Around those assets, the pipeline adds:
 
@@ -34,10 +30,10 @@ Around those assets, the pipeline adds:
 - **A film grade and per-brand motion personality.** Grain, vignette, and bloom tuned per brand, and a `motion` token block so each brand's choreography feels like itself. Grain size is stated at 1080p and scaled by frame height, so an asset carries the same visual grain at 4K. Optional `halation` blooms wherever the frame is *actually* bright rather than glowing a fixed spot, which is the difference between footage that reads photographed and a flat vector comp.
 - **An export matrix.** The picture-locked launch video and social clips fan into 16:9, 9:16, 1:1, and 4:5 through responsive layout (not crops), with burned-caption variants for muted autoplay and SRT/VTT sidecars.
 - **Mission Control.** A local click-to-approve gallery: watch assets land, review act-boundary contact sheets before the expensive render, approve or request a redo with a note, and the run reacts — no terminal required.
-- **Designed sound.** Whooshes on act cuts, ticks on feature reveals, and a riser into the CTA, generated once as a shared SFX library and mixed under the voiceover automatically.
+- **Designed sound.** Explicit shot events can request sparse ticks, transitions, or a CTA rise from the shared SFX library. Cuts do not receive automatic whooshes.
 - **Word-locked sync.** Voiceover lines carry word-level timestamps; when they do, act lengths derive from the measured voice and reveals land on the words that name them, with `judge-av-sync` verifying every cue against the timings. Wordless manifests render exactly as before.
 - **A mastered mix.** Final renders pass a two-pass loudness master to -14 LUFS with a true-peak ceiling, measured in the delivered file rather than trusted from the filter graph, plus SFX asset leveling and per-cue audibility proof.
-- **A direction pass.** Before a launch film is built, three genuinely different visual directions are written and two are killed (`docs/templates/DIRECTION.md`), and iteration renders are versioned v1, v2, ... so a fix can be proven and an earlier cut recovered.
+- **A direction pass.** Finite presets help explore alternatives, but they do not guarantee originality or a fixed number of useful directions. The chosen direction records the product-specific metaphor, references, sound intent, and iteration history.
 - **A set judge, not just file judges.** Seven mechanical gates run before any human looks: motion craft, palette, A/V sync, demo dead air, size budgets, audio presence (`check-audio`: every delivered film carries a mastered track with narration), and `judge-drift`, which scores the whole output directory *as a set*. That last one catches the failure no per-file gate can see — assets that are each individually on-brand but collectively fragment into three or four different-looking brands. It emits a worst-first review grid, because attention is reliable over about six tiles, not twenty.
 - **Paste-ready post kits and a footage cache.** Every platform gets a folder with the right-aspect video, a lint-gated caption, alt text, and a posting checklist; the kit root also carries `manifest.json`, a machine-readable index that the `launch/` CLI reads to auto-attach videos to X, LinkedIn, Bluesky and YouTube posts, plus `LICENCES.md` and `DISCLOSURE.md` — what is synthetic, which platform toggle to set at upload, and which obligations the kit does *not* yet cover. Unchanged product UIs are never re-filmed thanks to content-hash caching of capture and Blender staging.
 
@@ -45,37 +41,35 @@ Each asset also works standalone: run `/logo-reveal`, `/product-demo`, `/launch-
 
 `/ship-it` chains the two halves: `/marketing` renders the suite, then `/launch` posts it with the videos attached, through the same approval gates.
 
-## Example output
+## Proof and review
 
-Everything below was produced by one `/marketing` run against a real product, unedited. Turn the sound on: the voiceover and music are generated too.
-
-### sidetap.io (drive a real iPhone from Windows)
-
-<!-- For inline playback, drag examples/sidetap/launch.mp4 into a GitHub comment box
-     and paste the resulting user-attachments URL on its own line here. -->
-
-| File | Asset |
-|------|-------|
-| [`launch.mp4`](examples/sidetap/launch.mp4) | 88s launch video with generated voiceover and music |
-| [`demo.mp4`](examples/sidetap/demo.mp4) | Product demo filmed against a live iPhone, with measured camera zooms |
-| [`logo-reveal.mp4`](examples/sidetap/logo-reveal.mp4) | Blender draw-on logo reveal |
-| [`social-x.mp4`](examples/sidetap/social-x.mp4), [`social-linkedin.mp4`](examples/sidetap/social-linkedin.mp4) | Per-platform social clips |
-| [`og.png`](examples/sidetap/og.png), [`og.gif`](examples/sidetap/og.gif), [`og.mp4`](examples/sidetap/og.mp4) | OG image, loop, and video |
-| [`readme.gif`](examples/sidetap/readme.gif) | README-sized GIF (the one at the top of this page) |
+Every run keeps its media beside the product that owns it under
+`marketing/assets/<brand>/`. Mission Control shows the full film, shot samples, and
+review controls from that workspace. A deliverable production run hashes its
+direction, shot plan, every routed props source including caption/audio-bearing
+variants, canonical staged-public inventory, final render, samples, and review.
+Review identity is a local operator attestation, not authenticated identity. Live
+publishing revalidates the current bytes and production verdict before upload. The
+current four-shot, 782-frame proof has 12 measured samples and zero failures, but
+remains incomplete on nine human stage/full-film checks; it is not an agency-quality
+claim. See [Production quality](docs/production-quality.md) for the acceptance
+contract and [the playbook](docs/PLAYBOOK.md) for the exact commands.
 
 ## How it works
 
-- **One engine, many brands.** All rendering happens in this repo, never in your product's repo. Finished assets are copied out at the end.
+- **One engine, many brands.** Reusable rendering source lives here; every run writes its generated inputs, evidence, renders, and delivery assets into the product repo under `marketing/assets/<brand>/`.
 - **Remotion is the backbone.** Every final video renders through Remotion compositions in `studio/` (SocialClip, ProductDemo, LogoReveal, LaunchVideo, AnimatedOG, AgentSession for a scripted Claude Code terminal).
 - **Brands are data.** `brands/<id>.json` holds your product's tokens (13 colors, 3 fonts, tagline, voice rules), zod-validated. Templates resolve `getBrand(brandId)` and never hardcode brand values, so a new product is a JSON file and a logo mark component, not a fork.
-- **Feeders produce raw material.** Playwright records your running app for demos, headless Blender renders 3D logo reveals, ElevenLabs generates voiceover and music, and ComfyUI can add AI backdrops. Every feeder degrades cleanly when its dependency is missing.
+- **Feeders produce raw material.** Playwright records your running app for demos, headless Blender renders 3D plates, ElevenLabs generates voiceover and music, and ComfyUI can add AI backdrops. Missing required tools produce clear errors; only routes with an explicit documented fallback continue without them.
 - **The knowledge lives in the skills.** The `skills/` directory ships the Claude Code skills that operate this repo, including the hard-won gotchas in `docs/PLAYBOOK.md` (camera math, seamless-loop rules, Blender API traps) so the agent does not re-derive them.
+
+The creative acceptance contract, product-owned workspace, baseline evidence, and strict production gate are documented in [Production quality](docs/production-quality.md).
 
 ## Requirements
 
 Required: [Claude Code](https://claude.com/claude-code), Node 22+ for the studio and Node 24+ for `launch/` (the versions CI exercises), Python 3.10+, and **ffmpeg on your PATH** (26 scripts shell out to `ffmpeg`/`ffprobe` directly).
 
-Optional, each degrading cleanly when absent: Blender for 3D logo reveals, an ElevenLabs API key for voiceover and music, ComfyUI for AI backdrops.
+Optional: Blender for 3D plates, an ElevenLabs API key for voiceover and music, and ComfyUI for AI backdrops. A workflow must select an explicit fallback before treating any missing optional tool as non-blocking.
 
 **Remotion licence.** Every final video renders through [Remotion](https://www.remotion.dev/), which is free for individuals and for companies of three people or fewer. Larger companies need a Remotion company licence. That is Remotion's term, separate from this repo's MIT licence.
 
@@ -89,6 +83,11 @@ Optional, each degrading cleanly when absent: Blender for 3D logo reveals, an El
 ```
 
 Plugin skills are namespaced, so the commands are `/marketing-studio:marketing`, `/marketing-studio:logo-reveal`, and so on.
+
+The current plugin version is **2.0.0**. Migrating from 1.x requires a product
+repository for every production run: pass `--project <product-repo>` (or invoke a
+supported tool from that product worktree). Generated inputs and outputs no longer
+default to the installed engine or its legacy `out/` tree.
 
 The engine ships with the plugin, but its npm dependencies do not. Bootstrap once by asking Claude to *"bootstrap the marketing studio engine"*, or run it yourself against the installed plugin directory:
 
@@ -108,7 +107,7 @@ cp .env.example .env            # set BLENDER_PATH / ELEVENLABS_API_KEY if you h
 node scripts/install-skills.mjs # installs /marketing and friends into ~/.claude/skills
 ```
 
-Installing from source gives you unnamespaced commands (`/marketing` rather than `/marketing-studio:marketing`) and keeps renders in the clone instead of the plugin cache. Use this one if you intend to work on the engine itself.
+Installing from source gives you unnamespaced commands (`/marketing` rather than `/marketing-studio:marketing`). Renderer source stays in the clone; production inputs and outputs still belong to the selected product repository. Use this path if you intend to work on the engine itself.
 
 Then, from your product's repo:
 
@@ -159,19 +158,19 @@ feeders/audio/     ElevenLabs client (voiceover + music)
 feeders/comfy/     ComfyUI client (optional AI backdrops)
 skills/            the Claude Code skills that drive all of this (rendering and launch)
 launch/            distribution layer: the launch CLI + guarded dashboard (own package)
-examples/          real output: the full asset suite for one shipped product
 scripts/           props builders, staging, statics, smoke, copy linter, brief
                    gatherer, storyboard board, export matrix, captions, thumbs,
                    post kit, contact sheets, footage cache, SFX library,
                    Mission Control review server
-props/             generated render props (edit via their builder scripts only)
 docs/PLAYBOOK.md   the operational reference: engine map, onboarding, gotchas
 docs/DECISIONS.md  durable architecture decisions, newest first
 reference/         read-only reference material carried in from retired repos
 launch.py          single-command health check + Remotion Studio
 ```
 
-`out/`, `assets/`, and `studio/public/*/` are build products and stay untracked.
+Engine-local `out/`, `assets/`, `props/`, `examples/`, and
+`studio/public/*/` are not product-run destinations. Generated product assets belong
+under the product repo's `marketing/assets/<brand>/` workspace.
 
 ## Manual controls
 
@@ -180,22 +179,21 @@ Everything the skills do can be run by hand:
 ```bash
 python launch.py                    # health checks + Remotion Studio
 node scripts/smoke.mjs              # frame-0 still of every composition
-cd studio && npx remotion render LogoReveal ../out/<brand>/logo.mp4 \
-  --props='{"brandId":"<brand>","cta":"..."}'
-node scripts/lint-copy.mjs props/<brand>-launch.json   # no-slop copy gate
-node scripts/render-matrix.mjs <brand> --stills-only   # 16:9/9:16/1:1/4:5 fan-out
-node scripts/build-captions.mjs <brand> --check        # SRT/VTT sidecars
-node scripts/mission-control.mjs <brand>               # click-to-approve run console
-node scripts/master-audio.mjs out/<brand>/launch.mp4   # -14 LUFS master, verified in the delivered file
-node scripts/verify-cue.mjs out/<brand>/launch.mp4 2 1.5  # prove a sound cue is audible in a window
+node scripts/build-launch-props.mjs <brand> --project <product>
+node scripts/lint-copy.mjs <product>/marketing/assets/<brand>/props/<brand>-launch.json
+node scripts/render-matrix.mjs <brand> --project <product> --production --stills-only
+node scripts/build-captions.mjs <brand> --project <product> --check
+node scripts/mission-control.mjs <brand> --project <product>
+node scripts/master-audio.mjs <product>/marketing/assets/<brand>/launch.mp4 --project <product>
+node scripts/verify-cue.mjs <product>/marketing/assets/<brand>/launch.mp4 2 1.5
 node scripts/judge-motion.mjs <brand>                  # motion-craft + motion/grade token bands
-node scripts/judge-drift.mjs <brand>                   # scores out/<brand>/ as a SET; writes a worst-first review grid
-node scripts/build-postkit.mjs <brand>                 # per-platform kits + LICENCES.md + DISCLOSURE.md
+node scripts/judge-drift.mjs <brand> --project <product>
+node scripts/build-postkit.mjs <brand> --project <product> --production
 node launch/dist/index.js post <product-dir> --all      # preview every platform post with the kit attached (dry-run is the default)
 node launch/dist/index.js post <product-dir> --all --live   # publish for real, through the ledger and media pre-flight
-node scripts/publish-bluesky.mjs <brand> --dry-run     # Mission Control's Publish button still runs this; the same publisher is a launch/ provider
-node scripts/publish-youtube.mjs <brand> --dry-run     # same: private by default, --auth once; also a launch/ provider
-node scripts/fetch-results.mjs <brand>                 # engagement per hook variant from X, Bluesky and YouTube into results.json
+node scripts/publish-bluesky.mjs <brand> --project <product> --dry-run
+node scripts/publish-youtube.mjs <brand> --project <product> --dry-run
+node scripts/fetch-results.mjs <brand> --project <product>
 ```
 
 `docs/PLAYBOOK.md` has the full engine map: every feeder, builder script, and render command, plus the verified gotchas.
@@ -206,14 +204,14 @@ node scripts/fetch-results.mjs <brand>                 # engagement per hook var
 2. Register it in `studio/src/lib/brand.ts` and add a mark component in `studio/src/brands/`.
 3. `cd studio && npm test` validates the schema.
 
-Only `id`, `name`, `tagline`, `url`, `colors` (13), `fonts` (3) and `voice` are required. Every other block is optional and defaults to the value it was hardcoded to before the token existed, so a brand that omits it renders byte-identically:
+Only `id`, `name`, `tagline`, `url`, `colors` (13), `fonts` (3) and `voice` are required. Other blocks are optional. Most retain legacy defaults; `progressTreatment` intentionally defaults to `none`, and only NoBan opts into the `cs2-wear` FloatBar treatment.
 
 | Block | What it tunes |
 |-------|---------------|
 | `motion` | Choreography personality — `tempo`, `exuberance`, `stagger`, `overshoot`, `parallax`, `settle`, `textReveal`. Retunes every entrance without moving a rest position. |
 | `grade` | The film pass — `grain`, `grainSize` (stated at 1080p, scaled by frame height), `halation` (highlight bloom that samples the frame), `vignette`, `bloom`, `aberration`, `letterbox`. |
 | `effects` | `wash` and `glow` behind the mark. Brands whose rules forbid a hero wash set `wash: 0`. |
-| `textAccent`, `progressFill` | Which color tokens carry small colored text and the progress gradient. |
+| `textAccent`, `progressTreatment`, `progressFill` | Colored text plus an optional progress treatment. `none` is the default; only NoBan selects `cs2-wear`. |
 | `speechHint` | How the brand name is SPOKEN when that differs from how it is written. The transcriber cannot read a coined word it has never seen, so the audio judge primes it with this. |
 
 `voice` is not decoration — it is parsed. `judge-palette` reads "never <color>" rules out of it and fails renders that violate them, so write the real constraints there.
@@ -229,7 +227,8 @@ python launch.py --check   # toolchain health
 node scripts/smoke.mjs     # renders frame 0 of every composition; must stay green
 cd studio && npm test      # brand schema, motion standards, timing libs
 cd studio && npm run lint  # eslint + tsc
-node --test scripts/*.test.mjs feeders/capture/*.test.mjs feeders/audio/*.test.mjs feeders/comfy/*.test.mjs  # script-side gates (judges, postkit, drift descriptors); same command CI runs
+node --test scripts/*.test.mjs scripts/lib/*.test.mjs feeders/capture/*.test.mjs feeders/audio/*.test.mjs feeders/comfy/*.test.mjs
+python -m unittest discover -s feeders -p 'test_workspace.py' -v
 ```
 
 Every asset prop is nullable with a placeholder, so the smoke test passes on a clean clone with no captures, no Blender, and no API keys.

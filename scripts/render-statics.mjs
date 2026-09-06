@@ -5,10 +5,12 @@ import {copyFileSync, existsSync, mkdirSync, writeFileSync} from 'node:fs';
 import {execSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const hero = join(root, 'assets', 'noban', 'comfy', 'hero.png');
-const staged = join(root, 'studio', 'public', 'noban', 'hero.png');
+const workspace = resolveWorkspace(root, {brand: 'noban', project: projectArg(process.argv.slice(2))});
+const hero = join(workspace.assetsDir, 'comfy', 'hero.png');
+const staged = join(workspace.publicDir, 'noban', 'hero.png');
 
 let heroImage = null;
 if (existsSync(hero)) {
@@ -28,13 +30,13 @@ const props = {
   loopSequence: 'noban/background-loop',
   loopFrames: 240,
 };
-const propsPath = join(root, 'out', 'noban', 'og-props.json');
+const propsPath = join(workspace.brandRoot, 'og-props.json');
 mkdirSync(dirname(propsPath), {recursive: true});
 writeFileSync(propsPath, JSON.stringify(props));
 
 const render = (args, out) => {
   console.log(`render: ${out}`);
-  execSync(`npx remotion render AnimatedOG "${join(root, 'out', 'noban', out)}" --props="${propsPath}" ${args}`, {
+  execSync(`npx remotion render AnimatedOG "${join(workspace.brandRoot, out)}" --props="${propsPath}" --public-dir="${workspace.publicDir}" ${args}`, {
     cwd: join(root, 'studio'),
     stdio: 'inherit',
   });

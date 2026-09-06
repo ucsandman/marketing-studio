@@ -6,16 +6,19 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import http from 'node:http';
 import {mapVerdicts, runPull} from './pull-magnetic-verdicts.mjs';
+import {resolveWorkspace} from './lib/workspace.mjs';
+
+const engineRoot = join(import.meta.dirname, '..');
 
 // --- mapVerdicts -------------------------------------------------------------
 
 const MANIFEST = {
   proposedAt: '2026-07-13T00:00:00.000Z',
   assets: [
-    {key: 'logo-reveal', file: 'out/dashclaw/logo-reveal.mp4', fileName: 'logo-reveal.mp4', assetId: 'asset-1'},
-    {key: 'demo', file: 'out/dashclaw/demo.webm', fileName: 'demo.webm', assetId: 'asset-2'},
-    {key: 'social-x', file: 'out/dashclaw/social-x.mp4', fileName: 'social-x.mp4', assetId: 'asset-3'},
-    {key: 'launch-video', file: 'out/dashclaw/launch.mp4', fileName: 'launch.mp4'}, // import failed: no assetId
+    {key: 'logo-reveal', file: 'marketing/assets/dashclaw/logo-reveal.mp4', fileName: 'logo-reveal.mp4', assetId: 'asset-1'},
+    {key: 'demo', file: 'marketing/assets/dashclaw/demo.webm', fileName: 'demo.webm', assetId: 'asset-2'},
+    {key: 'social-x', file: 'marketing/assets/dashclaw/social-x.mp4', fileName: 'social-x.mp4', assetId: 'asset-3'},
+    {key: 'launch-video', file: 'marketing/assets/dashclaw/launch.mp4', fileName: 'launch.mp4'}, // import failed: no assetId
     {key: 'audio-track', skipped: true},
   ],
 };
@@ -81,14 +84,17 @@ test('mapVerdicts: empty/missing manifest assets yields no verdicts', () => {
 // --- runPull (fixture manifest + stub HTTP sidecar) --------------------------
 
 function tmpRoot() {
-  return mkdtempSync(join(tmpdir(), 'pull-magnetic-verdicts-test-'));
+  const root = mkdtempSync(join(tmpdir(), 'pull-magnetic-verdicts-test-'));
+  mkdirSync(join(root, '.git'));
+  return root;
 }
 
 function writeManifest(root, brand, manifest) {
-  const dir = join(root, 'out', brand, 'marketing');
+  const workspace = resolveWorkspace(engineRoot, {brand, project: root});
+  const dir = workspace.marketingDir;
   mkdirSync(dir, {recursive: true});
   writeFileSync(join(dir, 'magnetic-review.json'), JSON.stringify(manifest));
-  return dir;
+  return {dir, workspace};
 }
 
 function startStub(handlers) {
@@ -127,8 +133,8 @@ async function withEnv(overrides, fn) {
 const SIMPLE_MANIFEST = {
   proposedAt: '2026-07-13T00:00:00.000Z',
   assets: [
-    {key: 'logo-reveal', file: 'out/dashclaw/logo-reveal.mp4', fileName: 'logo-reveal.mp4', assetId: 'asset-1'},
-    {key: 'demo', file: 'out/dashclaw/demo.webm', fileName: 'demo.webm', assetId: 'asset-2'},
+    {key: 'logo-reveal', file: 'marketing/assets/dashclaw/logo-reveal.mp4', fileName: 'logo-reveal.mp4', assetId: 'asset-1'},
+    {key: 'demo', file: 'marketing/assets/dashclaw/demo.webm', fileName: 'demo.webm', assetId: 'asset-2'},
     {key: 'audio-track', skipped: true},
   ],
 };
@@ -138,14 +144,14 @@ const TIMELINE_TEXT =
 
 test('runPull: happy path — writes review.json in Mission Control\'s exact array/atomic-write shape', async () => {
   const root = tmpRoot();
-  const marketingDir = writeManifest(root, 'dashclaw', SIMPLE_MANIFEST);
+  const {dir: marketingDir, workspace} = writeManifest(root, 'dashclaw', SIMPLE_MANIFEST);
   const {server} = await startStub({
     read_timeline: () => ({status: 200, payload: {result: {ok: true, text: TIMELINE_TEXT}}}),
   });
   try {
     const {port} = server.address();
     const verdicts = await withEnv({MAGNETIC_AGENT_PORT: String(port), MAGNETIC_AGENT_TOKEN: 'x'}, () =>
-      runPull({root, brand: 'dashclaw'}),
+      runPull({root: engineRoot, brand: 'dashclaw', workspace}),
     );
 
     assert.deepEqual(verdicts, {
@@ -180,7 +186,7 @@ test('runPull: happy path — writes review.json in Mission Control\'s exact arr
 
 test('runPull: merges onto an existing review.json (mission-control\'s own redo entries survive)', async () => {
   const root = tmpRoot();
-  const marketingDir = writeManifest(root, 'dashclaw', SIMPLE_MANIFEST);
+  const {dir: marketingDir, workspace} = writeManifest(root, 'dashclaw', SIMPLE_MANIFEST);
   const existing = [{assetId: 'logo-reveal', action: 'redo', note: 'too dark', at: '2026-07-01T00:00:00.000Z'}];
   writeFileSync(join(marketingDir, 'review.json'), JSON.stringify(existing, null, 2) + '\n');
   const {server} = await startStub({
@@ -189,7 +195,7 @@ test('runPull: merges onto an existing review.json (mission-control\'s own redo 
   try {
     const {port} = server.address();
     await withEnv({MAGNETIC_AGENT_PORT: String(port), MAGNETIC_AGENT_TOKEN: 'x'}, () =>
-      runPull({root, brand: 'dashclaw'}),
+      runPull({root: engineRoot, brand: 'dashclaw', workspace}),
     );
     const written = JSON.parse(readFileSync(join(marketingDir, 'review.json'), 'utf8'));
     assert.equal(written.length, 4, 'the prior redo entry plus 3 new verdict entries');
@@ -202,10 +208,11 @@ test('runPull: merges onto an existing review.json (mission-control\'s own redo 
 
 test('runPull: missing manifest fails loud with the review-in-magnetic hint, never calls the sidecar', async () => {
   const root = tmpRoot();
-  mkdirSync(join(root, 'out', 'dashclaw', 'marketing'), {recursive: true});
+  const workspace = resolveWorkspace(engineRoot, {brand: 'dashclaw', project: root});
+  mkdirSync(workspace.marketingDir, {recursive: true});
   try {
     await assert.rejects(
-      () => runPull({root, brand: 'dashclaw'}),
+      () => runPull({root: engineRoot, brand: 'dashclaw', workspace}),
       /run review-in-magnetic first/,
     );
   } finally {
@@ -215,12 +222,12 @@ test('runPull: missing manifest fails loud with the review-in-magnetic hint, nev
 
 test('runPull: unreachable sidecar rejects with the enable-Agent-Access hint, review.json untouched', async () => {
   const root = tmpRoot();
-  const marketingDir = writeManifest(root, 'dashclaw', SIMPLE_MANIFEST);
+  const {dir: marketingDir, workspace} = writeManifest(root, 'dashclaw', SIMPLE_MANIFEST);
   const appDataDir = mkdtempSync(join(tmpdir(), 'pull-magnetic-verdicts-appdata-'));
   try {
     await withEnv({APPDATA: appDataDir}, () =>
       assert.rejects(
-        () => runPull({root, brand: 'dashclaw'}),
+        () => runPull({root: engineRoot, brand: 'dashclaw', workspace}),
         /Magnetic is not reachable.*Agent Access.*sidebar/s,
       ),
     );

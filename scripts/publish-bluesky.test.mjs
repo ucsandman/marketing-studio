@@ -2,11 +2,13 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {mkdirSync, rmSync, writeFileSync} from 'node:fs';
+import {mkdirSync, mkdtempSync, rmSync, writeFileSync} from 'node:fs';
+import {tmpdir} from 'node:os';
 import {join, dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {
   BSKY_MAX_GRAPHEMES,
+  blueskyCredentialError,
   buildRecord,
   graphemeCount,
   linkFacets,
@@ -15,23 +17,30 @@ import {
   parsePostUrl,
   postUrl,
 } from './publish-bluesky.mjs';
+import {resolveWorkspace} from './lib/workspace.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
 const cli = join(here, 'publish-bluesky.mjs');
-const BRAND = '__bskytest__'; // out/__bskytest__/ is a gitignored build product
+const BRAND = 'bskytest';
 
-function runCli(args, env = {}) {
+function tempProduct() {
+  const project = mkdtempSync(join(tmpdir(), 'bsky-product-'));
+  mkdirSync(join(project, '.git'));
+  return {project, workspace: resolveWorkspace(root, {brand: BRAND, project})};
+}
+
+function runCli(args, project, env = {}) {
   try {
-    const stdout = execFileSync('node', [cli, ...args], {encoding: 'utf8', env: {...process.env, ...env}});
+    const stdout = execFileSync('node', [cli, ...args, '--project', project], {encoding: 'utf8', env: {...process.env, ...env}});
     return {stdout, status: 0};
   } catch (err) {
     return {stdout: err.stdout ?? '', stderr: err.stderr ?? '', status: err.status};
   }
 }
 
-function kit({caption, video = true}) {
-  const dir = join(root, 'out', BRAND, 'postkit', 'bluesky');
+function kit(workspace, {caption, video = true}) {
+  const dir = join(workspace.postkitDir, 'bluesky');
   mkdirSync(dir, {recursive: true});
   writeFileSync(join(dir, 'caption.txt'), caption);
   writeFileSync(join(dir, 'alt.txt'), 'A terminal running the audit.');
@@ -88,15 +97,21 @@ test('normalizeBskyMetrics folds quotes into reposts and leaves impressions null
 });
 
 test('loadPostkit reports a missing kit as a reason, not a throw', () => {
-  const r = loadPostkit(root, '__nokit__');
-  assert.equal(r.ok, false);
-  assert.match(r.reason, /build-postkit/);
+  const {project, workspace} = tempProduct();
+  try {
+    const r = loadPostkit(root, workspace, BRAND);
+    assert.equal(r.ok, false);
+    assert.match(r.reason, /build-postkit/);
+  } finally {
+    rmSync(project, {recursive: true, force: true});
+  }
 });
 
 test('--dry-run builds the record from the postkit without credentials and exits 0', () => {
-  kit({caption: 'Nothing sensitive runs until you allow it. https://dashclaw.dev'});
+  const {project, workspace} = tempProduct();
+  kit(workspace, {caption: 'Nothing sensitive runs until you allow it. https://dashclaw.dev'});
   try {
-    const r = runCli([BRAND, '--dry-run', '--json'], {BLUESKY_HANDLE: '', BLUESKY_APP_PASSWORD: ''});
+    const r = runCli([BRAND, '--dry-run', '--json'], project, {BLUESKY_HANDLE: '', BLUESKY_APP_PASSWORD: ''});
     assert.equal(r.status, 0, r.stderr);
     const out = JSON.parse(r.stdout);
     assert.equal(out.dryRun, true);
@@ -104,32 +119,38 @@ test('--dry-run builds the record from the postkit without credentials and exits
     assert.equal(out.record.embed.aspectRatio.width, 1920);
     assert.equal(out.record.facets.length, 1);
   } finally {
-    rmSync(join(root, 'out', BRAND), {recursive: true, force: true});
+    rmSync(project, {recursive: true, force: true});
   }
 });
 
 test('a caption over 300 graphemes is refused before any network call', () => {
-  kit({caption: 'x'.repeat(301)});
+  const {project, workspace} = tempProduct();
+  kit(workspace, {caption: 'x'.repeat(301)});
   try {
-    const r = runCli([BRAND, '--dry-run']);
+    const r = runCli([BRAND, '--dry-run'], project);
     assert.equal(r.status, 1);
     assert.match(r.stderr, /301 graphemes/);
   } finally {
-    rmSync(join(root, 'out', BRAND), {recursive: true, force: true});
+    rmSync(project, {recursive: true, force: true});
   }
 });
 
-test('without a postkit the CLI exits 2 with the build-postkit hint; without creds it exits 2 too', () => {
-  const none = runCli(['__nokit__']);
-  assert.equal(none.status, 2);
-  assert.match(none.stderr, /build-postkit/);
-  kit({caption: 'short'});
+test('without a postkit the CLI exits 2 with the build-postkit hint; missing evidence blocks before credentials', () => {
+  const {project, workspace} = tempProduct();
   try {
-    const r = runCli([BRAND], {BLUESKY_HANDLE: '', BLUESKY_APP_PASSWORD: ''});
-    // Only reaches the creds check when the repo .env has no Bluesky creds; with
-    // creds present this would hit the network, so the assertion is conditional.
-    if (r.status === 2) assert.match(r.stderr, /BLUESKY_HANDLE/);
+    const none = runCli([BRAND], project);
+    assert.equal(none.status, 2);
+    assert.match(none.stderr, /build-postkit/);
+    kit(workspace, {caption: 'short'});
+    const r = runCli([BRAND], project, {BLUESKY_HANDLE: '', BLUESKY_APP_PASSWORD: ''});
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /live publish blocked before credentials\/network: delivery-evidence\.json is missing/);
   } finally {
-    rmSync(join(root, 'out', BRAND), {recursive: true, force: true});
+    rmSync(project, {recursive: true, force: true});
   }
+});
+
+test('credential validation names the missing Bluesky variables without invoking the publisher', () => {
+  assert.match(blueskyCredentialError('', ''), /BLUESKY_HANDLE \/ BLUESKY_APP_PASSWORD/);
+  assert.equal(blueskyCredentialError('brand.bsky.social', 'app-password'), null);
 });

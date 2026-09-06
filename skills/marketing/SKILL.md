@@ -9,9 +9,17 @@ One command produces a product's full asset suite: brand onboarding, UI polish, 
 
 **REQUIRED BACKGROUND:** marketing-studio (engine-repo workflow shape and non-negotiables). All PLAYBOOK rules apply.
 
+**Production route:** read [`docs/production-quality.md`](../../docs/production-quality.md).
+Require `--project <product-repo>` and use
+`<workspace> = <product>/marketing/assets/<brand>`. Every generated capture, audio file,
+prop, public-stage asset, render, report, matrix row, and post kit stays in that product
+workspace. Engine-local `out/` is not a product-run path.
+
 ## Resume check — before anything else
 
-Glob `out/*/marketing/run.json` in the engine repo. If an incomplete run exists (any asset not `delivered`), this invocation is a RESUME: skip Phase 0, load the saved intake answers from the manifest, and continue at the first asset whose status is not `approved`/`delivered`. If several incomplete runs match, ask which one. Only a fresh run proceeds to Phase 0.
+Read `<workspace>/marketing/run.json`. If it exists and any asset is not `delivered`,
+this invocation is a RESUME: load its intake and continue at the first incomplete asset.
+Confirm every claimed artifact exists inside the product workspace before trusting state.
 
 On resume, still run the Phase 1 environment checks (shared-repo guard + `launch.py --check` — the previous process died mid-flight), but skip brand onboarding and Phase 2 polish if the manifest marks them complete. Trust a `rendered`/`approved` status only after confirming its artifact actually exists on disk; missing or truncated artifact → demote that asset to `planned`.
 
@@ -19,7 +27,7 @@ On resume, still run the Phase 1 environment checks (shared-repo guard + `launch
 
 Fresh runs only. Ask everything in a single AskUserQuestion, then run without asking again (exceptions: per-asset stills gates in gated mode, final delivery):
 
-1. **Product/brand + destination** — which brand, and where finished assets land in the product repo (default: its existing media/marketing dir).
+1. **Product/brand** — which brand and the explicit product repo used by `--project`.
 2. **UI polish before filming?** Default YES: the demo films the real running app, so rough edges get rendered at 60fps forever. YES = impeccable → polish → frontend-verify on the product repo before any capture. NO = film as-is. This edits product code, so it is always the user's call — never silently skip it AND never silently do it.
 3. **Audio** — music + voiceover is the default and the only thing a film ships with; ask only WHO narrates (brand voice id vs default) and whether music leads or narration leads. "None" is not an option and music-only is a recorded exception (`--music-only`), never a default: a film with no voice explaining the product is not done (CLAUDE.md, learned 2026-09-01).
 4. **Social clips** — platforms and count (default: X + LinkedIn, one each).
@@ -29,15 +37,19 @@ Fresh runs only. Ask everything in a single AskUserQuestion, then run without as
 
 1. Shared-repo guard + `python launch.py --check` (marketing-studio steps 0–1), then `node scripts/install-skills.mjs --check` — it warns when a bundled `skills/` copy and its installed `~/.claude/skills` copy have drifted, so the run does not follow a stale checklist. Warn only; fix the drift or note it, then continue.
 2. Brand: if `brands/<id>.json` is missing, onboard per PLAYBOOK. Brand-token judgment stays in the main loop — do not delegate it.
-3. Create the run manifest `out/<brand>/marketing/run.json`. It stores BOTH the Phase 0 intake answers (brand, destination, polish flag, audio choice, social config, checkpoint mode) AND one entry per planned asset. Statuses mean exactly this:
+3. Create `<workspace>/marketing/run.json`. It stores the intake answers and one entry per planned asset. Statuses mean exactly this:
    - `planned` — not rendered yet. Gated mode: user approves pre-render stills before the render starts (that is the ONLY user gate per asset).
    - `rendered` — artifact on disk, post-render frame check pending (extract 2–3 frames from the artifact and inspect them — self-check in both modes).
    - `approved` — frame check passed; approval is recorded in the manifest the moment it happens, never inferred from chat history. A resumed session redoes the frame check for any `rendered` asset, showing the frames to the user first in gated mode.
    - `delivered` — copied to the product repo.
    Update the manifest after every status change. Never restart a run from scratch because the session died.
-4. Infographic bridge: `node scripts/build-infographic-style.mjs <brand>` writes `out/<brand>/marketing/infographic-style.md`, the /epic-infographics design language built from the brand tokens; copy it to `~/.claude/skills/epic-infographics/references/design-languages/<brand>.md` and name it at that skill's step 6, so any infographic in this run renders on brand hexes instead of an invented palette.
+4. Infographic bridge: build the product-owned `<workspace>/marketing/infographic-style.md`, then name it when an infographic is part of this run so that asset uses the approved brand tokens.
 
-**Content approval gate.** Once `out/<brand>/marketing/brief.json` is synthesized and passes `node scripts/lint-copy.mjs`, run `node scripts/build-storyboard.mjs <brand>` and show the user `storyboard.html` for content approval BEFORE any rendering; in full-auto mode the main-loop judge reviews it instead.
+**Content and direction gate.** Once `<workspace>/marketing/brief.json` is synthesized
+and passes the copy gate, generate direction, shot plan, and production plan with the
+product-aware builder. Run `node scripts/build-storyboard.mjs <brand> --project <product>`.
+Approve the grounded copy and a style frame, then build an audio-bearing animatic with
+scratch voice/music and obtain named non-author approval before full rendering.
 
 **Brief synthesis rules.** The zod schema (`studio/src/lib/brief.ts`) is the contract; fill the grounding sections, not just the copy: `audience` + `customerLanguage` + `objections` + `switchingForces` from the brief-inputs grounding, and a `proofPoints` entry (claim + source) for EVERY number the copy cites — an unsourced stat is fabrication, omit it instead (lint-copy WARNs on stat-shaped claims in a brief with no proofPoints). Draw `hook.headline` and each of the (up to two) `altHeadlines` from DIFFERENT hook categories per `references/hook-formulas.md`, record the categories in `hook.strategies`, and include at least one emotion-forward category (story/contrarian) against a value hook — evidence in `references/campaign-evidence.md` (read it before synthesis; it also lists debunked claims that must never appear in copy). Build `cta` with the [Action Verb] + [What They Get] formula. The storyboard renders the grounding sections so the approver can check copy against facts.
 
@@ -55,13 +67,16 @@ The engine repo is shared mutable state (props builders, registries, render queu
 |---|-------|-------------------|
 | 1 | /logo-reveal | Cheapest comp — surfaces brand-token bugs before the expensive assets |
 | 2 | /product-demo | Films the (now polished) UI; footage feeds everything downstream |
-| 3 | /launch-video | Picture-lock the hero video (composes demo + logo + copy). Before locking, when the brief carries altHeadlines: `node scripts/render-hook-variants.mjs <brand>` renders the competing hook takes and registers them as Mission Control variants — pick the winner there, then lock. Optionally `node scripts/render-variants.mjs <brand> logo-reveal` for hero takes. |
-| 4 | /audio-track | MANDATORY, never skipped. Score the locked film: a bespoke film (studio/src/films/<brand>/) via `node scripts/build-<brand>-film-audio.mjs` + `node scripts/score-film.mjs <brand> <film.mp4>`; a LaunchVideo template film via build-<brand>-audio.mjs + merge + master to `launch-final.mp4`. Then set the launch-video asset's `artifact` to the SCORED file (keep the silent lock as `silentLock`) and copy it to `out/<brand>/launch.mp4` so postkit and the gallery carry the narrated cut. A silent launch card is a defect, not a variant (postflop shipped two silent cuts on 2026-09-01) |
-| 5 | /social-clip × N | Reuse demo/logo footage per platform. SocialClip renders silent, so EVERY delivered clip is scored before it counts: `node scripts/score-social-clip.mjs <brand> <clipId> --vo <act>` per clip (music bed plus the ONE VO line that matches the plate, e.g. hook for the X clip), leaving `<clipId>-final.mp4` in out/<brand>/ so build-postkit picks it over the generic matrix row. The captioned 9:16/1:1 matrix rows are for MUTED autoplay, which is a viewer default, not a licence to ship them with no track (postflop's tiktok/shorts/instagram rows had none, 2026-09-01) |
+| 3 | /launch-video | Build the chosen direction through an authored shot plan. Use directed LaunchVideo or a bespoke film according to the idea; captured UI, rebuilt UI, 2D, 3D, and hybrid shots are all valid. Picture, narration, music, and SFX share the same plan. |
+| 4 | /audio-track | MANDATORY unless the recorded music-only exception applies. Score the lock from product-owned audio inputs with `--project <product>`, verify the delivered master, and set the launch artifact to that scored file. A silent launch card is a defect, not a variant. |
+| 5 | /social-clip × N | Reuse approved sources per platform. Every delivered clip is scored in the product workspace before it counts. Muted-autoplay captions do not grant permission to ship a silent media file. |
 | 6 | /og-assets | Statics + README GIF pulled from final footage |
-| 7 | Cards (`node scripts/build-cards.mjs <brand>`) | One stat card per brief proofPoint plus a quote card from hook.headline, rendered as Card stills into out/<brand>/marketing/cards/; skips clean with exit 0 when there is no brief. Not an asset skill, a builder |
+| 7 | Cards | One stat card per brief proofPoint plus a quote card from the hook, rendered into `<workspace>/marketing/cards/`; skip when there is no grounded brief. |
 
-Per asset: stills gate before full render — `node scripts/contact-sheet.mjs <brand> <Comp>` is the standard gate artifact (each sub-skill enforces it), render logs `| tail -2`, then update the manifest. Assets #1 (/logo-reveal's Blender staging) and #2 (/product-demo's Playwright capture) check the content-hash footage cache first and skip the expensive stage when their inputs (product git state, capture/staging script, and resolved config) are byte-identical to the last run; pass `--force` to re-capture.
+Per asset, inspect inexpensive representative stills before a full render. For the hero
+film, generate hash-bound start/middle/end samples for every planned shot from the exact
+final render with `contact-sheet.mjs --project <product> --plan ... --render ...`.
+Footage caches also live in the product workspace; `--force` re-captures only when needed.
 
 **Render budget: one full-resolution render per asset.** The renderer is not where a
 two-hour run goes; correction rounds are. Measured 2026-09-01 on the 24-core box: a
@@ -76,7 +91,12 @@ run (postflop's demo step spent 64 minutes that way).
 
 **Budget the VO before you dispatch #4, not after.** Picture-lock (#3) and audio (#4) are separate steps, and the trap between them is that measured VO word timings DERIVE act lengths, so scoring a locked film can push it past the 30-90s band `launchTiming.test.ts` enforces. Do the arithmetic yourself at dispatch time and hand it to the executor: `frames_available = 2700 - current_total`, minus the demo act which is FIXED (the PLAYBOOK forbids shortening a recorded demonstration to fit narration). Estimate each act's need at ~150wpm plus `VO_LEAD` + `VO_PAD`. If the narration overruns, say so in the brief and name the act to cut hardest — copy is trimmed ONLY in `build-<brand>-audio.mjs`, never by editing act constants. Measured on the practicalsystems run (2026-08-17): an 80.8s lock left 276 frames of headroom against ~564 needed, so ~25 words had to go. **Name any claim that must survive the trim**, because the shortest phrasing is often the false one — "cold outreach never sends without a human" compresses to "nothing sends without a human", which was untrue there.
 
-**Phase 3.5 — Responsive export matrix.** Once the launch video is picture-locked and the social clips are rendered, run `node scripts/render-matrix.mjs <brand>` to fan the launch video and social clips into all four aspects (16:9, 1:1, 4:5, 9:16) by responsive layout, not crops. Variants land in `out/<brand>/matrix/` and register in the manifest's `exports[]`. Add `--stills-only` first to prove the layout with one still per aspect before committing CPU to full renders. The muted-autoplay rows (9:16 and 1:1) additionally emit an `<id>-captioned` variant with the VO burned into on-screen captions, and `node scripts/build-captions.mjs <brand>` writes matching `launch.srt`/`launch.vtt` sidecars — both require the brand's audio props (skipped silently without them).
+**Phase 3.5 — Responsive export matrix.** After the scored launch and social clips pass
+their own review, run `render-matrix <brand> --project <product> --production
+--stills-only` to prove all formats. This is non-delivery layout evidence. Then run the
+production matrix without `--stills-only`; it binds each complete row to the approved
+plan and strict evidence. Use `--verify-production` to recheck pending existing media
+without rerendering it.
 
 ## Execution mode — pick by session model
 
@@ -107,26 +127,50 @@ Fable never goes inside a workflow (the model-guard hook blocks it in `parallel(
 
 ## Phase 4 — Final QA
 
-1. `node scripts/smoke.mjs` — must pass.
-1a. `node scripts/check-audio.mjs <brand>` — HARD gate, exit 1 blocks delivery: every delivery-surface mp4 has a mastered track with narration (see CLAUDE.md). Run it again after postkit, because postkit is where silent matrix rows sneak back in.
-1b. Mechanical judges before any agent sweep (cheap, run all six): `node scripts/judge-av-sync.mjs <brand>` (VO overruns/caption dwell), `node scripts/judge-demo-pacing.mjs <brand>` (dead air), `node scripts/judge-palette.mjs <brand> <still>` (forbidden colors; low-confidence findings are product-UI suspects, treat per step 2's false-positive rule), `node scripts/judge-motion.mjs <brand>` (motion-craft conventions in studio src + brand motion/grade token bands), `node scripts/judge-drift.mjs <brand>` (cross-asset drift: scores the whole `out/<brand>/` as a SET, which is the only judge that can catch assets that are each individually on-brand but collectively fragment into several — run it LAST, after everything else has rendered, or the set is incomplete; pass `--ref out/<brand>/approved/<latest>/` when that directory exists, so drift is measured as distance from approved rather than from the set average, and in full-auto mode run `node scripts/mission-control.mjs <brand> --snapshot-approved` first because writing run.json directly never fills approved/), and `node scripts/check-budgets.mjs <brand>` (hard size gate — an OVER blocks delivery). judge-av-sync also reports the frame at which the first claim copy lands (`hook copy on screen at frame N`); a 5.0s static open is the shared LOGO_LEN default and `actLengths.logo` is the override. Their JSON reports feed the judge; only findings the reports can't decide go to the agent sweep. judge-drift also writes `drift-sheet.html`, a worst-first review grid — open that rather than eyeballing the whole gallery, because attention is reliable over about six tiles, not twenty.
+1. Watch the entire scored hero film with sound as a viewer before reading judge scores.
+   Record whether you would share it and a concrete defect list; weak work returns to its
+   cheapest responsible stage. Contact sheets cannot make this decision.
+1a. `node scripts/smoke.mjs` — runtime gate; it is not visual approval.
+1b. `node scripts/check-audio.mjs <brand> --project <product>` — HARD gate: every
+   delivery-surface video carries its intended mastered track. Run it again after postkit.
+1c. Run the existing A/V sync, pacing, palette, motion, drift, and budget judges with
+`--project <product>` where supported. These measure properties; warnings return to the
+perceptual review rather than becoming invented aesthetic thresholds.
+1d. Record the structured non-author review in Mission Control, then run
+`judge-production <brand> --project <product> --plan <production-plan.json> --render
+<final.mp4> --strict`. Missing or stale stage approval, three-per-shot evidence, full
+render/audio attestations, or hash bindings blocks delivery.
 2. Brand-compliance sweep: one Sonnet subagent reviews a still from every asset against the brand's `voice` rules (e.g. noban: profit gold `#d6c23c`, never green). Re-render only violators — but VERIFY findings against the product repo's source first. Product screenshots inside assets show the PRODUCT's own fonts/tokens, not the engine brand's stand-ins; a reviewer expecting the engine's mono will misread the product's mono as a violation (paperroute run 2026-07-10: 4 of 5 sweep findings were this exact false positive; the fifth was a real product bug, fixed in the product repo, no asset re-render needed).
 
 ## Phase 5 — Delivery
 
-1. Copy every asset to the destination dir; write a README there listing each file and its intended use.
-2. Launch the operator console: `node scripts/mission-control.mjs <brand>` (add `--port N` if 4600 is taken). Tell the user the URL it prints (default `http://localhost:4600/`). This is a live click-to-approve gallery reading `out/<brand>/marketing/run.json` — one card per asset with the embedded artifact, an Approve button, a Redo box, and variant pickers. An advisory bar under the header shows the mechanical judges' verdicts (expandable findings), footage-staleness warnings ("capture footage: N commits behind" — computed from the cache's recorded product git state), and engagement results when they exist. Each asset card carries a Mark posted button: it prompts for the live post URL and writes the row into `out/<brand>/marketing/posts.json` (one row per platform, last write wins), which is the input `scripts/fetch-results.mjs` reads to close the hook A/B loop. **The run is not done until the user has seen the gallery.**
-3. While it runs, poll `out/<brand>/marketing/run.json` and `out/<brand>/marketing/review.json` for the operator's actions: an asset flipped to `approved` in the manifest is that asset's approval gate cleared (approve is the manifest gate, never inferred from chat); a `redo` entry in `review.json` — with its note, also stored as `redoNote` on the asset (now back to `planned`) — feeds the Phase 3 correction loop. Re-render the redone asset per its skill, update the manifest, and the console picks up the new state on its next 2s poll.
+1. Assets already live in the product workspace; do not copy an engine-local render into
+   place at the end. Write a product-owned README listing each file and intended use.
+2. Launch `node scripts/mission-control.mjs <brand> --project <product>` and give the
+   user its local URL. The run is not done until a named non-author has watched the
+   scored film and the structured review is bound to current evidence.
+3. Poll `<workspace>/marketing/{run,review}.json` for approve/redo actions. Approval is a
+   recorded, hash-bound action, never inferred from chat. A redo returns to the responsible
+   stage and produces a new version rather than overwriting evidence.
 
-**Phase 5.5 — Thumbnails and paste-ready post kits.** Before delivery, run `node scripts/extract-thumbs.mjs <brand>` to grab one poster still per aspect from `out/<brand>/matrix/` into `out/<brand>/thumbs/`, then `node scripts/build-postkit.mjs <brand>` to assemble `out/<brand>/postkit/{x,linkedin,tiktok,shorts,youtube,instagram}/` — each folder gets the right-aspect video, thumbnail, a lint-gated `caption.txt`, `alt.txt`, caption sidecars (YouTube/LinkedIn), and a `POST.md` checklist. This is what makes delivery paste-ready instead of raw files the user has to reassemble by hand.
+**Phase 5.5 — Thumbnails and paste-ready post kits.** Extract thumbnails from the
+product-owned matrix, then run `node scripts/build-postkit.mjs <brand> --project
+<product> --production`. It copies only strict-PASS, hash-bound matrix assets and keeps
+captions, alt text, checklists, licences, and disclosures beside the media.
 
-**Phase 5.75 — Results loop (after publishing, usually a later session).** Multi-platform posting is `/launch` (the `launch/` CLI: `launch post <product-dir> --all`, dry-run by default, `--live` to publish, kit attached via `--kit out/<brand>/postkit`). The two studio-side scripts remain for Mission Control's buttons. Bluesky: `node scripts/publish-bluesky.mjs <brand>` (or Mission Control's Publish to Bluesky button) uploads the postkit's social-16x9 clip with caption.txt, records the URL in posts.json, and fetch-results reads its likes/reposts/replies with no token. YouTube is the second: `node scripts/publish-youtube.mjs <brand>` uploads the postkit's launch-16x9 as a PRIVATE video (run `--auth` once per machine; flip visibility in YouTube Studio after watching it), records the URL, and fetch-results reads its view/like/comment counts. Every other platform is still a paste. When posts go live (via `/launch`, which also writes `<product>/.launch/ledger.json`), record them in `out/<brand>/marketing/posts.json` — an array of `{platform, url, variant?, metrics?}` where `variant` is the run.json variant id the post carried (e.g. `hook-2`) and `metrics` is manual entry for platforms without API access (LinkedIn). Then `node scripts/fetch-results.mjs <brand>` pulls X engagement (X_BEARER_TOKEN in .env; exit 2 + unavailable markers without it) into `results.json`, and Mission Control shows engagement per hook variant. The winning hook CATEGORY feeds the next brief's `hook.strategies` pick — that closes the A/B loop with reality instead of taste. build-postkit seeds posts.json with one `published:false` row per platform, so the file always exists; fetch-results skips unpublished rows and prints `N of M rows published` beside its verdict.
+**Phase 5.75 — Results loop (after publishing, usually a later session).** `/launch`
+previews by default and takes the product-owned post kit. Live posting remains a separate
+explicitly authorized action. Record live URLs and later metrics in
+`<workspace>/marketing/posts.json`; feed the winning hook category into the next brief
+rather than treating one campaign's visual treatment as a permanent template.
 
-**Phase 5.9 — Prove the link preview actually changed.** After delivery, and again the day the site redeploys, run `node scripts/verify-og-wired.mjs <brand>` (optionally pass a URL to override the brand's configured `url`). It fetches the LIVE page, parses its `og:image` and `twitter:image` meta tags, fetches the referenced image, and compares its dimensions against the delivered `out/<brand>/og.png` or `og-image.png`. A rendered still proves the BUILD is right; this proves the WIRE is right: a stale CDN, an unswapped meta tag, or a site that has not redeployed all pass every other judge and still ship a broken link preview. Advisory (exit 0) like the other judges; add `--strict` to gate. Skips clean when the brand has no `url` or the page is not reachable yet.
+**Phase 5.9 — Prove the link preview actually changed.** After delivery and site
+redeploy, compare the live `og:image`/`twitter:image` against the delivered product-owned
+OG file. A correct render does not prove the deployed meta tags or CDN are current.
 
 ## Phase 6 — Close out
 
-1. Commit the engine repo (tests + lint + smoke first; `out/`, `assets/`, `studio/public/*/` stay uncommitted). An uncommitted engine tree strands the run.
+1. Commit engine source changes only when this run required them (tests + lint + smoke first); generated run data stays in the product repo.
 2. Commit product-repo delivery.
 3. Final summary: per-asset table (file, duration, status) + deviations log.
 

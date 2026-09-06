@@ -7,13 +7,24 @@
 // feature headings + lines, cta) overrides the hardcoded copy below; the
 // screenshots/assets/demo structure always stays local. With no valid brief the
 // output is byte-identical to the pre-brief builder (the compatibility contract).
-import {readFileSync, existsSync, writeFileSync} from 'node:fs';
+import {readFileSync, existsSync, mkdirSync, writeFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
-import {dirname, join} from 'node:path';
+import {dirname, join, relative} from 'node:path';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
+import {inventoryPublicSource, sourceBundleDigest} from './lib/production-quality.mjs';
+import {resolveDirection} from '../studio/src/lib/direction.ts';
+import {buildLaunchShotPlan, defaultDirectedShots} from '../studio/src/lib/shotPlan.ts';
+import {voTimingFrom} from '../studio/src/lib/launchTiming.ts';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-const brand = process.argv.slice(2).find((a) => !a.startsWith('--')) ?? 'noban';
+const argv = process.argv.slice(2);
+const brand = argv.find((a, i) => !a.startsWith('--') && argv[i - 1] !== '--project') ?? 'noban';
+const workspace = resolveWorkspace(root, {brand, project: projectArg(argv)});
+mkdirSync(workspace.propsDir, {recursive: true});
+mkdirSync(workspace.marketingDir, {recursive: true});
+mkdirSync(workspace.publicDir, {recursive: true});
 
 // Per-brand launch composition. Each builder takes the brand's demo props (so the
 // demo act's telemetry never drifts from the latest capture) and returns the
@@ -35,7 +46,7 @@ const DEMO_PROPS = {
 // with scripts/merge-launch-audio.mjs, unchanged.
 // Membership rule (build-launch-props.test.mjs): every brand whose
 // props/<brand>-audio.json carries measured `words` is in this set.
-const EMBED_AUDIO = new Set(['tenwords', 'practicalsystems', 'postflop']);
+const EMBED_AUDIO = new Set(['tenwords', 'practicalsystems', 'postflop', 'truckside']);
 
 const BRANDS = {
   noban: (demo) => ({
@@ -482,7 +493,7 @@ if (!build) {
   process.exit(1);
 }
 
-const demoPath = join(root, 'props', DEMO_PROPS[brand] ?? `${brand}-demo.json`);
+const demoPath = join(workspace.propsDir, DEMO_PROPS[brand] ?? `${brand}-demo.json`);
 if (!existsSync(demoPath)) {
   console.error(`build-launch-props: missing demo props ${demoPath}`);
   process.exit(1);
@@ -494,9 +505,10 @@ const launch = build(JSON.parse(readFileSync(demoPath, 'utf8')));
 // tests) — same convention the build-*-audio scripts use to mirror launchTiming.
 // A missing or malformed brief falls through to the hardcoded copy untouched, so
 // output is byte-identical with no brief present.
-const briefPath = join(root, 'out', brand, 'marketing', 'brief.json');
+const briefPath = join(workspace.marketingDir, 'brief.json');
+let brief = null;
 if (existsSync(briefPath)) {
-  const brief = validBrief(readFileSync(briefPath, 'utf8'));
+  brief = validBrief(readFileSync(briefPath, 'utf8'));
   if (!brief) {
     console.warn(`build-launch-props: out/${brand}/marketing/brief.json is invalid; using hardcoded copy`);
   } else {
@@ -519,7 +531,7 @@ launch.features.forEach((f) => delete f.briefIndex);
 
 // VO-derived picture locks embed the audio manifest (see EMBED_AUDIO above).
 if (EMBED_AUDIO.has(brand)) {
-  const audioPath = join(root, 'props', `${brand}-audio.json`);
+  const audioPath = join(workspace.propsDir, `${brand}-audio.json`);
   if (existsSync(audioPath)) {
     launch.audio = JSON.parse(readFileSync(audioPath, 'utf8'));
     console.log(`build-launch-props: embedded props/${brand}-audio.json`);
@@ -552,8 +564,105 @@ function validBrief(text) {
     if (!f.benefitLines.every((l) => typeof l === 'string')) return null;
   }
   if (b.cta != null && typeof b.cta !== 'string') return null;
-  return {hook, cta: typeof b.cta === 'string' ? b.cta : '', features};
+  const direction = b.direction && typeof b.direction === 'object' ? b.direction : null;
+  const shots = Array.isArray(b.shots) ? b.shots : [];
+  const references = Array.isArray(b.references) ? b.references : [];
+  return {
+    hook,
+    cta: typeof b.cta === 'string' ? b.cta : '',
+    features,
+    direction,
+    shots,
+    references,
+    visualMetaphor: typeof b.visualMetaphor === 'string' ? b.visualMetaphor : null,
+    soundIntent: typeof b.soundIntent === 'string' ? b.soundIntent : null,
+  };
 }
 
-writeFileSync(join(root, 'props', `${brand}-launch.json`), JSON.stringify(launch, null, 2) + '\n');
-console.log(`wrote props/${brand}-launch.json`);
+const directionPreset = {
+  noban: 'playful',
+  costclaw: 'precision',
+  sidetap: 'playful',
+  practicalsystems: 'editorial',
+  tenwords: 'editorial',
+  postflop: 'editorial',
+  truckside: 'precision',
+}[brand] ?? 'precision';
+const directionInput = brief?.direction ?? {
+  preset: directionPreset,
+  reason: `Derived from ${brand}'s stable brand voice and product evidence.`,
+  visualMetaphor: brief?.visualMetaphor ?? null,
+  soundIntent: brief?.soundIntent ?? null,
+  references: brief?.references ?? [],
+  styleFrame: null,
+  animatic: null,
+  overrides: {},
+};
+const resolvedDirection = resolveDirection(directionInput);
+launch.direction = directionInput;
+launch.shots = brief?.shots?.length
+  ? brief.shots
+  : defaultDirectedShots(
+      resolvedDirection,
+      launch.features.length,
+      launch.demo.telemetry?.durationMs ?? null,
+      30,
+    );
+if (brief?.shots?.length) {
+  const selectedAudio = new Set(launch.shots.map((shot) => shot.audioRef).filter(Boolean));
+  if (launch.audio) launch.audio.lines = launch.audio.lines.filter((line) => selectedAudio.has(line.act));
+}
+
+const shotPlan = buildLaunchShotPlan({
+  telemetryDurationMs: launch.demo.telemetry?.durationMs ?? null,
+  demoViewport: launch.demo.telemetry?.viewport ?? null,
+  featureCount: launch.features.length,
+  lengths: launch.actLengths ?? null,
+  vo: voTimingFrom(launch.audio?.lines ?? null, launch.features.length, {
+    force: launch.voTiming ?? null,
+  }),
+  direction: launch.direction,
+  shots: launch.shots,
+  fps: 30,
+});
+
+const propsPath = join(workspace.propsDir, `${brand}-launch.json`);
+const directionPath = join(workspace.marketingDir, 'direction.json');
+const shotPlanPath = join(workspace.marketingDir, 'shot-plan.json');
+const productionPlanPath = join(workspace.marketingDir, 'production-plan.json');
+const propsText = JSON.stringify(launch, null, 2) + '\n';
+const directionText = JSON.stringify(resolvedDirection, null, 2) + '\n';
+const shotPlanText = JSON.stringify(shotPlan, null, 2) + '\n';
+const projectPath = (path) => relative(workspace.projectRoot, path).replaceAll('\\', '/');
+const sha256 = (text) => createHash('sha256').update(text).digest('hex');
+const directionSha256 = sha256(directionText);
+const shotPlanSha256 = sha256(shotPlanText);
+const propsSha256 = sha256(propsText);
+const publicSource = inventoryPublicSource(workspace.projectRoot, projectPath(workspace.publicDir));
+const bundleSha256 = sourceBundleDigest({directionSha256, shotPlanSha256, propsSha256, publicSha256: publicSource.sha256});
+const productionPlan = {
+  version: 1,
+  selectedComposition: 'LaunchVideo',
+  props: projectPath(propsPath),
+  renderProps: null,
+  publicDir: projectPath(workspace.publicDir),
+  direction: {path: projectPath(directionPath), sha256: directionSha256},
+  shotPlan: {path: projectPath(shotPlanPath), sha256: shotPlanSha256},
+  sourceBundle: {
+    version: 1,
+    props: {path: projectPath(propsPath), sha256: propsSha256},
+    public: publicSource,
+    sha256: bundleSha256,
+  },
+  exports: {
+    launch: {composition: 'LaunchVideo', props: projectPath(propsPath), renderProps: null, captioned: true},
+    social: {composition: 'LaunchVideo', props: projectPath(propsPath), renderProps: {burnCaptions: true}, captioned: true},
+  },
+};
+
+writeFileSync(propsPath, propsText);
+writeFileSync(directionPath, directionText);
+writeFileSync(shotPlanPath, shotPlanText);
+writeFileSync(productionPlanPath, JSON.stringify(productionPlan, null, 2) + '\n');
+console.log(`wrote ${projectPath(propsPath)}`);
+console.log(`wrote ${projectPath(productionPlanPath)}`);

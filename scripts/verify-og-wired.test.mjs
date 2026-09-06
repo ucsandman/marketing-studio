@@ -1,8 +1,12 @@
 // node --test scripts/verify-og-wired.test.mjs
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {parseMetaImages, compareOgAsset} from './verify-og-wired.mjs';
+import {mkdirSync, mkdtempSync, rmSync, writeFileSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {parseMetaImages, compareOgAsset, findLocalAsset} from './verify-og-wired.mjs';
 import {encodePng, decodePng, solidImage} from './lib/png.mjs';
+import {resolveWorkspace} from './lib/workspace.mjs';
 
 // --- parseMetaImages ---------------------------------------------------------
 
@@ -25,7 +29,7 @@ test('parseMetaImages returns null for both tags when neither is present', () =>
 
 // --- compareOgAsset -----------------------------------------------------------
 
-const expectedPaths = ['out/noban/og.png', 'out/noban/og-image.png'];
+const expectedPaths = ['marketing/assets/noban/og.png', 'marketing/assets/noban/og-image.png'];
 
 test('L1: absent og:image meta tag is reported as FAIL, not skipped or passed', () => {
   const {ogImage} = parseMetaImages('<head></head>');
@@ -33,12 +37,12 @@ test('L1: absent og:image meta tag is reported as FAIL, not skipped or passed', 
     tagName: 'og:image',
     tagValue: ogImage,
     remote: null,
-    local: {path: 'out/noban/og.png', width: 1200, height: 630},
+    local: {path: expectedPaths[0], width: 1200, height: 630},
     expectedPaths,
   });
   assert.equal(verdict, 'FAIL');
   assert.match(message, /no <meta property="og:image">/);
-  assert.match(message, /out\/noban\/og\.png/);
+  assert.match(message, /marketing\/assets\/noban\/og\.png/);
 });
 
 test('remote image fetch/decode failure is FAIL and names the tag to fix', () => {
@@ -46,7 +50,7 @@ test('remote image fetch/decode failure is FAIL and names the tag to fix', () =>
     tagName: 'og:image',
     tagValue: 'https://x.test/og.png',
     remote: {error: '404 Not Found'},
-    local: {path: 'out/noban/og.png', width: 1200, height: 630},
+    local: {path: expectedPaths[0], width: 1200, height: 630},
     expectedPaths,
   });
   assert.equal(verdict, 'FAIL');
@@ -62,7 +66,7 @@ test('missing delivered asset is FAIL and names both probed paths', () => {
     expectedPaths,
   });
   assert.equal(verdict, 'FAIL');
-  assert.match(message, /out\/noban\/og\.png or out\/noban\/og-image\.png/);
+  assert.match(message, /marketing\/assets\/noban\/og\.png or marketing\/assets\/noban\/og-image\.png/);
 });
 
 test('a non-PNG remote image is FAIL and reports the content type instead of guessing dimensions', () => {
@@ -70,7 +74,7 @@ test('a non-PNG remote image is FAIL and reports the content type instead of gue
     tagName: 'og:image',
     tagValue: 'https://x.test/og.jpg',
     remote: {contentType: 'image/jpeg', width: null, height: null},
-    local: {path: 'out/noban/og.png', width: 1200, height: 630},
+    local: {path: expectedPaths[0], width: 1200, height: 630},
     expectedPaths,
   });
   assert.equal(verdict, 'FAIL');
@@ -82,7 +86,7 @@ test('dimension mismatch between live image and delivered asset is FAIL and quot
     tagName: 'og:image',
     tagValue: 'https://x.test/og.png',
     remote: {contentType: 'image/png', width: 600, height: 315},
-    local: {path: 'out/noban/og.png', width: 1200, height: 630},
+    local: {path: expectedPaths[0], width: 1200, height: 630},
     expectedPaths,
   });
   assert.equal(verdict, 'FAIL');
@@ -95,11 +99,11 @@ test('matching dimensions is PASS', () => {
     tagName: 'og:image',
     tagValue: 'https://x.test/og.png',
     remote: {contentType: 'image/png', width: 1200, height: 630},
-    local: {path: 'out/noban/og.png', width: 1200, height: 630},
+    local: {path: expectedPaths[0], width: 1200, height: 630},
     expectedPaths,
   });
   assert.equal(verdict, 'PASS');
-  assert.match(message, /matches out\/noban\/og\.png/);
+  assert.match(message, /matches marketing\/assets\/noban\/og\.png/);
 });
 
 // --- tiny generated PNG round trip: proves the comparison uses real decoded
@@ -114,7 +118,7 @@ test('a real encoded PNG round-trips through decodePng into a PASS/FAIL verdict'
     tagName: 'og:image',
     tagValue: 'https://x.test/og.png',
     remote: {contentType: 'image/png', width: decoded.width, height: decoded.height},
-    local: {path: 'out/noban/og.png', width: decoded.width, height: decoded.height},
+    local: {path: expectedPaths[0], width: decoded.width, height: decoded.height},
     expectedPaths,
   });
   assert.equal(same.verdict, 'PASS');
@@ -124,8 +128,24 @@ test('a real encoded PNG round-trips through decodePng into a PASS/FAIL verdict'
     tagName: 'og:image',
     tagValue: 'https://x.test/og.png',
     remote: {contentType: 'image/png', width: resized.width, height: resized.height},
-    local: {path: 'out/noban/og.png', width: decoded.width, height: decoded.height},
+    local: {path: expectedPaths[0], width: decoded.width, height: decoded.height},
     expectedPaths,
   });
   assert.equal(different.verdict, 'FAIL');
+});
+
+test('findLocalAsset decodes the product-owned OG image and never probes the engine output tree', () => {
+  const project = mkdtempSync(join(tmpdir(), 'og-product-'));
+  mkdirSync(join(project, '.git'));
+  const workspace = resolveWorkspace(process.cwd(), {brand: 'noban', project});
+  mkdirSync(workspace.brandRoot, {recursive: true});
+  const png = encodePng(8, 4, solidImage(8, 4, {r: 20, g: 40, b: 60}).data);
+  writeFileSync(join(workspace.brandRoot, 'og.png'), png);
+  try {
+    const found = findLocalAsset(workspace);
+    assert.equal(found.path, join(workspace.brandRoot, 'og.png'));
+    assert.deepEqual({width: found.width, height: found.height}, {width: 8, height: 4});
+  } finally {
+    rmSync(project, {recursive: true, force: true});
+  }
 });

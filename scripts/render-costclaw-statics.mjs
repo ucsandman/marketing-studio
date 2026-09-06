@@ -19,6 +19,7 @@ import {mkdirSync, statSync, unlinkSync, writeFileSync} from 'node:fs';
 import {execSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -26,7 +27,8 @@ process.on('unhandledRejection', (reason) => {
 });
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const outDir = join(root, 'out', 'costclaw');
+const workspace = resolveWorkspace(root, {brand: 'costclaw', project: projectArg(process.argv.slice(2))});
+const outDir = workspace.brandRoot;
 mkdirSync(outDir, {recursive: true});
 
 const studioDir = join(root, 'studio');
@@ -54,7 +56,7 @@ writeFileSync(animatedPropsPath, JSON.stringify(baseProps));
 const still = (out, width, height) => {
   console.log(`still: ${out} (${width}x${height})`);
   execSync(
-    `npx remotion still AnimatedOG "${join(outDir, out)}" --props="${staticPropsPath}" --width=${width} --height=${height}`,
+    `npx remotion still AnimatedOG "${join(outDir, out)}" --props="${staticPropsPath}" --public-dir="${workspace.publicDir}" --width=${width} --height=${height}`,
     {cwd: studioDir, stdio: 'inherit'},
   );
 };
@@ -66,14 +68,14 @@ still('twitter-card.png', 1200, 600);
 still('github-social-preview.png', 1280, 640); // GitHub repo social card
 
 console.log('render: og.mp4');
-execSync(`npx remotion render AnimatedOG "${join(outDir, 'og.mp4')}" --props="${animatedPropsPath}"`, {
+execSync(`npx remotion render AnimatedOG "${join(outDir, 'og.mp4')}" --props="${animatedPropsPath}" --public-dir="${workspace.publicDir}"`, {
   cwd: studioDir,
   stdio: 'inherit',
 });
 
 console.log('render: og.gif');
 execSync(
-  `npx remotion render AnimatedOG "${join(outDir, 'og.gif')}" --props="${animatedPropsPath}" --codec=gif --every-nth-frame=2`,
+  `npx remotion render AnimatedOG "${join(outDir, 'og.gif')}" --props="${animatedPropsPath}" --public-dir="${workspace.publicDir}" --codec=gif --every-nth-frame=2`,
   {cwd: studioDir, stdio: 'inherit'},
 );
 

@@ -34,9 +34,7 @@
  * export dialog; timeline geometry flicks->x for on-canvas spine regions), never
  * click points, then verified against extracted frames. See docs/PLAYBOOK.md.
  *
- * Output (staged, gitignored build products):
- *   studio/public/magnetic/{demo.webm,telemetry.json}
- *   assets/magnetic/demo/{demo.webm,telemetry.json}
+ * Output: <project>/marketing/assets/magnetic/{assets,public}/
  */
 import {_electron as electron} from '@playwright/test';
 import {execFileSync} from 'node:child_process';
@@ -44,13 +42,17 @@ import {copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync} from 'node:
 import {tmpdir} from 'node:os';
 import {dirname, join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {projectArg, resolveWorkspace} from '../../scripts/lib/workspace.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '..', '..');
-const FCP = process.env.MAGNETIC_ROOT ?? 'C:/projects/final-cut-pro';
+const argv = process.argv.slice(2);
+const workspace = resolveWorkspace(ROOT, {brand: 'magnetic', project: projectArg(argv) ?? process.env.MAGNETIC_ROOT ?? 'C:/projects/final-cut-pro'});
+const FCP = workspace.projectRoot;
 const ELECTRON_BIN = join(FCP, 'node_modules', 'electron', 'dist', 'electron.exe');
 const MAIN = join(FCP, 'out', 'main', 'index.js');
-const MEDIA = join(ROOT, 'out', 'magnetic', 'demo-media');
+const MEDIA = join(workspace.assetsDir, 'demo-media');
+const publicDir = join(workspace.publicDir, 'magnetic');
 const CLIPS = ['clip-a.mp4', 'clip-b.mp4', 'clip-c.mp4'].map((f) => join(MEDIA, f));
 const VO = join(MEDIA, 'voiceover-take.mp4');
 const IMPORT_PATHS = [...CLIPS, VO];
@@ -102,7 +104,7 @@ const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 /
 async function main() {
   const tempRoot = mkdtempSync(join(tmpdir(), 'magnetic-demo-'));
   const libraryPath = join(tempRoot, 'Demo.mglib');
-  const videoDir = join(ROOT, 'out', 'capture', 'magnetic');
+  const videoDir = mkdtempSync(join(tmpdir(), 'magnetic-video-'));
   mkdirSync(videoDir, {recursive: true});
 
   const app = await electron.launch({
@@ -393,16 +395,17 @@ async function main() {
 
   // --- stage into both consumer locations (gitignored build products) ---
   const telemetryJson = JSON.stringify(telemetry, null, 2) + '\n';
-  for (const destDir of [join(ROOT, 'studio', 'public', 'magnetic'), join(ROOT, 'assets', 'magnetic', 'demo')]) {
+  for (const destDir of [publicDir, workspace.assetsDir]) {
     mkdirSync(destDir, {recursive: true});
     copyFileSync(trimmedWebm, join(destDir, 'demo.webm'));
     writeFileSync(join(destDir, 'telemetry.json'), telemetryJson);
   }
   const countByType = (type) => telemetry.events.filter((e) => e.type === type).length;
   console.log(
-    `staged demo.webm + telemetry.json -> studio/public/magnetic/ and assets/magnetic/demo/  ` +
+    `staged demo.webm + telemetry.json -> ${workspace.assetsDir} and ${publicDir}  ` +
       `(${countByType('step')} steps, ${countByType('click')} clicks, ${countByType('focus')} focus)`,
   );
+  rmSync(videoDir, {recursive: true, force: true});
 }
 
 /** Run the ffmpeg bundled with @remotion/renderer via its CLI (studio has it). */

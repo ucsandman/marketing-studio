@@ -1,20 +1,28 @@
 // Generates the shared, brand-agnostic sound-design library ONCE and stages it for
-// rendering: whoosh (act-cut transition), tick (feature-line reveal), riser (build
-// into the end-card CTA). Three short files, one generation call each (<=3 total),
-// written to assets/sfx/ (gitignored) and copied to studio/public/sfx/ (gitignored).
+// rendering. Three short files, one generation call each (<=3 total), written to
+// the product marketing assets/sfx/ and copied to its runtime public/sfx/.
 //
-// Idempotent: skips any file already staged. Silent-fallback: if the audio feeder
-// exits 2 (no ELEVENLABS_API_KEY) nothing is generated and this script exits 0 — the
-// launch video simply renders without the cue layer (build-<brand>-audio.mjs then
-// leaves the manifest's sfx gate off). NEVER a hard failure on a missing key.
+// Idempotent and local-first: existing assets are staged without any network call.
+// Missing files are reported and skipped unless --generate is explicitly supplied;
+// that flag is a paid external action and must be approved before use.
 import {copyFileSync, existsSync, mkdirSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const assetsDir = join(root, 'assets', 'sfx');
-const publicDir = join(root, 'studio', 'public', 'sfx');
+const argv = process.argv.slice(2);
+const brand = argv.find((arg, i) => !arg.startsWith('--') && argv[i - 1] !== '--project');
+const project = projectArg(argv);
+if (!brand || !project) {
+  console.error('usage: node scripts/build-sfx.mjs <brand> --project <product-repo> [--generate]');
+  process.exit(2);
+}
+const workspace = resolveWorkspace(root, {brand, project});
+const assetsDir = join(workspace.assetsDir, 'sfx');
+const publicDir = join(workspace.publicDir, 'sfx');
+const allowGenerate = process.argv.includes('--generate');
 
 // Prompts tuned for short, clean, non-musical UI/transition sounds. durationSec must
 // sit in the feeder's 0.5-30s window; the spec caps each cue at <=2s.
@@ -41,6 +49,7 @@ mkdirSync(publicDir, {recursive: true});
 
 let generated = 0;
 let staged = 0;
+let missing = 0;
 
 for (const cue of LIBRARY) {
   const staticFile = join(publicDir, `${cue.name}.mp3`);
@@ -52,11 +61,18 @@ for (const cue of LIBRARY) {
 
   const assetFile = join(assetsDir, `${cue.name}.mp3`);
   if (!existsSync(assetFile)) {
+    if (!allowGenerate) {
+      console.log(`sfx missing: ${cue.name}.mp3 (local-only run; --generate requires approval)`);
+      missing += 1;
+      continue;
+    }
     const res = spawnSync(
       'node',
       [
         'feeders/audio/client.mjs',
         'sfx',
+        '--project',
+        workspace.projectRoot,
         '--prompt',
         cue.prompt,
         '--duration-sec',
@@ -85,4 +101,5 @@ for (const cue of LIBRARY) {
   console.log(`sfx staged: ${cue.name}.mp3`);
 }
 
-console.log(`sfx OK: ${staged}/${LIBRARY.length} staged to studio/public/sfx/ (${generated} generated this run)`);
+const verdict = missing === 0 ? 'OK' : 'INCOMPLETE';
+console.log(`sfx ${verdict}: staged=${staged}/${LIBRARY.length} generated=${generated} missing=${missing}`);

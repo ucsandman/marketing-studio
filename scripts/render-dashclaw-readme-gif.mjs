@@ -15,10 +15,11 @@ import {execSync} from 'node:child_process';
 import {statSync, unlinkSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const studioDir = join(root, 'studio');
-const outDir = join(root, 'out', 'dashclaw');
+const outDir = resolveWorkspace(root, {brand: 'dashclaw', project: projectArg(process.argv.slice(2))}).brandRoot;
 const src = join(outDir, 'demo.mp4');
 const palette = join(outDir, 'readme-demo-palette.png');
 const out = join(outDir, 'readme-demo.gif');

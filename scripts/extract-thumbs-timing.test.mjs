@@ -25,7 +25,7 @@ test('resolveTimingFrame: uses the launch-embedded demo duration, not props/<bra
     const expect = pickFeatureFrame(mod.launchTiming(embedded, 2, null, mod.voTimingFrom([], 2, {force: null})));
     const wrong = pickFeatureFrame(mod.launchTiming(standalone, 2, null, mod.voTimingFrom([], 2, {force: null})));
     assert.notEqual(expect, wrong, 'fixture must discriminate the two sources');
-    const got = await resolveTimingFrame('fx', dir);
+    const got = await resolveTimingFrame('fx', {propsDir: join(dir, 'props')});
     assert.equal(got.frame, expect);
     assert.match(got.source, /timing lookup/);
   } finally {

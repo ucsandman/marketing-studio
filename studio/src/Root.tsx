@@ -16,7 +16,8 @@ import { StoreTile, storeTileSchema } from "./templates/StoreTile";
 import { Card, cardSchema } from "./templates/Card";
 import { WrapClip, wrapClipSchema, wrapDurationInFrames } from "./templates/WrapClip";
 import { AgentSession, agentSessionSchema } from "./templates/AgentSession";
-import { launchTiming, voTimingFrom } from "./lib/launchTiming";
+import { voTimingFrom } from "./lib/launchTiming";
+import { buildLaunchShotPlan } from "./lib/shotPlan";
 import { sessionTiming, welcomeBoxHeight } from "./lib/sessionTiming";
 
 export const RemotionRoot: React.FC = () => {
@@ -130,20 +131,26 @@ export const RemotionRoot: React.FC = () => {
           voTiming: null,
           hookFold: null,
           hookStamp: null,
+          direction: null,
+          shots: null,
         }}
         // VO-driven act lengths (Phase B): engages only when the audio manifest
         // carries word timings, so every existing render is byte-identical. The
         // component must build the SAME fourth argument — a mismatch here silently
         // truncates or pads the film.
         calculateMetadata={({props}) => ({
-          durationInFrames: launchTiming(
-            props.demo.telemetry?.durationMs ?? null,
-            props.features.length,
-            props.actLengths ?? null,
-            voTimingFrom(props.audio?.lines ?? null, props.features.length, {
+          durationInFrames: buildLaunchShotPlan({
+            telemetryDurationMs: props.demo.telemetry?.durationMs ?? null,
+            featureCount: props.features.length,
+            lengths: props.actLengths ?? null,
+            vo: voTimingFrom(props.audio?.lines ?? null, props.features.length, {
               force: props.voTiming ?? null,
             }),
-          ).total,
+            direction: props.direction ?? null,
+            shots: props.shots ?? null,
+            fps: 30,
+            demoViewport: props.demo.telemetry?.viewport ?? null,
+          }).total,
           width: props.formatWidth ?? 1920,
           height: props.formatHeight ?? 1080,
         })}

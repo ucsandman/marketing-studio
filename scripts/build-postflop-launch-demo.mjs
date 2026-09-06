@@ -1,6 +1,6 @@
 // Launch-cut of the approved postflop product demo.
 //
-// The approved capture (studio/public/postflop/demo.webm, 49.5s) is longer than a
+// The approved product-workspace capture (49.5s) is longer than a
 // 30-90s launch film can spend on one act, so the launch video plays a TRIMMED cut
 // of the SAME footage: nothing is re-captured, re-staged, or re-timed.
 //
@@ -26,14 +26,15 @@
 // whole page and the cut lands on a settled wide frame.
 //
 // Outputs (both gitignored, like every other brand's footage):
-//   studio/public/postflop/launch-demo.mp4
-//   props/postflop-launch-demo.json   (demo-props shape, telemetry re-based to the cut)
+//   public/postflop/launch-demo.mp4
+//   props/postflop-launch-demo.json   (both below the product workspace)
 //
-// Usage: node scripts/build-postflop-launch-demo.mjs
+// Usage: node scripts/build-postflop-launch-demo.mjs --project <repo>
 import {execFileSync} from 'node:child_process';
-import {existsSync, readFileSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -42,8 +43,10 @@ process.on('unhandledRejection', (reason) => {
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const studio = join(root, 'studio');
-const source = join(studio, 'public', 'postflop', 'demo.webm');
-const target = join(studio, 'public', 'postflop', 'launch-demo.mp4');
+const workspace = resolveWorkspace(root, {brand: 'postflop', project: projectArg(process.argv.slice(2))});
+const publicDir = join(workspace.publicDir, 'postflop');
+const source = join(publicDir, 'demo.webm');
+const target = join(publicDir, 'launch-demo.mp4');
 
 const WINDOWS = [
   [1400, 13800],
@@ -63,7 +66,7 @@ if (!existsSync(source)) {
   process.exit(1);
 }
 
-const demo = JSON.parse(readFileSync(join(root, 'props', 'postflop-demo.json'), 'utf8'));
+const demo = JSON.parse(readFileSync(join(workspace.propsDir, 'postflop-demo.json'), 'utf8'));
 const vp = demo.telemetry.viewport;
 
 // Re-base the telemetry onto the cut, window by window. The step ACTIVE at the
@@ -106,10 +109,8 @@ const chains = WINDOWS.map(
 ).join(';');
 const concat = `${WINDOWS.map((_, i) => `[w${i}]`).join('')}concat=n=${WINDOWS.length}:v=1:a=0[out]`;
 
-// Plain `ffmpeg` on PATH (launch.py --check verifies it), NOT `npx remotion
-// ffmpeg`: the npx hop needs `shell: true` on win32, and cmd.exe mangles the
-// unquoted `;` and `[]` of a filter graph. execFileSync with no shell passes the
-// graph through verbatim.
+// Remotion's bundled binary omits filters this graph needs, so use the system
+// ffmpeg verified by launch.py --check. The argv array preserves the graph verbatim.
 const args = [
   '-y', '-hide_banner', '-loglevel', 'error',
   '-i', source,
@@ -125,8 +126,10 @@ if (!existsSync(target)) {
   process.exit(1);
 }
 
+mkdirSync(workspace.propsDir, {recursive: true});
+const propsOut = join(workspace.propsDir, 'postflop-launch-demo.json');
 writeFileSync(
-  join(root, 'props', 'postflop-launch-demo.json'),
+  propsOut,
   JSON.stringify(
     {...demo, video: 'postflop/launch-demo.mp4', telemetry: {viewport: vp, durationMs, events}},
     null,
@@ -134,6 +137,6 @@ writeFileSync(
   ) + '\n',
 );
 console.log(
-  `wrote studio/public/postflop/launch-demo.mp4 + props/postflop-launch-demo.json ` +
+  `wrote ${target} + ${propsOut} ` +
     `(${WINDOWS.length} windows, ${(durationMs / 1000).toFixed(1)}s, ${events.length} events)`,
 );

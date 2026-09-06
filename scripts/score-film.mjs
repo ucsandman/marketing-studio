@@ -8,12 +8,12 @@
 // cue lands on its frame, and the mix is mastered to master-audio's TARGET_I with a
 // true-peak ceiling — then the DELIVERED mp4 is measured, never the filter graph.
 //
-// Usage: node scripts/score-film.mjs <brand> <film.mp4> [--manifest <json>] [--out <path>]
-//                                    [--force] [--music-only]
-//   --manifest   default props/<brand>-film-audio.json (built by
+// Usage: node scripts/score-film.mjs <brand> <film.mp4> --project <product-repo>
+//                                    [--manifest <json>] [--out <path>] [--music-only]
+//   --manifest   default product marketing props/<brand>-film-audio.json (built by
 //                scripts/build-<brand>-film-audio.mjs; never hand-edited)
-//   --out        default <film>-scored.mp4 beside the input; refuses to overwrite
-//                without --force (versions are evidence)
+//   --out        default <film>-scored.mp4 beside the input; always refuses to
+//                overwrite because versions are evidence
 //   --music-only explicit opt-out of narration; recorded in score.json so
 //                check-audio can flag it. Without it, a manifest with zero VO lines
 //                is an error, not a silent bed.
@@ -23,8 +23,17 @@
 import {spawnSync} from 'node:child_process';
 import {existsSync, mkdirSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
-import {basename, dirname, join, resolve} from 'node:path';
+import {basename, dirname, join, relative, resolve} from 'node:path';
 import {TARGET_I} from './master-audio.mjs';
+import {projectArg, resolveWorkspace, resolveWorkspacePath} from './lib/workspace.mjs';
+import {
+  analyzeMusicBed,
+  assessMusicMarkers,
+  probeMedia,
+  reportFindings,
+  resolveNarrationLines,
+  sha256File,
+} from './lib/sound-design.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -42,6 +51,7 @@ export const I_TOLERANCE = 0.5; // LU
 // Speech has an ~18 dB crest; 4:1 brings it to ~10 so the master converges
 // (same reasoning as score-social-clip's VO_COMP).
 export const VO_COMP = 'acompressor=threshold=-24dB:ratio=4:attack=3:release=100:makeup=8dB';
+export const VO_EQ = 'highpass=f=75,lowpass=f=15500,equalizer=f=260:t=q:w=1:g=-1.5';
 // Generated beds arrive with mean -32 dB / peak -0.6 (postflop, 2026-09-01): far
 // too spiky for a linear loudnorm. Tame the bed before it meets anything else.
 export const BED_COMP = 'acompressor=threshold=-20dB:ratio=4:attack=4:release=90:makeup=3dB';
@@ -49,6 +59,7 @@ export const BED_COMP = 'acompressor=threshold=-20dB:ratio=4:attack=4:release=90
 // VO so the duck depth does not depend on the bed's own level.
 export const DUCK = 'sidechaincompress=threshold=0.02:ratio=6:attack=30:release=400:makeup=1:level_sc=1';
 export const MIX_COMP = 'acompressor=threshold=-24dB:ratio=4:attack=3:release=120:makeup=6dB';
+export const SFX_BUS = 'highpass=f=70,lowpass=f=15000,acompressor=threshold=-18dB:ratio=2:attack=2:release=80';
 export const LIMIT = 0.74; // alimiter ceiling (-2.6 dBFS) before the AAC encode
 export const MAX_ITER = 4;
 
@@ -74,7 +85,7 @@ export function lineCollisions(lines, totalMs, breath = BREATH_MS) {
  * per VO line (in manifest order), then one per distinct SFX asset (in `sfxNames`
  * order). Returns the graph whose output pad is [mix]. Exported for the test.
  */
-export function mixFilter(manifest, totalS, sfxNames, {musicOnly = false} = {}) {
+export function mixFilter(manifest, totalS, sfxNames, {musicOnly = false, productionBuses = false} = {}) {
   const lines = musicOnly ? [] : manifest.lines;
   const fps = manifest.fps;
   const parts = [];
@@ -86,7 +97,8 @@ export function mixFilter(manifest, totalS, sfxNames, {musicOnly = false} = {}) 
   let bedOut = '[bed]';
   if (lines.length) {
     const voSum = lines.length === 1 ? '[vo0]' : (parts.push(`${lines.map((_, i) => `[vo${i}]`).join('')}amix=inputs=${lines.length}:normalize=0:duration=longest[vosum]`), '[vosum]');
-    parts.push(`${voSum}asplit[key0][voice]`);
+    parts.push(`${voSum}asplit[key0][voice0]`);
+    parts.push(`[voice0]${productionBuses ? VO_EQ : 'anull'}[voice]`);
     // sidechaincompress ends with its SHORTEST input, so a key that stops when the
     // last line does takes the bed down with it — and then `-shortest` on the mux
     // takes the PICTURE down to that: offlocalhost lost 17 frames and postflop's
@@ -99,7 +111,7 @@ export function mixFilter(manifest, totalS, sfxNames, {musicOnly = false} = {}) 
   const sfxBase = 2 + lines.length;
   const sfxPads = [];
   sfxNames.forEach((name, ni) => {
-    const cues = manifest.sfx.filter((c) => c.name === name);
+    const cues = (manifest.sfx ?? []).filter((c) => c.name === name);
     if (!cues.length) return;
     const gain = SFX_GAIN[name] ?? 0.25;
     parts.push(`[${sfxBase + ni}:a]asplit=${cues.length}${cues.map((_, ci) => `[s${ni}_${ci}]`).join('')}`);
@@ -109,7 +121,12 @@ export function mixFilter(manifest, totalS, sfxNames, {musicOnly = false} = {}) 
       sfxPads.push(`[S${ni}_${ci}]`);
     });
   });
-  const inputs = [bedOut, ...(lines.length ? ['[voice]'] : []), ...sfxPads];
+  let mixedSfxPads = sfxPads;
+  if (productionBuses && sfxPads.length) {
+    parts.push(`${sfxPads.join('')}amix=inputs=${sfxPads.length}:normalize=0:duration=longest,${SFX_BUS}[sfxbus]`);
+    mixedSfxPads = ['[sfxbus]'];
+  }
+  const inputs = [bedOut, ...(lines.length ? ['[voice]'] : []), ...mixedSfxPads];
   parts.push(`${inputs.join('')}amix=inputs=${inputs.length}:normalize=0:duration=first[mix]`);
   return parts.join(';');
 }
@@ -129,8 +146,17 @@ function ff(args, {capture = false} = {}) {
 }
 
 function durationS(file) {
-  const r = spawnSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file], {encoding: 'utf8'});
-  const d = Number(String(r.stdout).trim());
+  // Picture duration is authoritative. A previously muxed AAC tail can extend the
+  // container by one codec frame (observed 28.053s around a 28.000s/840-frame cut).
+  const r = spawnSync(
+    'ffprobe',
+    ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=duration', '-of', 'json', file],
+    {encoding: 'utf8'},
+  );
+  let d = NaN;
+  try {
+    d = Number(JSON.parse(String(r.stdout)).streams?.[0]?.duration);
+  } catch {}
   if (!Number.isFinite(d) || d <= 0) throw new Error(`could not measure ${file}`);
   return d;
 }
@@ -146,12 +172,12 @@ export function measure(file) {
   return {I: num(/\n\s+I:\s+(-?[\d.]+) LUFS/), TP: num(/Peak:\s+(-?[\d.]+) dB/), LRA: num(/LRA:\s+(-?[\d.]+) LU/)};
 }
 
-function levelledSfx(name, dir) {
+function levelledSfx(name, dir, assetsDir) {
   const out = join(dir, `${name}.mp3`);
   if (!existsSync(out)) {
     mkdirSync(dir, {recursive: true});
-    const src = join(root, 'assets', 'sfx', `${name}.mp3`);
-    if (!existsSync(src)) throw new Error(`no SFX asset ${src} (run scripts/build-sfx.mjs)`);
+    const src = join(assetsDir, 'sfx', `${name}.mp3`);
+    if (!existsSync(src)) throw new Error(`no product-owned SFX asset ${src} (run scripts/build-sfx.mjs <brand> --project <repo>)`);
     const dur = name === 'tick' ? '0.5' : '1.0';
     const gain = name === 'tick' ? '22' : '16';
     const r = spawnSync('node', [join(root, 'scripts', 'level-sfx.mjs'), src, '--gain', gain, '--dur', dur, '--out', out], {encoding: 'utf8'});
@@ -160,17 +186,30 @@ function levelledSfx(name, dir) {
   return out;
 }
 
-function main() {
+async function main() {
   const argv = process.argv.slice(2);
   const flag = (n) => (argv.indexOf(n) >= 0 ? argv[argv.indexOf(n) + 1] : null);
   const has = (n) => argv.includes(n);
-  const [brand, filmArg] = argv.filter((a, i) => !a.startsWith('--') && !(i > 0 && argv[i - 1].startsWith('--') && ['--manifest', '--out'].includes(argv[i - 1])));
-  if (!brand || !filmArg) {
-    console.error('usage: node scripts/score-film.mjs <brand> <film.mp4> [--manifest <json>] [--out <path>] [--force] [--music-only]');
+  const valueFlags = new Set(['--manifest', '--out', '--project']);
+  const positional = [];
+  for (let i = 0; i < argv.length; i++) {
+    if (valueFlags.has(argv[i])) {
+      i += 1;
+      continue;
+    }
+    if (!argv[i].startsWith('--')) positional.push(argv[i]);
+  }
+  const [brand, filmArg] = positional;
+  const project = projectArg(argv);
+  if (!brand || !filmArg || !project) {
+    console.error('usage: node scripts/score-film.mjs <brand> <film.mp4> --project <product-repo> [--manifest <json>] [--out <path>] [--music-only]');
     process.exit(2);
   }
-  const film = resolve(root, filmArg);
-  const manifestPath = resolve(root, flag('--manifest') ?? join('props', `${brand}-film-audio.json`));
+  const workspace = resolveWorkspace(root, {brand, project});
+  const film = resolveWorkspacePath(workspace, filmArg);
+  const manifestPath = flag('--manifest')
+    ? resolveWorkspacePath(workspace, flag('--manifest'))
+    : join(workspace.propsDir, `${brand}-film-audio.json`);
   if (!existsSync(film) || !existsSync(manifestPath)) {
     console.error(`score-film: missing ${existsSync(film) ? manifestPath : film}`);
     process.exit(2);
@@ -181,32 +220,39 @@ function main() {
     console.error('score-film: the manifest has no VO lines. A film narrates the product; pass --music-only ONLY as a recorded, deliberate choice.');
     process.exit(1);
   }
-  const out = resolve(root, flag('--out') ?? join(dirname(film), `${basename(film, '.mp4')}-scored.mp4`));
-  if (existsSync(out) && !has('--force')) {
-    console.error(`score-film: refusing to overwrite ${out} (pass --force, or score into a new version)`);
+  const out = flag('--out')
+    ? resolveWorkspacePath(workspace, flag('--out'))
+    : join(dirname(film), `${basename(film, '.mp4')}-scored.mp4`);
+  if (existsSync(out)) {
+    console.error(`score-film: refusing to overwrite ${out}; score into a new version`);
     process.exit(1);
   }
   const totalS = durationS(film);
   const totalMs = Math.round(totalS * 1000);
-  const collisions = musicOnly ? [] : lineCollisions(manifest.lines, totalMs);
+  const resolvedLines = musicOnly ? [] : resolveNarrationLines(manifest.lines, manifest.fps, totalMs);
+  const resolvedManifest = {...manifest, lines: resolvedLines};
+  const collisions = musicOnly ? [] : lineCollisions(resolvedLines, totalMs);
   if (collisions.length) {
     console.error('score-film: narration does not fit the picture — trim the COPY in the builder, never the timing:');
     for (const c of collisions) console.error('  ' + c);
     process.exit(1);
   }
-  const pub = join(root, 'studio', 'public');
+  const pub = workspace.publicDir;
+  if (!manifest.music?.src) throw new Error('film audio manifest has no music bed');
   const bed = join(pub, manifest.music.src);
-  const voFiles = musicOnly ? [] : manifest.lines.map((l) => join(pub, l.src));
+  const voFiles = musicOnly ? [] : resolvedLines.map((l) => join(pub, l.src));
   for (const f of [bed, ...voFiles]) if (!existsSync(f)) throw new Error(`missing audio ${f}`);
-  const workDir = join(dirname(out), '.score-work');
+  const workDir = join(workspace.brandRoot, '.score-work', basename(out, '.mp4'));
   mkdirSync(workDir, {recursive: true});
-  const sfxNames = [...new Set((manifest.sfx ?? []).map((c) => c.name))];
-  const sfxFiles = sfxNames.map((n) => levelledSfx(n, join(workDir, 'sfx')));
+  const sfxNames = [...new Set((resolvedManifest.sfx ?? []).map((c) => c.name))];
+  const sfxFiles = sfxNames.map((n) => levelledSfx(n, join(workDir, 'sfx'), workspace.assetsDir));
+  const beatAnalysis = analyzeMusicBed(bed);
+  const markerResults = assessMusicMarkers(manifest.music.markers ?? [], beatAnalysis, manifest.fps);
 
   // 1. mix to float WAV (no clipping in the intermediate)
   const mixWav = join(workDir, 'mix.wav');
   const inputs = [film, bed, ...voFiles, ...sfxFiles].flatMap((f) => ['-i', f]);
-  const graph = mixFilter(manifest, totalS, sfxNames, {musicOnly});
+  const graph = mixFilter(resolvedManifest, totalS, sfxNames, {musicOnly, productionBuses: true});
   let r = ff(['-loglevel', 'error', '-y', ...inputs, '-filter_complex', graph, '-map', '[mix]', '-c:a', 'pcm_f32le', '-t', totalS.toFixed(3), mixWav]);
   if (r.status !== 0) {
     console.error('score-film: mix failed\n' + r.stderr);
@@ -240,22 +286,61 @@ function main() {
     gain = nextGain(gain, m.I);
   }
   const pass = m && Math.abs(m.I - TARGET_I) <= I_TOLERANCE && m.TP <= DELIVER_TP;
+  const media = probeMedia(out);
+  const outHash = await sha256File(out);
+  const findings = reportFindings({
+    measurements: m,
+    beatAnalysis,
+    markerResults,
+    expectedDurationSec: totalS,
+    actualDurationSec: media.durationSec,
+  });
+  const machinePass = pass && !findings.some((finding) => finding.level === 'error');
+  const rel = (path) => relative(workspace.projectRoot, path).replaceAll('\\', '/');
   const record = {
+    judge: 'sound-design-machine',
+    verdict: machinePass ? 'PASS' : 'FAIL',
+    generatedAt: new Date().toISOString(),
+    input: {
+      path: rel(out),
+      sha256: outHash,
+      bytes: media.bytes,
+      durationSec: media.durationSec,
+      audio: media.audio,
+      processed: {
+        voLines: musicOnly ? 0 : resolvedLines.length,
+        sfxCues: (manifest.sfx ?? []).length,
+        musicMarkers: markerResults.length,
+        beatWindows: beatAnalysis.windows,
+        beatCandidates: beatAnalysis.beatTimesMs.length,
+      },
+    },
+    findings,
     film: filmArg,
-    out: out.replace(root + '\\', '').replaceAll('\\', '/'),
-    manifest: manifestPath.replace(root + '\\', '').replaceAll('\\', '/'),
-    voLines: musicOnly ? 0 : manifest.lines.length,
+    out: rel(out),
+    manifest: rel(manifestPath),
+    voLines: musicOnly ? 0 : resolvedLines.length,
     sfxCues: (manifest.sfx ?? []).length,
     musicOnly,
     measured: m,
+    beatAnalysis: {
+      estimatedBpm: beatAnalysis.estimatedBpm,
+      confidence: beatAnalysis.confidence,
+      candidates: beatAnalysis.beatTimesMs.length,
+      windows: beatAnalysis.windows,
+    },
+    musicMarkers: markerResults,
     passes: iter + 1,
-    verdict: pass ? 'PASS' : 'FAIL',
   };
-  writeFileSync(join(dirname(out), 'score.json'), JSON.stringify(record, null, 2) + '\n');
+  mkdirSync(workspace.marketingDir, {recursive: true});
+  writeFileSync(join(workspace.marketingDir, 'score.json'), JSON.stringify(record, null, 2) + '\n');
+  const reportPath = join(workspace.marketingDir, `${basename(out, '.mp4')}-audio-report.json`);
+  writeFileSync(reportPath, JSON.stringify(record, null, 2) + '\n');
   rmSync(mixWav, {force: true});
   rmSync(stage, {force: true});
-  console.log(`score-film [${brand}]: ${record.verdict} — ${record.voLines} VO lines, ${record.sfxCues} sfx cues, music bed; delivered ${record.out} at I ${m?.I} LUFS / TP ${m?.TP} dBTP`);
-  if (!pass) {
+  console.log(`score-film [${brand}]: ${record.verdict} — ${record.voLines} VO lines, ${record.sfxCues} sfx cues, ${markerResults.length} music markers; delivered ${record.out} at I ${m?.I} LUFS / TP ${m?.TP} dBTP`);
+  console.log(`  report ${rel(reportPath)} sha256 ${outHash} bytes ${media.bytes} duration ${media.durationSec}s`);
+  if (!machinePass) {
     console.error(`score-film: delivered file outside the gate (I within ${I_TOLERANCE} of ${TARGET_I}, TP <= ${DELIVER_TP}) after ${iter + 1} passes`);
     process.exit(1);
   }

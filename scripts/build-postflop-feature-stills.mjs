@@ -1,5 +1,5 @@
 // Feature-act plates for the postflop launch video. The direction (The Proof
-// Sheet, out/postflop/marketing/direction.md) sets real workbench footage under
+// Sheet, in the product marketing workspace) sets real workbench footage under
 // ink rules as framed plates, and the brand voice is explicit that "the product is
 // the imagery": every plate is a REAL region of the already-approved demo capture,
 // nothing is re-captured, re-staged, or invented.
@@ -15,14 +15,14 @@
 // The convergence and lock beats are deliberately OUTSIDE the launch demo cut
 // (scripts/build-postflop-launch-demo.mjs), so the film shows each of them once.
 //
-// Outputs studio/public/postflop/feature-*.png (gitignored, like every other
-// brand's screenshots).
+// Outputs product-owned public/postflop/feature-*.png.
 //
-// Usage: node scripts/build-postflop-feature-stills.mjs
+// Usage: node scripts/build-postflop-feature-stills.mjs --project <repo>
 import {execFileSync} from 'node:child_process';
 import {existsSync, mkdirSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -31,7 +31,8 @@ process.on('unhandledRejection', (reason) => {
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const studio = join(root, 'studio');
-const dest = join(studio, 'public', 'postflop');
+const workspace = resolveWorkspace(root, {brand: 'postflop', project: projectArg(process.argv.slice(2))});
+const dest = join(workspace.publicDir, 'postflop');
 const capture = join(dest, 'demo.webm');
 
 // Crops are `w:h:x:y` in the capture's own 1920x1080 pixels. Each one starts on a
@@ -69,9 +70,8 @@ mkdirSync(dest, {recursive: true});
 
 for (const {name, crop, ss} of shots) {
   const out = join(dest, name);
-  // Offsets are computed here, not with ffmpeg's `(ow-iw)/2`: the npx hop needs
-  // `shell: true` on win32 and cmd.exe eats the parentheses. Plain `ffmpeg` on PATH
-  // (launch.py --check verifies it) with no shell passes the filter through verbatim.
+  // Compute offsets here so plain ffmpeg receives a literal, argv-safe filter.
+  // launch.py --check verifies the required system ffmpeg before this runs.
   const [cw, ch] = crop.split(':').map(Number);
   const k = Math.min((BOARD.w - 2 * BOARD.inset) / cw, (BOARD.h - 2 * BOARD.inset) / ch);
   const fw = Math.round((cw * k) / 2) * 2;
@@ -85,5 +85,5 @@ for (const {name, crop, ss} of shots) {
     console.error(`build-postflop-feature-stills: ffmpeg produced no output for ${name}`);
     process.exit(1);
   }
-  console.log(`wrote studio/public/postflop/${name} (crop ${crop} @ ${ss}s -> ${BOARD.w}x${BOARD.h})`);
+  console.log(`wrote ${out} (crop ${crop} @ ${ss}s -> ${BOARD.w}x${BOARD.h})`);
 }

@@ -24,7 +24,10 @@ import {existsSync, readFileSync, statSync} from 'node:fs';
 import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {readEnvVar} from './lib/env.mjs';
+import {evaluateProduction} from './judge-production.mjs';
+import {sha256File} from './lib/production-quality.mjs';
 import {applyPosted} from './mission-control.mjs';
+import {projectArg, resolveWorkspace, resolveWorkspacePath} from './lib/workspace.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -96,11 +99,15 @@ export function normalizeBskyMetrics(post) {
   };
 }
 
+export function blueskyCredentialError(handle, password) {
+  return handle && password ? null : 'BLUESKY_HANDLE / BLUESKY_APP_PASSWORD missing from .env (see .env.example) — nothing published.';
+}
+
 // Where the postkit put the pieces this publisher needs. Pure over a root so the
 // test can point it at a temp dir.
-export function loadPostkit(rootDir, brand) {
-  const dir = join(rootDir, 'out', brand, 'postkit', 'bluesky');
-  if (!existsSync(dir)) return {ok: false, reason: `no out/${brand}/postkit/bluesky/ yet — run node scripts/build-postkit.mjs ${brand}`};
+export function loadPostkit(rootDir, workspace, brand) {
+  const dir = join(workspace.postkitDir, 'bluesky');
+  if (!existsSync(dir)) return {ok: false, reason: `no product-owned postkit for ${brand} at ${dir} yet — run node scripts/build-postkit.mjs ${brand} --project <product-repo>`};
   const captionPath = join(dir, 'caption.txt');
   if (!existsSync(captionPath)) return {ok: false, reason: `missing ${captionPath}`};
   const text = readFileSync(captionPath, 'utf8').trim();
@@ -111,6 +118,36 @@ export function loadPostkit(rootDir, brand) {
   const platforms = JSON.parse(readFileSync(join(rootDir, 'scripts', 'platforms.json'), 'utf8'));
   const row = platforms.find((p) => p.id === 'social-16x9') ?? {width: 1920, height: 1080};
   return {ok: true, dir, text, alt, video, width: row.width, height: row.height};
+}
+
+export function publicationApproval(workspace, brand, exportId, mediaPath) {
+  const blocked = (reason) => ({approved: false, verdict: 'BLOCKED', reason});
+  try {
+    const deliveryPath = join(workspace.marketingDir, 'delivery-evidence.json');
+    if (!existsSync(deliveryPath)) return blocked('delivery-evidence.json is missing');
+    const delivery = JSON.parse(readFileSync(deliveryPath, 'utf8'));
+    const entry = delivery.exports?.find((item) => item.id === exportId);
+    if (!entry) return blocked(`no production evidence exists for ${exportId}`);
+    if (!mediaPath || sha256File(mediaPath) !== entry.sha256) return blocked(`current ${exportId} media does not match approved rendered bytes`);
+    if (!entry.evidence || !entry.review) return blocked(`${exportId} evidence is missing row-specific evidence or review paths`);
+    const productionPlanPath = resolveWorkspacePath(workspace, delivery.plan);
+    const result = evaluateProduction({
+      workspace,
+      brand,
+      productionPlanPath,
+      renderPath: mediaPath,
+      evidencePath: resolveWorkspacePath(workspace, entry.evidence),
+      reviewPath: resolveWorkspacePath(workspace, entry.review),
+    });
+    if (result.verdict !== 'PASS') {
+      const reason = result.findings.find((item) => item.level === 'FAIL' || item.level === 'INCOMPLETE')?.message ?? 'production review is not approved';
+      return blocked(reason);
+    }
+    if (entry.sourceBundleSha256 !== result.input?.sourceBundleSha256) return blocked('approved source bundle is stale');
+    return {approved: true, verdict: 'PASS', reason: null, report: result};
+  } catch (error) {
+    return blocked(error.message);
+  }
 }
 
 // --- wire ----------------------------------------------------------------------
@@ -175,13 +212,15 @@ async function main() {
   const asJson = argv.includes('--json');
   const variantIdx = argv.indexOf('--variant');
   const variant = variantIdx >= 0 ? argv[variantIdx + 1] : null;
-  const brand = argv.find((a, i) => !a.startsWith('--') && argv[i - 1] !== '--variant');
+  const brand = argv.find((a, i) => !a.startsWith('--') && !['--variant', '--project'].includes(argv[i - 1]));
+  const project = projectArg(argv);
   if (!brand) {
-    console.error('usage: node scripts/publish-bluesky.mjs <brand> [--dry-run] [--json] [--variant <id>]');
+    console.error('usage: node scripts/publish-bluesky.mjs <brand> --project <product-repo> [--dry-run] [--json] [--variant <id>]');
     process.exit(1);
   }
 
-  const kit = loadPostkit(root, brand);
+  const workspace = resolveWorkspace(root, {brand, project});
+  const kit = loadPostkit(root, workspace, brand);
   if (!kit.ok) {
     console.error(`publish-bluesky [${brand}]: ${kit.reason}`);
     process.exit(2);
@@ -191,6 +230,7 @@ async function main() {
     console.error(`publish-bluesky [${brand}]: caption is ${graphemes} graphemes, Bluesky allows ${BSKY_MAX_GRAPHEMES}`);
     process.exit(1);
   }
+  const approval = publicationApproval(workspace, brand, 'social-16x9', kit.video);
 
   if (dryRun) {
     const record = buildRecord({
@@ -200,19 +240,26 @@ async function main() {
       width: kit.width,
       height: kit.height,
     });
-    const summary = {brand, dryRun: true, graphemes, video: kit.video, record};
+    const summary = {brand, dryRun: true, publishApproved: approval.approved, blockedReason: approval.reason, graphemes, video: kit.video, record};
     if (asJson) console.log(JSON.stringify(summary, null, 2));
     else {
       console.log(`publish-bluesky [${brand}] dry run: ${graphemes} graphemes, ${record.facets?.length ?? 0} link facets, video ${kit.video ? `${statSync(kit.video).size} bytes` : 'none'}`);
+      if (!approval.approved) console.log(`publish-bluesky [${brand}] preview only; live publish blocked: ${approval.reason}`);
       console.log(record.text);
     }
     process.exit(0);
   }
 
+  if (!approval.approved) {
+    console.error(`publish-bluesky [${brand}]: live publish blocked before credentials/network: ${approval.reason}`);
+    process.exit(2);
+  }
+
   const handle = readEnvVar('BLUESKY_HANDLE');
   const password = readEnvVar('BLUESKY_APP_PASSWORD');
-  if (!handle || !password) {
-    console.error('publish-bluesky: BLUESKY_HANDLE / BLUESKY_APP_PASSWORD missing from .env (see .env.example) — nothing published.');
+  const credentialError = blueskyCredentialError(handle, password);
+  if (credentialError) {
+    console.error(`publish-bluesky: ${credentialError}`);
     process.exit(2);
   }
 
@@ -229,7 +276,7 @@ async function main() {
     body: {repo: session.did, collection: 'app.bsky.feed.post', record},
   });
   const url = postUrl(session.handle ?? handle, created.uri);
-  const postsPath = join(root, 'out', brand, 'marketing', 'posts.json');
+  const postsPath = join(workspace.marketingDir, 'posts.json');
   const posted = applyPosted(postsPath, {platform: 'bluesky', url, variant});
   if (posted.status !== 200) {
     console.error(`publish-bluesky: posted but could not record it: ${posted.body.error}`);

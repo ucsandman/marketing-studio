@@ -1,17 +1,18 @@
-// Stat and quote cards for one brand: reads out/<brand>/marketing/brief.json,
+// Stat and quote cards for one brand: reads its product-owned brief.json,
 // emits one Card props JSON per proof point plus one quote card from the hook
 // headline, then renders each at 1080x1080 and 1080x1350 via the Card
 // composition's {formatWidth, formatHeight} props (the render-matrix pattern —
 // this Remotion version has no --width/--height CLI flags).
 //
-// Usage: node scripts/build-cards.mjs <brand> [--brief path] [--out dir] [--dry-run]
+// Usage: node scripts/build-cards.mjs <brand> --project <repo> [--brief path] [--out dir] [--dry-run]
 //
 // A missing brief is a clean skip (exit 0): cards are downstream of copy the
 // agent synthesizes, and half the brands have no brief yet.
 import {readFileSync, existsSync, mkdirSync, writeFileSync} from 'node:fs';
-import {execSync} from 'node:child_process';
+import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {dirname, join, resolve} from 'node:path';
+import {projectArg, resolveWorkspace, resolveWorkspacePath} from './lib/workspace.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -86,15 +87,16 @@ const main = () => {
   };
   // Indexes consumed as flag VALUES, so they are never mistaken for the brand.
   const taken = new Set(
-    ['--brief', '--out'].map((f) => args.indexOf(f)).filter((i) => i !== -1).map((i) => i + 1),
+    ['--brief', '--out', '--project'].map((f) => args.indexOf(f)).filter((i) => i !== -1).map((i) => i + 1),
   );
   const brand = args.find((a, i) => !a.startsWith('--') && !taken.has(i));
   if (!brand) {
-    console.error('usage: node scripts/build-cards.mjs <brand> [--brief path] [--out dir] [--dry-run]');
+    console.error('usage: node scripts/build-cards.mjs <brand> --project <repo> [--brief path] [--out dir] [--dry-run]');
     process.exit(1);
   }
-  const briefPath = flag('brief') ?? join(root, 'out', brand, 'marketing', 'brief.json');
-  const outDir = flag('out') ?? join(root, 'out', brand, 'marketing', 'cards');
+  const workspace = resolveWorkspace(root, {brand, project: projectArg(args)});
+  const briefPath = flag('brief') ? resolveWorkspacePath(workspace, flag('brief')) : join(workspace.marketingDir, 'brief.json');
+  const outDir = flag('out') ? resolveWorkspacePath(workspace, flag('out')) : join(workspace.marketingDir, 'cards');
   const dryRun = args.includes('--dry-run');
 
   if (!existsSync(briefPath)) {
@@ -121,7 +123,7 @@ const main = () => {
       const sizedPath = join(outDir, `${card.id}-${size.w}x${size.h}-props.json`);
       writeFileSync(sizedPath, JSON.stringify(props, null, 2));
       console.log(`still: ${card.id} (${size.w}x${size.h})`);
-      execSync(`npx remotion still Card "${outFile}" --props="${sizedPath}"`, {
+      execFileSync(process.platform === 'win32' ? 'npx.cmd' : 'npx', ['remotion', 'still', 'Card', outFile, `--props=${sizedPath}`, `--public-dir=${workspace.publicDir}`], {
         cwd: join(root, 'studio'),
         stdio: 'inherit',
       });

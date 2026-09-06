@@ -2,7 +2,7 @@
 // pull-magnetic-verdicts — reconciles a Magnetic review reel back into
 // review.json.
 //
-// Reads out/<brand>/marketing/magnetic-review.json (the manifest
+// Reads product-owned marketing/magnetic-review.json (the manifest
 // scripts/review-in-magnetic.mjs wrote: which assets were imported and
 // proposed, keyed by run.json's own asset id), read_timeline's the live
 // Magnetic sequence over the agent sidecar, and diffs [file=<name>]
@@ -19,7 +19,7 @@
 //   - clips the user added themselves (fileNames not in the manifest) are
 //     not in this map at all — ignored, not ours to verdict
 //
-// Verdicts are appended into out/<brand>/marketing/review.json in exactly
+// Verdicts are appended into product-owned marketing/review.json in exactly
 // the shape and atomic-write convention scripts/mission-control.mjs's
 // Approve/Redo writer uses (probed: reviewPath at mission-control.mjs:54,
 // the read-modify-write array + JSON.stringify(_, null, 2) + '\n' shape and
@@ -34,6 +34,7 @@ import {readFileSync, writeFileSync, renameSync, existsSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {basename, dirname, join, resolve} from 'node:path';
 import {callTool} from './lib/magnetic-sidecar.mjs';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -122,8 +123,8 @@ function printSummary(manifest, verdicts) {
 
 // --- orchestration (exported for scripts/pull-magnetic-verdicts.test.mjs) ---
 
-export async function runPull({root, brand}) {
-  const marketingDir = join(root, 'out', brand, 'marketing');
+export async function runPull({root, brand, workspace}) {
+  const marketingDir = workspace.marketingDir;
   const manifestPath = join(marketingDir, 'magnetic-review.json');
   let manifest;
   try {
@@ -150,13 +151,14 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 async function main() {
   const argv = process.argv.slice(2);
-  const brand = argv.find((a) => !a.startsWith('-'));
+  const brand = argv.find((a, i) => !a.startsWith('-') && argv[i - 1] !== '--project');
   if (!brand) {
-    console.error('Usage: node scripts/pull-magnetic-verdicts.mjs <brand>');
+    console.error('Usage: node scripts/pull-magnetic-verdicts.mjs <brand> --project <product-repo>');
     process.exit(1);
     return;
   }
-  await runPull({root, brand});
+  const workspace = resolveWorkspace(root, {brand, project: projectArg(argv)});
+  await runPull({root, brand, workspace});
 }
 
 // Import-safe (the test file imports mapVerdicts/runPull): only run when

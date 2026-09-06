@@ -6,13 +6,13 @@ in-process (WASM, no Go binary) and rasterises the SVG with resvg.
 ## Install
 
 ```
-cd feeders/diagram && npm install
+cd feeders/diagram && npm ci
 ```
 
 ## Usage
 
 ```
-node feeders/diagram/render.mjs <brand> <spec.d2> [--out DIR] [--width N]
+node feeders/diagram/render.mjs <brand> <spec.d2> [--project REPO] [--out DIR] [--width N]
 ```
 
 - `<brand>` resolves `brands/<id>.json`; the diagram takes `colors.bg` as its
@@ -20,7 +20,11 @@ node feeders/diagram/render.mjs <brand> <spec.d2> [--out DIR] [--width N]
   `colors.brand` on every connection. D2's default theme colors the boxes but
   leaves edge strokes alone, so the feeder prepends glob rules that cover
   connections as well as shapes.
-- Output defaults to `out/<brand>/marketing/diagrams/`. Each run writes
+- `--project` selects the external product git repository. It may be omitted when
+  invoked from that product worktree. The `.d2` input and any `--out` override
+  must stay inside the resolved product repository.
+- Output defaults to
+  `<product>/marketing/assets/<brand>/marketing/diagrams/`. Each run writes
   `<name>.svg`, `<name>.png`, and a copy of `<name>.d2` so the diagram is
   regenerable from what shipped.
 - `--width` (default 1600) sets the PNG width; the SVG is resolution independent.
@@ -29,8 +33,8 @@ node feeders/diagram/render.mjs <brand> <spec.d2> [--out DIR] [--width N]
 Example:
 
 ```
-node feeders/diagram/render.mjs sidetap docs/diagrams/pipeline.d2 --width 1600
-# diagram OK: out/sidetap/marketing/diagrams/pipeline.png (5 nodes, 4 edges, 1600px)
+node <engine-repo>/feeders/diagram/render.mjs sidetap docs/diagrams/pipeline.d2 --project . --width 1600
+# diagram OK: <product>/marketing/assets/sidetap/marketing/diagrams/pipeline.png (5 nodes, 4 edges, 1600px)
 ```
 
 resvg does not load D2's embedded webfont, so PNG text falls back to a system

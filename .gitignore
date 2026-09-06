@@ -1,7 +1,12 @@
 node_modules/
+studio/build/
+# Product media belongs in <product-repo>/marketing/assets/<brand>/.
 out/
 assets/
+props/
+examples/
 studio/public/*/
+.playwright-mcp/
 .env
 *.log
 .superpowers/

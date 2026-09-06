@@ -5,15 +5,16 @@ description: Use when generating any brand video, animation, image, or audio ass
 
 # Marketing Studio
 
-All brand video/animation/image assets render in ONE engine repo (Remotion +
-Blender + Playwright + ComfyUI feeders). Its root is:
+Reusable video/animation/image source lives in one engine repo (Remotion + Blender +
+Playwright + ComfyUI feeders). Its root is:
 
     ${CLAUDE_SKILL_DIR}/../..
 
-That path is substituted when this skill loads, so it is correct wherever the
-engine is installed. Call it ENGINE below. Never generate animation code inside
-a product repo — work in ENGINE, then copy the finished artifact into the
-calling repo.
+Call it ENGINE below. The product repo is PROJECT. Reusable source changes belong in
+ENGINE; every generated input, capture, audio file, prop, public-stage asset, review
+record, render, and delivery file belongs in
+`PROJECT/marketing/assets/<brand>/`. Pass `--project PROJECT` to generators and
+renderers. Do not render into ENGINE and copy out later.
 
 **REQUIRED READING before any asset work:** `${CLAUDE_SKILL_DIR}/../../docs/PLAYBOOK.md`
 — engine map, brand onboarding steps, and the verified gotchas (Blender 5.1.2 API
@@ -32,25 +33,27 @@ expensive to discover; do not re-derive or second-guess them.
    PLAYBOOK's "Onboarding a new brand" section first (tokens from the product repo's
    DESIGN.md/tailwind/CSS vars; mark component; registries). Ask the user only for
    values you cannot derive.
-3. Execute the asset recipe (per-skill).
-4. Rendered proof: inspect 2-4 stills (Read tool) at key frames BEFORE any full render.
-5. Full render to `out/<brand>/`; run `node scripts/smoke.mjs` if you touched studio code.
-6. Deliver: copy the artifact into the calling repo (ask once for the destination;
-   default its existing media/marketing dir) and SEND the file to the user. Not done
-   until the user has seen it. A video is not deliverable silent: it carries music +
-   narration + cues mastered to TARGET_I, and `node scripts/check-audio.mjs <brand>`
-   exits 0 before you say "done" (the one exception is a `-silent` variant that ships
-   NEXT TO its scored original, never instead of it).
-7. Commit the engine repo: any code/config/props changes your run made in
-   ENGINE get committed there (tests + lint + smoke first). Renders
-   under out/, assets/, studio/public/ stay uncommitted (gitignored). An uncommitted
-   engine tree strands your work and blocks the next session.
+3. For hero creative, choose a direction with references/provenance, approve a style
+   frame, and build an audio-bearing animatic before finish work. Use capture, native UI,
+   2D, 3D, or hybrid shots according to the product proof, not a house-style ritual.
+4. Execute the asset recipe with `--project PROJECT`. Remotion commands that use staged
+   media also pass `--public-dir=PROJECT/marketing/assets/<brand>/public`.
+5. Inspect representative stills before any full render. For a production film, inspect
+   start/middle/end evidence for every shot and watch the complete scored cut with sound.
+6. Run the asset gates plus `node scripts/check-audio.mjs <brand> --project PROJECT`.
+   Narration is the default; music-only is an explicit recorded exception. Mechanical
+   PASS never substitutes for the named non-author “would I share this?” review.
+7. The finished artifact already lives in PROJECT. Send it to the user; it is not done
+   until they have seen it. Commit only reusable ENGINE source/config changes and the
+   product-owned run artifacts appropriate for PROJECT.
 
 ## Non-negotiables
 
 - Brand values only from `brands/<id>.json` via `getBrand(brandId)`; never literal hex
   in templates. Honor the brand's stated color rules (noban: profit gold, never green).
 - Nullable asset props + placeholder fallbacks (clean-clone smoke stays green).
+- Production generators never write personal/product material into ENGINE. Diagnostic
+  probes use the explicit temp mode supplied by their wrapper and stay under OS temp.
 - Copy: no em dashes, no hype words.
 - Fail loudly; generated props files are edited via their builder scripts only.
 

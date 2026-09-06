@@ -13,10 +13,11 @@
 // exits 1 if any finding is a FAIL.
 //
 // Usage: node scripts/judge-av-sync.mjs <brand> [--strict] [--json]
-// Output: out/<brand>/marketing/judge-av-sync.json
+// Output: <product-repo>/marketing/assets/<brand>/marketing/judge-av-sync.json
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -363,15 +364,22 @@ async function main() {
   const argv = process.argv.slice(2);
   const strict = argv.includes('--strict');
   const asJson = argv.includes('--json');
-  const brand = argv.find((a) => !a.startsWith('--'));
+  const brand = argv.find((a, i) => !a.startsWith('--') && argv[i - 1] !== '--project');
   if (!brand) {
-    console.error('usage: node scripts/judge-av-sync.mjs <brand> [--strict] [--json]');
+    console.error('usage: node scripts/judge-av-sync.mjs <brand> --project <product-repo> [--strict] [--json]');
+    process.exit(1);
+  }
+  let ws;
+  try {
+    ws = resolveWorkspace(root, {brand, project: projectArg(argv)});
+  } catch (err) {
+    console.error(`judge-av-sync: ${err.message}`);
     process.exit(1);
   }
 
-  const launchPath = join(root, 'props', `${brand}-launch.json`);
-  const audioPath = join(root, 'props', `${brand}-audio.json`);
-  const demoPath = join(root, 'props', `${brand}-demo.json`);
+  const launchPath = join(ws.propsDir, `${brand}-launch.json`);
+  const audioPath = join(ws.propsDir, `${brand}-audio.json`);
+  const demoPath = join(ws.propsDir, `${brand}-demo.json`);
   if (!existsSync(launchPath)) {
     console.error(`judge-av-sync: missing ${launchPath}`);
     process.exit(1);
@@ -481,7 +489,7 @@ async function main() {
     findings,
   };
 
-  const outDir = join(root, 'out', brand, 'marketing');
+  const outDir = ws.marketingDir;
   mkdirSync(outDir, {recursive: true});
   const outPath = join(outDir, 'judge-av-sync.json');
   writeFileSync(outPath, JSON.stringify(report, null, 2));
@@ -492,7 +500,7 @@ async function main() {
     console.log(`judge-av-sync [${brand}]: ${verdict} (${findings.length} finding(s))`);
     for (const f of findings) console.log(`  [${f.level}] ${f.check}: ${f.message}`);
     console.log(`  ${hookOnset.message}`);
-    console.log(`  report -> out/${brand}/marketing/judge-av-sync.json`);
+    console.log(`  report -> ${outPath}`);
   }
 
   process.exit(strict && verdict === 'FAIL' ? 1 : 0);

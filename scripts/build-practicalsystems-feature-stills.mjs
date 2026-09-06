@@ -1,6 +1,6 @@
 // Feature-act stills for the practicalsystems launch video. All three panels show
 // REAL surfaces only, cropped out of the already-approved demo capture
-// (studio/public/practicalsystems/demo.webm, 1440x900, 25 fps). The brand's whole
+// (product public workspace, 1440x900, 25 fps). The brand's whole
 // claim is "nothing staged", so a staged construction would contradict the film:
 //   feature-loop       <- the hero at t=11s: the live agent_log feed, real cycle rows
 //                         (ceo picks, qa PASS, pnl closed books revenue $0 cost $0.30)
@@ -16,13 +16,14 @@
 // to 1.04 about origin 50%/30% and eats a few percent off the edges.
 // Re-time these whenever the capture is re-shot. Nothing is re-captured and nothing is
 // invented; this script is the source of truth for
-// studio/public/practicalsystems/feature-*.png (gitignored, like every brand's stills).
+// product-owned public/practicalsystems/feature-*.png.
 //
-// Usage: node scripts/build-practicalsystems-feature-stills.mjs
+// Usage: node scripts/build-practicalsystems-feature-stills.mjs --project <repo>
 import {execFileSync} from 'node:child_process';
 import {existsSync, mkdirSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -31,7 +32,9 @@ process.on('unhandledRejection', (reason) => {
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const studio = join(root, 'studio');
-const dest = join(studio, 'public', 'practicalsystems');
+const remotionCli = join(studio, 'node_modules', '@remotion', 'cli', 'remotion-cli.js');
+const workspace = resolveWorkspace(root, {brand: 'practicalsystems', project: projectArg(process.argv.slice(2))});
+const dest = join(workspace.publicDir, 'practicalsystems');
 const capture = join(dest, 'demo.webm');
 
 const shots = [
@@ -49,11 +52,11 @@ mkdirSync(dest, {recursive: true});
 for (const {name, crop, ss} of shots) {
   const out = join(dest, name);
   // Arg-array invocation with the win32 shell hop, same as build-sidetap-feature-stills.
-  const args = ['remotion', 'ffmpeg', '-y', '-ss', ss, '-i', capture, '-frames:v', '1', '-update', '1', '-vf', `crop=${crop}`, out];
-  execFileSync('npx', args, {cwd: studio, stdio: 'ignore', shell: process.platform === 'win32'});
+  const args = ['ffmpeg', '-y', '-ss', ss, '-i', capture, '-frames:v', '1', '-update', '1', '-vf', `crop=${crop}`, out];
+  execFileSync(process.execPath, [remotionCli, ...args], {cwd: studio, stdio: 'ignore'});
   if (!existsSync(out)) {
     console.error(`build-practicalsystems-feature-stills: ffmpeg produced no output for ${name}`);
     process.exit(1);
   }
-  console.log(`wrote studio/public/practicalsystems/${name} (t=${ss}s crop ${crop})`);
+  console.log(`wrote ${out} (t=${ss}s crop ${crop})`);
 }

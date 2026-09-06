@@ -15,7 +15,7 @@
  *   out/costclaw/marketing/demo/{terminal-after.txt,html-after.html}   (preferred)
  *   out/costclaw/marketing/polish/{terminal-after.txt,html-after.html} (fallback)
  *
- * Output: ../../studio/public/costclaw/demo.webm + ../../props/costclaw-demo.json
+ * Output: <project>/marketing/assets/costclaw/{assets,public,props}/
  *
  * Camera focus rects are MEASURED from each target element's real boundingBox
  * (viewport px == webm px because recordVideo.size == viewport), never derived
@@ -30,9 +30,12 @@ import {Recorder} from './recorder.mjs';
 import {replayHtml, resolveGroups, toLines} from './ansi-replay.mjs';
 import {cacheKey, checkCache, storeCache} from '../../scripts/lib/cache.mjs';
 import {captureKeyParts} from './capture-cache.mjs';
+import {projectArg, resolveWorkspace} from '../../scripts/lib/workspace.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const CC_ROOT = process.env.CC_ROOT ?? 'C:/Projects/costclaw';
+const argv = process.argv.slice(2);
+const workspace = resolveWorkspace(ROOT, {brand: 'costclaw', project: projectArg(argv) ?? process.env.CC_ROOT ?? 'C:/Projects/costclaw'});
+const CC_ROOT = workspace.projectRoot;
 const VIEWPORT = {width: 1440, height: 900};
 const SETTLE_MS = 650; // let reveal/scroll settle before measuring a focus rect
 
@@ -48,8 +51,8 @@ const TERMINAL_GROUPS = [
 
 // --- Evidence resolution (before the cache gate: its bytes are a cache input) ---
 const EVIDENCE_DIRS = [
-  join(ROOT, 'out', 'costclaw', 'marketing', 'demo'),
-  join(ROOT, 'out', 'costclaw', 'marketing', 'polish'),
+  join(workspace.marketingDir, 'demo'),
+  join(workspace.marketingDir, 'polish'),
 ];
 const evidenceDir = EVIDENCE_DIRS.find(
   (d) => existsSync(join(d, 'terminal-after.txt')) && existsSync(join(d, 'html-after.html')),
@@ -66,12 +69,13 @@ const ansiText = readFileSync(join(evidenceDir, 'terminal-after.txt'), 'utf8');
 const reportHtml = readFileSync(join(evidenceDir, 'html-after.html'), 'utf8');
 
 // --- Footage cache gate (before the browser launch) ---
-const argv = process.argv.slice(2);
 const FORCE = argv.includes('--force');
 const CHECK_ONLY = argv.includes('--cache-check-only');
-const videoOut = join(ROOT, 'studio', 'public', 'costclaw', 'demo.webm');
-const propsOut = join(ROOT, 'props', 'costclaw-demo.json');
-const CACHE_ARTIFACTS = [videoOut, propsOut];
+const publicDir = join(workspace.publicDir, 'costclaw');
+const videoOut = join(publicDir, 'demo.webm');
+const assetOut = join(workspace.assetsDir, 'demo.webm');
+const propsOut = join(workspace.propsDir, 'costclaw-demo.json');
+const CACHE_ARTIFACTS = [videoOut, assetOut, propsOut];
 const sha = (s) => createHash('sha256').update(s).digest('hex');
 const keyParts = captureKeyParts({
   repo: CC_ROOT,
@@ -91,14 +95,14 @@ const CACHE_KEY = cacheKey(keyParts);
 const CACHE_ENABLED = keyParts.productHead !== null; // null => product state unverifiable
 
 if (CHECK_ONLY) {
-  const {hit} = CACHE_ENABLED ? checkCache('costclaw', 'capture', CACHE_KEY, CACHE_ARTIFACTS) : {hit: false};
+  const {hit} = CACHE_ENABLED ? checkCache(workspace, 'capture', CACHE_KEY, CACHE_ARTIFACTS) : {hit: false};
   console.log(hit ? 'HIT' : 'MISS');
   process.exit(0);
 }
 if (!CACHE_ENABLED) {
   console.log(`capture cache: product git state unavailable at ${CC_ROOT} — caching disabled this run`);
 } else if (!FORCE) {
-  const {hit} = checkCache('costclaw', 'capture', CACHE_KEY, CACHE_ARTIFACTS);
+  const {hit} = checkCache(workspace, 'capture', CACHE_KEY, CACHE_ARTIFACTS);
   if (hit) {
     console.log(`capture cache hit — reusing ${videoOut}`);
     process.exit(0);
@@ -106,7 +110,7 @@ if (!CACHE_ENABLED) {
 }
 
 // --- Build the two pages this take films ---
-const stageDir = join(ROOT, 'out', 'capture', 'costclaw');
+const stageDir = join(workspace.assetsDir, '.capture', 'costclaw');
 mkdirSync(stageDir, {recursive: true});
 const groups = resolveGroups(toLines(ansiText), TERMINAL_GROUPS);
 const replayPage = join(stageDir, 'terminal.html');
@@ -122,7 +126,7 @@ const clampFocus = (box, {padX = 48, padY = 48} = {}) => {
   return {x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h)};
 };
 
-const videoDir = join(ROOT, 'out', 'capture');
+const videoDir = join(workspace.assetsDir, '.capture');
 let browser;
 try {
   browser = await chromium.launch();
@@ -188,9 +192,10 @@ try {
   await context.close(); // flushes the webm
   const src = await video.path();
 
-  const destDir = join(ROOT, 'studio', 'public', 'costclaw');
-  mkdirSync(destDir, {recursive: true});
-  copyFileSync(src, join(destDir, 'demo.webm'));
+  for (const destDir of [workspace.assetsDir, publicDir]) {
+    mkdirSync(destDir, {recursive: true});
+    copyFileSync(src, join(destDir, 'demo.webm'));
+  }
 
   const props = {
     brandId: 'costclaw',
@@ -198,9 +203,10 @@ try {
     cta: 'Run the free audit: npx costclaw audit',
     telemetry,
   };
+  mkdirSync(workspace.propsDir, {recursive: true});
   writeFileSync(propsOut, JSON.stringify(props, null, 2) + '\n');
   if (CACHE_ENABLED) {
-    storeCache('costclaw', 'capture', CACHE_KEY, CACHE_ARTIFACTS, {
+    storeCache(workspace, 'capture', CACHE_KEY, CACHE_ARTIFACTS, {
       productRepo: CC_ROOT,
       productHead: keyParts.productHead,
       evidenceDir,
@@ -208,7 +214,7 @@ try {
   }
   console.log(`capture OK: ${telemetry.durationMs}ms, ${telemetry.events.length} events`);
   console.log(`evidence: ${evidenceDir}`);
-  console.log('wrote studio/public/costclaw/demo.webm and props/costclaw-demo.json');
+  console.log(`wrote ${assetOut}, ${videoOut}, and ${propsOut}`);
 } catch (err) {
   console.error(String(err?.stack ?? err?.message ?? err));
   process.exitCode = 1;

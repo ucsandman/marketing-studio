@@ -7,53 +7,61 @@ here. Everything below was learned the expensive way during the 5-phase build
 
 ## Engine map
 
-All rendering happens IN THE ENGINE REPO (the directory holding this `docs/` folder),
-never in the product's repo. Assets are copied out to the calling repo at the end.
-Every path below is relative to that engine root, so they resolve whether the engine
-is a source clone or an installed plugin.
+Reusable source and renderer execution live in the engine repo. Generated inputs,
+captures, audio, props, public staging, evidence, renders, and delivery files live in
+`<product>/marketing/assets/<brand>/`, selected with `--project <product-repo>` or an
+external calling git worktree. They are not rendered in the engine and copied later.
+Historical incident notes below may name the old `out/<brand>/` layout; those paths are
+provenance, not valid instructions. A generator that cannot resolve a product workspace
+is not production-capable until migrated.
+
+**Plugin 2.0.0 migration:** production commands require `--project <product-repo>`
+(or documented calling-worktree inference). No generated product input or output may
+default to the installed engine. Move any still-needed legacy `out/` artifact into its
+product workspace before using it as production evidence.
 
 | Piece | Where | Run |
 |---|---|---|
-| Remotion studio (all final video) | `studio/` | `cd studio && npm run dev` / `npx remotion render <Comp> <out> --props=<json>` |
+| Remotion studio (all final video) | `studio/` | `npx remotion render <Comp> <product-output> --props=<product-props> --public-dir=<product>/marketing/assets/<brand>/public` |
 | Health checks + Studio | `launch.py` | `python launch.py --check` |
 | Smoke (frame 0 of every comp) | `scripts/smoke.mjs` | run before claiming any studio change done |
 | Brand tokens | `brands/<id>.json` + `studio/src/lib/brand.ts` (zod) + `studio/src/brands/marks.ts` (mark registry) | |
 | Playwright capture feeder | `feeders/capture/record-noban-demo.mjs` | needs the product's app running |
-| Blender feeder | `feeders/blender/render.py <scene> --out <dir> --frame N \| --animation` | Blender via `BLENDER_PATH` in `.env` |
-| Unreal feeder | `feeders/unreal/render.py <scene> --out <dir> --frame N \| --animation [--timeout S]` | UE 5.8.2 via `UNREAL_PATH` in `.env`; two headless launches (commandlet builds level + sequence + MRQ queue, then `-game -RenderOffscreen` renders the manifest); reference scene `scenes/cube_flythrough.py`; gotchas below |
-| ComfyUI feeder | `feeders/comfy/client.mjs hero [--seed N]` | non-load-bearing; exit 2 = fallback |
-| Diagram feeder | `feeders/diagram/render.mjs <brand> <spec.d2> [--out DIR] [--width N]` | D2 (WASM) + resvg; brand-colored SVG+PNG+source -> out/<brand>/marketing/diagrams/; own npm install (MPL-2.0 deps, consumed unmodified) |
-| Infographic style bridge | `scripts/build-infographic-style.mjs <brand>` | brand tokens -> out/<brand>/marketing/infographic-style.md, a design-language file for the installed /epic-infographics skill (copy it into that skill's references/design-languages/) |
-| Cards | `scripts/build-cards.mjs <brand> [--brief path] [--out dir] [--dry-run]` | one stat card per brief proofPoint + a quote card from hook.headline, rendered as Card stills at 1080x1080 and 1080x1350 -> out/<brand>/marketing/cards/; clean skip when there is no brief |
-| Link-preview wiring check | `scripts/verify-og-wired.mjs <brand> [url] [--strict]` | fetches the LIVE page, compares its og:image against the delivered og asset; advisory, skips clean without a url |
-| Stage Blender output | `scripts/stage-blender-assets.mjs [brandId]` | assets/<brand>/ -> studio/public/<brand>/ |
-| Launch props builder | `scripts/build-launch-props.mjs` | copy source of truth (JSON is generated) |
+| Blender feeder | `feeders/blender/render.py <scene> --brand <brand> --project <product> [--out <dir>] --frame N \| --animation` | Blender via `BLENDER_PATH` in `.env`; defaults to product-owned assets |
+| Unreal feeder | `feeders/unreal/render.py <scene> --brand <brand> --project <product> [--out <dir>] --frame N \| --animation` | UE 5.8.2 via `UNREAL_PATH` in `.env`; defaults to product-owned assets |
+| ComfyUI feeder | `feeders/comfy/client.mjs hero --project <product> --brand <brand> [--seed N]` | optional; product-owned output and a clear error when unavailable; a procedural fallback must be selected explicitly |
+| Diagram feeder | `feeders/diagram/render.mjs <brand> <spec.d2> --project <product> [--out DIR] [--width N]` | D2 (WASM) + resvg; confined product-owned SVG, PNG, and source under `marketing/diagrams/` by default |
+| Infographic style bridge | `scripts/build-infographic-style.mjs <brand> --project <product> [--out path]` | brand tokens to product-owned `marketing/infographic-style.md` |
+| Cards | `scripts/build-cards.mjs <brand> --project <product> [--brief path] [--out dir] [--dry-run]` | product-owned square and portrait card stills under `marketing/cards/` |
+| Link-preview wiring check | `scripts/verify-og-wired.mjs <brand> --project <product> [url] [--strict]` | compares the live og:image against the product-owned delivered asset |
+| Stage Blender output | `scripts/stage-blender-assets.mjs <brand> --project <product>` | product assets to that product's staged public tree |
+| Launch props builder | `scripts/build-launch-props.mjs <brand> --project <product>` | product-owned props, direction, shot plan, and production plan |
 | Agent session (scripted terminal demo) | `studio/src/templates/AgentSession.tsx` + `studio/src/components/agent-session/` (typing.ts, palette.ts, ui.tsx) + `studio/src/lib/sessionTiming.ts`; props builder `scripts/build-offlocalhost-session-props.mjs` -> props/offlocalhost-session.json | A Claude Code session played as a beat sheet: welcome box, typed prompt, thinking spinner, tool calls that go amber and only then flip, and a buffer that scrolls in stages at overflow, over the brand's own ground, ending on `EndCard`. `sessionTiming.ts` is the one pure lib for BOTH the frame math and the transcript's pixel model, so editing one beat's `frames` reflows every later beat by exactly that amount and `calculateMetadata` cannot disagree with the component. Vendored from the `claude-code-remotion` skill by flocker.md (MIT, 2026); `agent-session/palette.ts` is the ONE allowed home for literal hex outside `brands/*.json` because those are Claude Code's own UI colours, the way a capture plate carries an app's. Brand tokens carry the meaning: accent tints the MCP server prefix, `safe` marks a finished call, `loss` marks a `hold` (finished, waiting on the human) and never flips green. MCP tool names on screen must be verified against the live server, never paraphrased |
 | Static presets | `scripts/render-statics.mjs` (noban), `scripts/render-<brand>-statics.mjs` per brand | og.png / og.mp4 / og.gif / readme.gif |
-| Audio feeder (ElevenLabs) | `feeders/audio/client.mjs vo\|music\|probe` | needs ELEVENLABS_API_KEY in .env; exit 2 = silent fallback |
-| Audio build + merge | `scripts/build-<brand>-audio.mjs`, `scripts/merge-launch-audio.mjs <brand>` | VO/music copy source of truth -> props/<brand>-audio.json; merge takes brand argv, defaults noban |
-| Bespoke films | `studio/src/films/<brand>/` (Film.tsx + timeline.ts + ui/ kit + shots/ShotNN.tsx), composition id `<Brand>Film` in Root.tsx and in smoke.mjs | The reference-quality route (2026-09-01, postflop): every product shot is REBUILT native UI (never a screenshot or capture), one React.FC per shot with shot-local frames, 8-frame overlap handovers owned by the incoming shot, no FloatBar/captions/kicker, FilmGrade once. The shot spec the builders work from lives at out/<brand>/marketing/film-spec.md (see postflop's for the template). LaunchVideo is the fallback, not the default |
-| Film audio (bespoke) | `scripts/build-<brand>-film-audio.mjs` -> props/<brand>-film-audio.json, then `scripts/score-film.mjs <brand> <film.mp4> [--out] [--force]` | Narration lines with the film-second each starts on, SFX cues on the frames the shots land things (offsets computed from timeline.ts, max two per beat), exact-length music via the feeder. score-film places every line, ducks the bed with a sidechain, lands the cues, masters by measured gain into a limiter and re-measures the DELIVERED mp4 (I within 0.5 of TARGET_I, TP <= -1 dBTP, iterating up to 4 passes), writes out/<brand>/film/score.json. It REFUSES overlapping lines (trim the copy in the builder, never the picture) and a manifest with zero VO lines unless `--music-only` is passed as a recorded choice. master-audio.mjs alone fails on generated beds (mean -32 dB / peak -0.6: crest too high for linear loudnorm), which is why score-film compresses the bed first |
-| Content brief gatherer | `scripts/derive-brief.mjs <brand> <productRepo> [--url]` | grounding (README, package.json, route names, CHANGELOG, public GitHub issue titles via gh, landing DOM) -> out/<brand>/marketing/brief-inputs.json; agent synthesizes brief.json (zod: `studio/src/lib/brief.ts` — includes grounding sections: audience, customerLanguage, objections, JTBD switchingForces, sourced proofPoints, hook.strategies; hook/CTA formulas in `skills/marketing/references/hook-formulas.md`, campaign evidence in `references/campaign-evidence.md`); build-launch-props overlays brief copy when brief.json exists |
+| Audio feeder (ElevenLabs) | `feeders/audio/client.mjs vo\|music\|probe` | needs ELEVENLABS_API_KEY in .env; missing credentials produce a clear non-zero result, and silence is production-valid only when explicitly approved |
+| Audio build + merge | `scripts/build-<brand>-audio.mjs --project <product>`, `scripts/merge-launch-audio.mjs <brand> --project <product>` | product-owned VO/music source, props, and scored output |
+| Authored films | `studio/src/films/<brand>/` or directed `LaunchVideo` | The chosen direction and shot plan are the canonical story source. Choose captured UI, rebuilt native UI, 2D, 3D, or a hybrid shot by shot according to the idea and required proof; no medium is the universal default |
+| Film audio (bespoke) | `scripts/build-<brand>-film-audio.mjs --project <product>`, then `scripts/score-film.mjs <brand> <film.mp4> --project <product>` | Product-owned narration, explicit SFX cues, mix, score report, and master; zero-VO delivery requires a recorded `--music-only` choice |
+| Content brief gatherer | `scripts/derive-brief.mjs <brand> --project <product> [--url]` | product grounding -> product-owned `marketing/brief-inputs.json`; the agent synthesizes validated `brief.json`, which the props builder consumes |
 | Copy voice-linter | `scripts/lint-copy.mjs <file.json> [--json]` | gates any props/brief JSON: em dashes, slop lexicon, hype, weak qualifiers, announcement openers, generic CTAs, unsourced stats in briefs; exit 1 on ERROR violations |
-| Storyboard board | `scripts/build-storyboard.mjs <brand>` | brief.json -> out/<brand>/marketing/storyboard.html (content approval before any render) |
-| Mission Control | `scripts/mission-control.mjs <brand> [--port 4600]` | live run console over run.json; Approve/Redo buttons write manifest + review.json atomically; advisory bar surfaces judge-*.json verdicts, footage staleness (cache meta vs product git HEAD), and results.json engagement per variant |
-| Results loop | `scripts/fetch-results.mjs <brand>` | posts.json ({platform, url, variant, metrics?}) -> results.json; X metrics via X_BEARER_TOKEN in .env (exit 2 fallback), LinkedIn manual; closes the hook A/B loop with real engagement. posts.json is seeded by build-postkit (one row per platform, published:false) and rows are written by Mission Control's Mark posted button as well as by hand; fetch-results prints N of M rows published beside its verdict |
-| Export matrix | `scripts/render-matrix.mjs <brand> [--comp] [--stills-only]` + `scripts/platforms.json` | fans LaunchVideo/SocialClip into 16:9/9:16/1:1/4:5 via calculateMetadata props (no --width CLI flag in Remotion 4.0.486); captioned variants for muted-autoplay rows when audio props exist |
-| Caption sidecars | `scripts/build-captions.mjs <brand> [--check]` | props/<brand>-audio.json -> out/<brand>/captions/launch.srt + .vtt |
-| Thumbnails | `scripts/extract-thumbs.mjs <brand> [--comp] [--frame <n>] [--frame-<aspect> <n>]` | poster JPG per aspect -> out/<brand>/thumbs/; the poster frame is CHOSEN, never defaulted (precedence: `--frame-<aspect>` > `--frame` > a dormant `posterFrame` in props/<brand>-launch.json > the script default). Never mid-motion, half-typed, or cursor-visible; test it at 200px wide |
+| Storyboard board | `scripts/build-storyboard.mjs <brand> --project <product>` | product-owned `brief.json` -> `marketing/storyboard.html` before an expensive render |
+| Mission Control | `scripts/mission-control.mjs <brand> --project <product> [--port 4600]` | local run console and hash-bound operator attestations; typed reviewer names/roles are not authenticated identities |
+| Results loop | `scripts/fetch-results.mjs <brand> --project <product>` | product-owned `posts.json` -> `results.json`; prints N of M rows published beside its verdict |
+| Export matrix | `scripts/render-matrix.mjs <brand> --project <product> [--comp] [--stills-only]` + `scripts/platforms.json` | product-owned 16:9/9:16/1:1/4:5 exports via responsive metadata; captioned variants use the routed audio-bearing props |
+| Caption sidecars | `scripts/build-captions.mjs <brand> --project <product> [--check]` | product-owned audio props -> product-owned SRT and VTT sidecars |
+| Thumbnails | `scripts/extract-thumbs.mjs <brand> --project <product> [--comp] [--frame <n>] [--frame-<aspect> <n>]` | product-owned poster JPG per aspect; choose and inspect the frame at small size |
 | Launch (distribution) | `node launch/dist/index.js <init|research|copy|post|notify|ui> <product-dir>` | the folded launch engine (`launch/`, own package, `cd launch && npm ci && npm run build`): scans the product repo into `<product>/.launch/`, drafts and validates per-platform copy, and posts to X, LinkedIn, Facebook, Reddit, GSC, Bluesky and YouTube with the postkit's videos attached (`--kit` or `postkitDir` in the config). Dry-run is the default; `--live` publishes; `--assist` opens the HN and Product Hunt assisted flows. Ledger in `<product>/.launch/ledger.json`, media refused before upload over platform caps. Skill: `/launch`; `/ship-it` runs `/marketing` then this |
-| Publish (Bluesky) | `scripts/publish-bluesky.mjs <brand> [--dry-run]` | ported into `launch/` as the `bluesky` provider (same wire sequence); this script remains because Mission Control's Publish button runs it. Originally the only platform with an open write API: uploads out/<brand>/postkit/bluesky/social-16x9.mp4 through video.bsky.app, posts caption.txt (links become facets, 300-grapheme cap enforced) with alt.txt, records the URL in posts.json via Mission Control's applyPosted; BLUESKY_HANDLE + BLUESKY_APP_PASSWORD in .env (missing = exit 2). Mission Control's Publish to Bluesky button runs the same script. fetch-results reads its counts from the public AppView, no token |
-| Publish (YouTube) | `scripts/publish-youtube.mjs <brand> [--dry-run] [--auth] [--privacy private|unlisted|public]` | ported into `launch/` as the `youtube` provider (skipped with `skipped-no-media` when the draft has no video); script kept for Mission Control. No SDK: OAuth installed-app flow (loopback redirect, refresh token in gitignored .youtube-token.json, scopes youtube.upload + youtube.readonly — upload alone gets 403 on videos.list) and the resumable upload endpoint. Uploads out/<brand>/postkit/youtube/launch-16x9.mp4 titled with the brief's hook headline, PRIVATE by default (flip in YouTube Studio after watching it), records https://youtu.be/<id> in posts.json via applyPosted. Desktop OAuth client lives in GCP project seentoit; the token is bound to whichever channel the consenting Google account defaults to (proven 2026-09-01: sandman.uc's UC_SANDMAN channel, not the Studio default) — add a brand channel's account as a test user and re-run --auth to target it. fetch-results reads videos.list statistics with the same token |
-| Post kit | `scripts/build-postkit.mjs <brand>` | per-platform folders (video, lint-gated caption.txt, alt.txt, thumb, POST.md, SRT/VTT for yt/li) -> out/<brand>/postkit/; also writes a `<video>-silent.mp4` per copied video (ffmpeg `-c copy -an`, skipped with a log line when ffmpeg is missing) and two root records: `LICENCES.md` (music/SFX/font sources actually present) and `DISCLOSURE.md` (what this pipeline actually synthesised for the brand, the per-platform AI toggle to set at upload, and the gaps it does NOT close — no C2PA credential embedded despite EU AI Act Art. 50 since 2026-08-02, plus the TikTok Content Posting API's private-until-audited trap) |
-| Contact sheets | `scripts/contact-sheet.mjs <brand> <Comp>` | act-boundary stills + sheet HTML -> out/<brand>/marketing/stills/; Mission Control shows the strip |
+| Publish (Bluesky) | `scripts/publish-bluesky.mjs <brand> --project <product> [--dry-run]` | product-owned post kit; before a live upload it re-hashes the media, reruns the strict production evaluation, and refuses stale/non-PASS evidence |
+| Publish (YouTube) | `scripts/publish-youtube.mjs <brand> --project <product> [--dry-run] [--auth] [--privacy private\|unlisted\|public]` | product-owned post kit and installed-app OAuth; before live upload it revalidates current media and production evidence; privacy defaults to private |
+| Post kit | `scripts/build-postkit.mjs <brand> --project <product> [--production]` | PASS-only product-owned platform folders plus `LICENCES.md` and `DISCLOSURE.md` |
+| Contact sheets | `scripts/contact-sheet.mjs <brand> --project <product> --plan <plan> --render <final.mp4>` | three product-owned measured samples per shot plus review HTML |
 | Footage cache | `scripts/lib/cache.mjs`; capture scripts + stage-blender-assets consult it | key = product git HEAD+porcelain + script source + config; `--force` re-captures; caching disabled when product git state is unresolvable; capture entries also store readable meta {productRepo, productHead} so Mission Control can warn when footage falls behind the product repo |
-| SFX library | `scripts/build-sfx.mjs` (one-time, idempotent) | ElevenLabs sound-generation -> assets/sfx/ + studio/public/sfx/ (whoosh/tick/riser, exit 2 = silent fallback); cues derived at render from launchTiming via `studio/src/lib/sfxCues.ts`, gated by `sfx.enabled` in the audio manifest (builder flips it only when files are staged) |
-| Quality judges | `scripts/judge-av-sync.mjs`, `judge-demo-pacing.mjs`, `judge-palette.mjs <brand>`, `judge-motion.mjs [brand]`, `judge-drift.mjs <brand>` | Phase-4 advisors (exit 0 + JSON verdicts; `--strict` gates): VO overruns/caption dwell, dead-air (raw-capture footage means dead = literally frozen frames, threshold 0.2), forbidden-color washes with high/low confidence + `--mask-region` (product-UI false-positive guard), motion-craft conventions (no Easing.in/scale(0)/CSS transitions in studio src, springs via lib/motion.ts, brand motion-token bands, entry-scale + stagger + grain + halation ceilings — numbers IMPORTED from lib/motion.ts, never restated; adapted from Emil Kowalski's review-animations standards, MIT). **judge-drift is the only SET judge** — it scores the whole out/<brand>/ rather than one file, so it runs LAST once everything has rendered, and it emits a worst-first `drift-sheet.html` alongside its JSON. Its z-scores are relative to the set's own dispersion with NO absolute threshold; calibrate with `--ref <dir>` against approved assets (see the cross-asset drift section below) |
+| SFX library | `scripts/build-sfx.mjs <brand> --project <product>` | product-owned ElevenLabs SFX; only explicit shot events place cues, and unavailable generation reports a clear non-zero result |
+| Quality judges | `scripts/judge-*.mjs <brand> --project <product>` | product-owned reports for A/V sync, pacing, palette, motion, drift, and strict production evidence; advisory measurements never replace local human review |
 | Encode budgets | `scripts/check-budgets.mjs <brand>` (hard gate, exit 1 on OVER) | byte budgets per asset class; render-matrix now faststart-remuxes every mp4 and `--webm` adds a VP9/Opus transcode |
 | Audio presence | `scripts/check-audio.mjs <brand>` (hard gate, exit 1 on any FAIL) | A film is not done without audio (CLAUDE.md). Scans the delivery surfaces (postkit/** minus `-silent`, top-level `launch.mp4` and `*-final*.mp4`, the newest `film/film-vN.mp4` via its `-scored` sibling + score.json with voLines > 0); each must carry an audio stream that is not silent and sits within 2 LU of TARGET_I. Verdict line carries checked/failed/skipped counts. Working files (launch-vN, demo.mp4, logo-reveal.mp4, og.mp4, `-silent`) are skipped with a reason. First run on postflop (2026-09-01) failed 6 of 14: the launch lock was silent, the youtube/linkedin launch rows were unmastered at -26.6 LUFS, and the captioned 9:16/1:1 social rows had no track at all |
-| Hook A/B | `scripts/render-hook-variants.mjs <brand> [--headlines '<json>']` | renders the hook act per headline (brief.json altHeadlines or flag) -> out/<brand>/marketing/hooks/ + picker.html; registers run.json variants[] for Mission Control's radio pick |
-| Hero takes | `scripts/render-variants.mjs <brand> <logo-reveal\|launch-hook> [--takes N]` | brand-safe motion-knob takes via nullable `motionOverride` prop (exuberant take floors at 0.65 — below ~0.55 the spring is overdamped and deltas render invisible); registers variants[] |
+| Hook A/B | `scripts/render-hook-variants.mjs <brand> --project <product> [--headlines '<json>']` | product-owned hook variants and picker |
+| Hero takes | `scripts/render-variants.mjs <brand> <logo-reveal\|launch-hook> --project <product> [--takes N]` | product-owned brand-safe motion takes |
 
 Compositions: PostflopFilm (bespoke, studio/src/films/postflop/), SocialClip, ProductDemo, LogoReveal, LaunchVideo, AnimatedOG,
 AgentSession (scripted Claude Code terminal session; duration from lib/sessionTiming
@@ -89,8 +97,9 @@ placeholder so smoke stays green on a clean clone.
 4. Fonts: `studio/src/lib/fonts.ts` currently loads one global font set
    (Saira/HankenGrotesk/GeistMono). If the new brand needs different fonts, extend
    fonts.ts to a per-brand loader keyed like the mark registry.
-5. Screenshots/footage: copy into `studio/public/<id>/` (gitignored) via a
-   `scripts/fetch-<id>-assets.mjs` following the noban one.
+5. Screenshots/footage: stage them inside the product workspace's canonical `public/`
+   tree via a workspace-aware capture or `scripts/fetch-<id>-assets.mjs`; never write
+   product footage into engine `studio/public/`.
 6. Blender logo reveal for the new brand: copy `feeders/blender/scenes/logo_reveal.py`
    to `logo_reveal_<id>.py` and replace ONLY the geometry builders (rounded rect /
    circle / ticks / dot) with the new mark's shapes sampled from its SVG. Everything
@@ -147,8 +156,8 @@ placeholder so smoke stays green on a clean clone.
   (full-size 8s 1200x630 ~= 30MB); prefer mp4 for social embeds; scale down for READMEs.
 - Rendered proof: inspect stills at act boundaries BEFORE full renders; a full render
   is never the first look at anything.
-- Export matrix: LaunchVideo rows read `out/<brand>/launch-audio-props.json` when it
-  exists (scripts/merge-launch-audio.mjs writes it), so they carry the merged audio AND
+- Export matrix: LaunchVideo rows read the product-owned merged launch props when they
+  exist, so they carry the merged audio AND
   the same VO-derived act lengths as the launch video; SocialClip rows have no audio
   track by design and are silent. A brand whose intake asked for audio scores its per-platform clips AFTER render with `scripts/score-social-clip.mjs` (bed + one VO line, VO compressed 4:1 so master-audio converges in one pass) and build-postkit prefers that `<clipId>-final.mp4` over the matrix row. Measured 2026-09-01 before the fix: dashclaw and
   costclaw launch-16x9.mp4 were -70.0 LUFS (digital silence), tenwords -26.3 only because
@@ -256,8 +265,8 @@ placeholder so smoke stays green on a clean clone.
   keeps writing frames into the output dir (see build-magnetic-demo-media.mjs).
 
 ### Unreal Engine 5.8 (headless, feeders/unreal) — each verified 2026-09-03 on 5.8.2
-- Install lives on the C: NVMe (`C:\Program Files\Epic Games\UE_5.8`). D: is a USB
-  spinning disk and never holds anything the engine reads at runtime.
+- Resolve the executable through `UNREAL_PATH`; public documentation does not assume a
+  machine-specific install directory.
 - The Epic launcher is a Chromium canvas with no accessibility tree; nothing can drive
   it. The UE entitlement is granted only by accepting the EULA in it once (Wes did).
   After that, `legendary` (pip `legendary-gl`, `legendary auth --import` after copying
@@ -386,9 +395,9 @@ placeholder so smoke stays green on a clean clone.
   (default 47) make heroes reproducible; `--seed N` re-rolls.
 - The fallback is part of the contract: exit 2 + message; `render-statics.mjs` logs
   the procedural fallback. Never make an asset depend on ComfyUI being up.
-- `feeders/comfy/client.mjs` is noban-hardwired (violet prompt, `assets/noban/comfy`
-  output, negative prompt excludes "green"). Other brands take the procedural fallback
-  until someone parameterizes it — do not point it at a new brand as-is.
+- The Comfy hero prompt remains visually NoBan-specific (violet, near-black, and no
+  green). `--brand` safely namespaces product-owned output but does not retune that
+  prompt; other brands should select a procedural fallback until it is parameterized.
 
 ### Brand-driven effects and fonts (post-DashClaw-onboarding facts)
 - Backdrop wash/glow intensities are brand-driven via the optional `effects` block in
@@ -398,9 +407,9 @@ placeholder so smoke stays green on a clean clone.
   no hardcoded `${brand.colors.brand}<alpha>` washes remain. A saturated brand color
   as a big radial hero-wash is a known failure mode — check the brand's stated rules
   before leaning on the default (paperroute: wash MUST be 0, One Green Rule).
-- FloatBar's progress fill runs brand → profit tokens (changed from safe→profit→loss
-  during the paperroute run: a red-tipped scrubber reads as decoration-red and violates
-  brands whose red is error-only; noban's end color became its profit gold, on-identity).
+- `progressTreatment` defaults to `none`, so `FloatBar` returns no UI for every brand
+  except NoBan. NoBan alone opts into `cs2-wear`, where the wear-zone labels and
+  brand-to-profit fill are product language rather than universal decoration.
 - FeaturePanel is orientation-aware (`height > width` switches row→column), so vertical
   9:16 social clips render from the SAME SocialClip comp; no separate template. Set the
   dimensions with the optional `{formatWidth, formatHeight}` PROPS that `calculateMetadata`
@@ -445,7 +454,7 @@ placeholder so smoke stays green on a clean clone.
   byte-identical.
 
 ### Cross-asset drift judge (`scripts/judge-drift.mjs`)
-- Every other judge scores ONE asset. This one scores `out/<brand>/` as a **set**,
+- Every other judge scores ONE asset. This one scores the product workspace as a **set**,
   because the failure it looks for is invisible per file: assets that are each
   individually on-palette can collectively fragment into several distinct brands, and
   no per-file gate — including judge-palette, including a human approving one
@@ -544,9 +553,9 @@ placeholder so smoke stays green on a clean clone.
   credits per generation for music.
 - Remotion's `Audio` component is deprecated; use `Html5Audio` (same export, same
   props, zero behavior change) — see `SoundTrack.tsx`.
-- Fallback behavior is part of the contract, not an error state: missing
-  `ELEVENLABS_API_KEY` makes the feeder exit 2 with guidance and the video renders
-  silent — that silent render is still a valid deliverable on a clean clone.
+- Missing `ELEVENLABS_API_KEY` produces a clear non-zero result. A silent diagnostic
+  render may keep a clean-clone smoke path working, but it is not a production
+  deliverable unless the direction records and the operator approves that exception.
 
 #### Loudness mastering
 - `scripts/master-audio.mjs <in.mp4> [--out <path>]` — two-pass loudnorm to
@@ -642,21 +651,26 @@ invisible until this existed. Spec:
   `CursorGlyph` from it, and `ComponentGallery.tsx` imports `StageCursor` and
   `controlPressScale` from it, both live outside the staged-scene system.
 
-#### Direction discipline (process, not code)
-- Write three one-page directions per `docs/templates/DIRECTION.md`, kill two by its
-  four kill questions; the survivor must differ on >= 4 of the 11 dials from the last
-  film built in this repo, or it is a variant, not a direction.
-- Record the chosen direction in `out/<brand>/marketing/direction.md` before
-  storyboarding — the artifact that lets "make another like that" be honored later.
-- Never overwrite a render: `launch-v1.mp4`, `-v2`, ... The director loop is render ->
-  watch -> write the defect list yourself -> fix -> re-render as a NEW file. Notes are
-  symptoms, not specs ("make it 3D" usually means a camera rig, not a rotation).
-- Versioning applies to the ITERATION renders only. `out/<brand>/launch.mp4` stays the
-  locked/delivered name because `mission-control.mjs` and `review-in-magnetic.mjs`
-  both hardcode it; the lock step copies the approved version there. Do not "fix" this
-  to a versioned final name.
-- Director (watching) and auditor (measuring every on-screen claim/number) are
-  DISJOINT review passes — run both; neither substitutes for the other.
+#### Direction and production proof
+
+- The full contract is [`production-quality.md`](production-quality.md). Start a run
+  with `--project <product-repo>`; generated sources and outputs live under
+  `<product>/marketing/assets/<brand>/`, not in this engine checkout.
+- Explore distinct directions, but treat the chosen `direction.json` as the source of
+  truth: visual metaphor, sound intent, references with provenance, and approved style
+  frame/animatic. Presets are starting grammars, not finished identities.
+- Build the animatic with scratch voice and music. Audio begins during direction; it is
+  not finish applied after a silent picture lock.
+- A shot plan is editorial intent, not a request for one medium. Use captured UI,
+  rebuilt native UI, 2D, 3D, or a hybrid according to the product proof and concept.
+- Never overwrite an iteration render. Watch the full scored cut, record defects, then
+  render a new version. Notes are symptoms, not specs ("make it 3D" often means missing
+  depth or camera intent, not that every element should rotate).
+- Local operator review and mechanical audit are disjoint. Generate three hash-bound
+  samples per shot, then record full-render, soundtrack, would-share, five quality
+  scores, and structured defects in Mission Control. Names and roles are self-attested,
+  not authenticated. All five scores must be at least 4/5; any major or blocking defect
+  fails approval. Then run `judge-production --strict`.
 
 ## Token discipline for asset generation sessions
 
@@ -672,11 +686,25 @@ invisible until this existed. Spec:
 
 ## Delivery contract (skills end with this)
 
-1. Final artifact rendered into `out/<brand>/`.
-2. Copy the artifact into the CALLING repo (ask once where; default `marketing/assets/`
-   or the repo's existing media dir).
-3. When a post kit is part of the delivery, its root records travel WITH it —
+1. Require `--project <product-repo>`. All generated captures, audio, props, public
+   staging, evidence, renders, matrix rows, and post kits live in
+   `<product>/marketing/assets/<brand>/`. Engine-local `out/` is not a product-run path.
+2. Bind `direction.json`, `shot-plan.json`, every routed props source including
+   caption/audio-bearing variants, the canonical public inventory, stage artifacts,
+   evidence, final render, and review through `production-plan.json` hashes. A stale hash
+   is incomplete.
+3. Run the contact-sheet evidence builder and strict production judge before the matrix;
+   `--production --stills-only` proves layout but is explicitly not deliverable media.
+4. When a post kit is part of the delivery, its root records travel WITH it —
    `LICENCES.md` and `DISCLOSURE.md`. A disclosure record that stays behind in
-   `out/` never reaches the person who actually posts the file, which is the only
+   the engine never reaches the person who actually posts the file, which is the only
    moment it matters: the platform AI toggle is set at upload, by a human, once.
-4. Send the file to the user for approval — the asset is not done until a human saw it.
+5. The production post kit copies only PASS, hash-bound matrix rows. A live publisher
+   re-hashes the current media and reruns production evaluation before upload. Send the
+   scored file to the user; the asset is not done until a human watched it with sound.
+
+**2026-09-05 retro.** What worked: immutable renders and all-composition contact sheets
+made the repeated template grammar visible. What did not: green runtime gates and
+frame-zero smoke had no evidence that the films were worth sharing. One change: every
+production run now carries authored, hash-bound stage/render evidence plus a local
+full-film operator attestation, with mechanics kept separate from taste.

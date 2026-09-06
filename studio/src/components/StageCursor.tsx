@@ -1,6 +1,7 @@
 import React from 'react';
 import {Easing, interpolate, useCurrentFrame} from 'remotion';
 import type {Brand} from '../lib/brand';
+import {pointerPhaseAt, pressScaleAt, smootherstep} from '../lib/motion';
 
 // Choreographed cursor for staged UI shots (docs/product-launch-motion-adoption.md,
 // Phase C). Unlike DemoCursor (telemetry-driven overlay for captured demos), this
@@ -43,15 +44,7 @@ export const CursorGlyph: React.FC<{scale?: number; style?: React.CSSProperties}
 // Press dip for the CLICKED CONTROL: a cursor pressing a static button is
 // uncanny. Multiply the control's scale by this around each click frame.
 export const controlPressScale = (frame: number, clickFrame: number): number => {
-  const dt = frame - clickFrame;
-  if (dt < 0 || dt > 12) return 1;
-  if (dt <= 3) {
-    return interpolate(dt, [0, 3], [1, 0.94], {easing: Easing.out(Easing.quad)});
-  }
-  return interpolate(dt, [3, 12], [0.94, 1], {
-    extrapolateRight: 'clamp',
-    easing: Easing.out(Easing.back(1.8)),
-  });
+  return pressScaleAt(frame, clickFrame, {press: 3, release: 9, depth: 0.06});
 };
 
 const positionAt = (path: CursorWaypoint[], frame: number): {x: number; y: number} => {
@@ -102,7 +95,8 @@ export const StageCursor: React.FC<{
   brand: Brand;
   appearAt?: number; // fade in start
   exitAt?: number | null; // fade out when its work is done — never park it
-}> = ({path, clicks = [], brand, appearAt = 0, exitAt = null}) => {
+  emphasis?: 'none' | 'ring' | 'glow';
+}> = ({path, clicks = [], brand, appearAt = 0, exitAt = null, emphasis = 'ring'}) => {
   const frame = useCurrentFrame();
   const {x, y} = positionAt(path, frame);
   const appear = interpolate(frame, [appearAt, appearAt + 5], [0, 1], {
@@ -117,23 +111,20 @@ export const StageCursor: React.FC<{
           extrapolateRight: 'clamp',
         });
 
-  // click stack: bloom LEADS the press by ~3 frames (reads as intent), cursor
-  // dips and back-out recovers, ring expands and dies. Bloom 148px, ring 104px —
-  // sized to a ~150px control; bigger reads as a halo.
-  let press = 1;
-  for (const c of clicks) {
-    const dt = frame - c.at;
-    if (dt >= 0 && dt <= 2) press = interpolate(dt, [0, 2], [1, 0.86]);
-    else if (dt > 2 && dt <= 10) {
-      press = interpolate(dt, [2, 10], [0.86, 1], {easing: Easing.out(Easing.back(2.4))});
-    }
-  }
+  const cueTimes = clicks.map((click) => click.at);
+  const activeCue = [...cueTimes].reverse().find((cue) => cue <= frame);
+  const press =
+    activeCue === undefined
+      ? 1
+      : pressScaleAt(frame, activeCue, {press: 2, release: 8, depth: 0.14});
+  const phase = pointerPhaseAt(cueTimes, frame, {approach: TRAVEL, hover: 3, press: 2, release: 8});
 
   return (
     <div style={{position: 'absolute', inset: 0, pointerEvents: 'none'}}>
       {clicks.map((c, key) => {
         const dt = frame - c.at;
         if (dt < -3 || dt > 13) return null;
+        const clickPosition = positionAt(path, c.at);
         const bloomOpacity =
           dt < 0
             ? interpolate(dt, [-3, 0], [0, 1], {easing: Easing.out(Easing.quad)})
@@ -148,32 +139,30 @@ export const StageCursor: React.FC<{
                 extrapolateRight: 'clamp',
                 easing: Easing.out(Easing.quad),
               });
-        const ringP = interpolate(dt, [0, 13], [0, 1], {
-          extrapolateLeft: 'clamp',
-          extrapolateRight: 'clamp',
-          easing: Easing.out(Easing.quad),
-        });
+        const ringP = smootherstep(Math.max(0, dt) / 13);
         return (
           <React.Fragment key={key}>
-            <div
-              style={{
-                position: 'absolute',
-                left: x - 74,
-                top: y - 74,
-                width: 148,
-                height: 148,
-                borderRadius: '50%',
-                background: `radial-gradient(circle, ${brand.colors.brand}55, transparent 70%)`,
-                opacity: bloomOpacity,
-                transform: `scale(${bloomScale})`,
-              }}
-            />
-            {dt >= 0 ? (
+            {emphasis === 'glow' ? (
               <div
                 style={{
                   position: 'absolute',
-                  left: x - 52,
-                  top: y - 52,
+                  left: clickPosition.x - 74,
+                  top: clickPosition.y - 74,
+                  width: 148,
+                  height: 148,
+                  borderRadius: '50%',
+                  background: `radial-gradient(circle, ${brand.colors.brand}55, transparent 70%)`,
+                  opacity: bloomOpacity,
+                  transform: `scale(${bloomScale})`,
+                }}
+              />
+            ) : null}
+            {dt >= 0 && emphasis !== 'none' ? (
+              <div
+                style={{
+                  position: 'absolute',
+                  left: clickPosition.x - 52,
+                  top: clickPosition.y - 52,
                   width: 104,
                   height: 104,
                   borderRadius: '50%',
@@ -195,6 +184,7 @@ export const StageCursor: React.FC<{
           transform: `scale(${press})`,
           transformOrigin: '14% 6%', // the tip — press scales about the touch point
         }}
+        data-cursor-phase={phase}
       >
         <CursorGlyph />
       </div>

@@ -7,12 +7,7 @@
 // Store: out/<brand>/marketing/cache.json, one entry per stage, atomic (temp+rename).
 import {createHash} from 'node:crypto';
 import {existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync} from 'node:fs';
-import {dirname, join, resolve} from 'node:path';
-import {fileURLToPath} from 'node:url';
-
-// Repo root, resolved from this file's location so the cache lands in the same
-// place regardless of the caller's cwd.
-const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+import {dirname, join} from 'node:path';
 
 // Canonical form: sort object keys recursively so key ORDER never changes the
 // hash. Arrays keep order (order is meaningful for sequences/views).
@@ -31,12 +26,13 @@ export function cacheKey(parts) {
   return createHash('sha256').update(JSON.stringify(canonical(parts))).digest('hex');
 }
 
-function cacheFile(brand) {
-  return join(REPO_ROOT, 'out', brand, 'marketing', 'cache.json');
+function cacheFile(workspace) {
+  if (!workspace?.marketingDir) throw new Error('cache requires a product workspace');
+  return join(workspace.marketingDir, 'cache.json');
 }
 
-function readStore(brand) {
-  const f = cacheFile(brand);
+function readStore(workspace) {
+  const f = cacheFile(workspace);
   if (!existsSync(f)) return {};
   try {
     return JSON.parse(readFileSync(f, 'utf8'));
@@ -49,8 +45,8 @@ function readStore(brand) {
  * Hit only if the stored key matches AND every artifact path exists on disk as a
  * regular file with size > 0. Returns {hit, entry}.
  */
-export function checkCache(brand, stage, key, artifacts = []) {
-  const entry = readStore(brand)[stage];
+export function checkCache(workspace, stage, key, artifacts = []) {
+  const entry = readStore(workspace)[stage];
   if (!entry || entry.key !== key) return {hit: false};
   for (const p of artifacts) {
     let st;
@@ -70,10 +66,10 @@ export function checkCache(brand, stage, key, artifacts = []) {
  * the key is an opaque hash, so staleness checks (Mission Control's "footage
  * is N commits behind" warning) need the raw inputs recorded alongside it.
  */
-export function storeCache(brand, stage, key, artifacts = [], meta = null) {
-  const f = cacheFile(brand);
+export function storeCache(workspace, stage, key, artifacts = [], meta = null) {
+  const f = cacheFile(workspace);
   mkdirSync(dirname(f), {recursive: true});
-  const store = readStore(brand);
+  const store = readStore(workspace);
   store[stage] = {key, artifacts, storedAt: new Date().toISOString(), ...(meta ? {meta} : {})};
   const tmp = `${f}.${process.pid}.tmp`;
   writeFileSync(tmp, JSON.stringify(store, null, 2) + '\n');

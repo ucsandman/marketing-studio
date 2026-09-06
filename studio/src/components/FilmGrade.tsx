@@ -1,10 +1,9 @@
 import React from 'react';
 import {AbsoluteFill, useCurrentFrame, useVideoConfig} from 'remotion';
 import type {Brand} from '../lib/brand';
-import {alphaHex} from '../lib/brand';
 
 // Production-value overlay rendered LAST inside each template root: halation,
-// animated film grain, radial vignette, accent bloom, chromatic aberration,
+// animated film grain, radial vignette, source-aware bloom, chromatic aberration,
 // optional letterbox. Every layer is intensity 0..1 and is skipped entirely at 0,
 // so a zeroed grade costs nothing. Intensities are meant to stay RESTRAINED — see
 // the grade defaults in lib/brand.ts and each brand's stated rules (paperroute:
@@ -19,8 +18,9 @@ import {alphaHex} from '../lib/brand';
 // An added mask would double-apply a curve that is already correct.
 export const FilmGrade: React.FC<{
   grade: Brand['grade'];
-  accent: string; // bloom color: the brand's primary/accent token
-}> = ({grade, accent}) => {
+  accent: string; // retained for call-site compatibility; bloom keeps source hue
+}> = ({grade, accent: _accent}) => {
+  void _accent;
   const frame = useCurrentFrame();
   const {durationInFrames, fps, height} = useVideoConfig();
   const id = React.useId();
@@ -35,6 +35,7 @@ export const FilmGrade: React.FC<{
   const REF_HEIGHT = 1080;
   const grainFreq = (grainSize * REF_HEIGHT) / height;
   const halationBlur = (height / REF_HEIGHT) * 14;
+  const bloomBlur = (height / REF_HEIGHT) * 30;
 
   // Grain reseeds at 12Hz, not per frame: per-frame noise defeats inter-frame
   // compression (measured 9MB -> 85MB in the product-launch-motion case study)
@@ -71,12 +72,17 @@ export const FilmGrade: React.FC<{
         />
       ) : null}
 
-      {/* (c) bloom — soft accent glow, very low opacity, screen-blended */}
+      {/* (c) bloom — a broad, low-energy highlight spread. Like halation it
+          samples the frame, so a bright subject moves the bloom and a dark
+          frame stays dark. Screen blend is identity at white, preserving peak
+          highlights instead of painting a fixed accent wash over them. */}
       {bloom > 0 ? (
         <AbsoluteFill
           style={{
-            background: `radial-gradient(60% 50% at 50% 45%, ${accent}${alphaHex(bloom)}, transparent 70%)`,
+            backdropFilter: `blur(${bloomBlur.toFixed(2)}px) brightness(${(1 + bloom * 0.08).toFixed(3)}) contrast(${(1 + bloom * 1.25).toFixed(3)}) saturate(${(1 + bloom * 0.12).toFixed(3)})`,
+            WebkitBackdropFilter: `blur(${bloomBlur.toFixed(2)}px) brightness(${(1 + bloom * 0.08).toFixed(3)}) contrast(${(1 + bloom * 1.25).toFixed(3)}) saturate(${(1 + bloom * 0.12).toFixed(3)})`,
             mixBlendMode: 'screen',
+            opacity: bloom * 0.22,
           }}
         />
       ) : null}

@@ -11,9 +11,11 @@ import {mkdirSync, writeFileSync} from 'node:fs';
 import {execSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const outDir = join(root, 'out', 'dashclaw');
+const workspace = resolveWorkspace(root, {brand: 'dashclaw', project: projectArg(process.argv.slice(2))});
+const outDir = workspace.brandRoot;
 mkdirSync(outDir, {recursive: true});
 
 const props = {
@@ -32,14 +34,14 @@ const studioDir = join(root, 'studio');
 const still = (out, width, height) => {
   console.log(`still: ${out} (${width}x${height})`);
   execSync(
-    `npx remotion still AnimatedOG "${join(outDir, out)}" --props="${propsPath}" --width=${width} --height=${height}`,
+    `npx remotion still AnimatedOG "${join(outDir, out)}" --props="${propsPath}" --public-dir="${workspace.publicDir}" --width=${width} --height=${height}`,
     {cwd: studioDir, stdio: 'inherit'},
   );
 };
 
 const render = (args, out) => {
   console.log(`render: ${out}`);
-  execSync(`npx remotion render AnimatedOG "${join(outDir, out)}" --props="${propsPath}" ${args}`, {
+  execSync(`npx remotion render AnimatedOG "${join(outDir, out)}" --props="${propsPath}" --public-dir="${workspace.publicDir}" ${args}`, {
     cwd: studioDir,
     stdio: 'inherit',
   });

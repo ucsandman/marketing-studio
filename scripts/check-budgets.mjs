@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Byte-budget gate: scans out/<brand>/'s known asset locations (matrix/, thumbs/,
+// Byte-budget gate: scans the product brand's known asset locations (matrix/, thumbs/,
 // postkit/, and the top-level statics outputs render-statics.mjs / the per-brand
 // statics scripts produce) and checks each file against a hardcoded byte budget for
 // its asset type. THIS IS A HARD GATE — exits non-zero if any file is OVER budget.
@@ -20,7 +20,8 @@
 // Missing known-location directories/files are skipped with a log note, not an error.
 import {existsSync, readdirSync, statSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
-import {basename, dirname, join} from 'node:path';
+import {basename, dirname, join, relative} from 'node:path';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 export const BUDGETS = {
   'readme-gif': {label: 'readme gif', maxBytes: 5 * 1024 * 1024},
@@ -106,22 +107,29 @@ function main() {
 
   const root = join(dirname(fileURLToPath(import.meta.url)), '..');
   const args = process.argv.slice(2);
-  const brand = args.find((a) => !a.startsWith('--'));
+  const brand = args.find((a, i) => !a.startsWith('--') && args[i - 1] !== '--project');
   const jsonOut = args.includes('--json');
 
   if (!brand) {
-    console.error('usage: node scripts/check-budgets.mjs <brand> [--json]');
+    console.error('usage: node scripts/check-budgets.mjs <brand> --project <product-repo> [--json]');
+    process.exit(1);
+  }
+  let ws;
+  try {
+    ws = resolveWorkspace(root, {brand, project: projectArg(args)});
+  } catch (err) {
+    console.error(`check-budgets: ${err.message}`);
     process.exit(1);
   }
 
-  const brandOut = join(root, 'out', brand);
+  const brandOut = ws.brandOut;
   const notes = [];
   const allFiles = [];
 
   const locations = [
-    {dir: join(brandOut, 'matrix'), recursive: true, label: `out/${brand}/matrix/`},
-    {dir: join(brandOut, 'thumbs'), recursive: false, label: `out/${brand}/thumbs/`},
-    {dir: join(brandOut, 'postkit'), recursive: true, label: `out/${brand}/postkit/`},
+    {dir: join(brandOut, 'matrix'), recursive: true, label: relative(ws.projectRoot, join(brandOut, 'matrix'))},
+    {dir: join(brandOut, 'thumbs'), recursive: false, label: relative(ws.projectRoot, join(brandOut, 'thumbs'))},
+    {dir: join(brandOut, 'postkit'), recursive: true, label: relative(ws.projectRoot, join(brandOut, 'postkit'))},
   ];
   for (const loc of locations) {
     const files = listFiles(loc.dir, {recursive: loc.recursive});
@@ -137,7 +145,7 @@ function main() {
   for (const name of ['readme.gif', 'og.mp4']) {
     const p = join(brandOut, name);
     if (existsSync(p)) allFiles.push(p);
-    else notes.push(`skipped out/${brand}/${name} (not found)`);
+    else notes.push(`skipped ${relative(ws.projectRoot, p)} (not found)`);
   }
 
   const results = checkFiles(allFiles);
@@ -148,7 +156,7 @@ function main() {
   } else {
     for (const note of notes) console.log(`check-budgets: ${note}`);
     for (const r of results) {
-      const rel = r.path.slice(root.length + 1).replace(/\\/g, '/');
+      const rel = relative(ws.projectRoot, r.path).replace(/\\/g, '/');
       console.log(`${r.status}  ${rel}  ${fmtSize(r.bytes)} / ${fmtSize(r.maxBytes)}  (${r.budget})`);
     }
     console.log(`check-budgets: ${results.length} file(s) checked, ${overCount} over budget`);

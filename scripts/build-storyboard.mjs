@@ -1,15 +1,16 @@
-// Storyboard approval board: renders out/<brand>/marketing/brief.json (the WHOLE
+// Storyboard approval board: renders the product workspace's brief.json (the WHOLE
 // derived story — hook, features, narration, social, CTA) as one self-contained
 // HTML page so the operator reviews content BEFORE an hour of rendering commits
 // to it. Read-only: never writes brief.json, never touches props/ or studio/.
 //
 //   node scripts/build-storyboard.mjs <brandId>
 //
-// Missing out/<brand>/marketing/brief.json is a loud error (exit 1) — the
+// Missing marketing/assets/<brand>/marketing/brief.json is a loud error (exit 1) — the
 // derive/synthesis phase (derive-brief.mjs + agent synthesis) hasn't run yet.
 import {readFileSync, existsSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -18,14 +19,21 @@ function fail(msg) {
   process.exit(1);
 }
 
-const brandId = process.argv[2];
-if (!brandId) fail('missing <brandId> (usage: build-storyboard.mjs <brandId>)');
+const argv = process.argv.slice(2);
+const brandId = argv[0];
+if (!brandId) fail('missing <brandId> (usage: build-storyboard.mjs <brandId> --project <product-repo>)');
+let workspace;
+try {
+  workspace = resolveWorkspace(root, {brand: brandId, project: projectArg(argv)});
+} catch (err) {
+  fail(err.message);
+}
 
 // --- load brief.json ------------------------------------------------------
-const briefPath = join(root, 'out', brandId, 'marketing', 'brief.json');
+const briefPath = join(workspace.marketingDir, 'brief.json');
 if (!existsSync(briefPath)) {
   fail(
-    `out/${brandId}/marketing/brief.json not found. Run the derive/synthesis phase first ` +
+      `${briefPath} not found. Run the derive/synthesis phase first ` +
       `(node scripts/derive-brief.mjs ${brandId} <productRepoPath> then have the agent synthesize brief.json).`,
   );
 }
@@ -34,7 +42,7 @@ let briefRaw;
 try {
   briefRaw = JSON.parse(readFileSync(briefPath, 'utf8'));
 } catch (err) {
-  fail(`out/${brandId}/marketing/brief.json is not valid JSON: ${err.message}`);
+  fail(`${briefPath} is not valid JSON: ${err.message}`);
 }
 
 // Structural check mirroring studio/src/lib/brief.ts (the canonical zod schema).
@@ -143,17 +151,17 @@ function validateBrief(b) {
 
 const brief = validateBrief(briefRaw);
 if (!brief) {
-  fail(`out/${brandId}/marketing/brief.json does not match the brief.ts shape — cannot build a storyboard from it.`);
+  fail(`${briefPath} does not match the brief.ts shape — cannot build a storyboard from it.`);
 }
 
 // --- load brief-inputs.json (optional, for grounding provenance) ---------
-const briefInputsPath = join(root, 'out', brandId, 'marketing', 'brief-inputs.json');
+const briefInputsPath = join(workspace.marketingDir, 'brief-inputs.json');
 let briefInputs = null;
 if (existsSync(briefInputsPath)) {
   try {
     briefInputs = JSON.parse(readFileSync(briefInputsPath, 'utf8'));
   } catch (err) {
-    console.warn(`build-storyboard: out/${brandId}/marketing/brief-inputs.json is not valid JSON, skipping provenance: ${err.message}`);
+    console.warn(`build-storyboard: ${briefInputsPath} is not valid JSON, skipping provenance: ${err.message}`);
   }
 }
 
@@ -216,7 +224,7 @@ const socialRows = brief.social
 
 // --- provenance footer line -------------------------------------------------
 function provenanceLine() {
-  if (!briefInputs) return `No grounding file found (out/${brandId}/marketing/brief-inputs.json missing).`;
+  if (!briefInputs) return `No grounding file found (${briefInputsPath} missing).`;
   const readmeYes = briefInputs.readme != null ? 'yes' : 'no';
   const routesCount = briefInputs.nextRoutes ? briefInputs.nextRoutes.routes.length : 0;
   const routesLabel = briefInputs.nextRoutes ? `${routesCount}` : 'n/a (not a Next.js app)';
@@ -238,6 +246,41 @@ function provenanceLine() {
 }
 
 const generatedAt = new Date().toISOString();
+
+// Direction and shot plan are generated production inputs. The storyboard
+// surfaces their intent and provenance for human review; the production judge
+// remains the fail-closed validator.
+function readOptional(path) {
+  if (!existsSync(path)) return null;
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'));
+  } catch (err) {
+    console.warn(`build-storyboard: ${path} is not valid JSON: ${err.message}`);
+    return null;
+  }
+}
+
+const direction = readOptional(join(workspace.marketingDir, 'direction.json'));
+const shotPlan = readOptional(join(workspace.marketingDir, 'shot-plan.json'));
+const referenceRows = Array.isArray(direction?.references)
+  ? direction.references.map((ref) => `<tr><td><code>${esc(ref.id)}</code></td><td>${esc((ref.intendedAttributes ?? []).join(', '))}</td><td>${esc(ref.provenance?.kind)} · ${esc(ref.provenance?.source)}</td><td>${esc(ref.pathOrUrl)}</td></tr>`).join('')
+  : '';
+const shotRows = Array.isArray(shotPlan?.shots)
+  ? shotPlan.shots.map((shot) => `<tr><td><code>${esc(shot.id)}</code></td><td>${esc(shot.purpose)}</td><td>${esc(shot.from)}–${esc(Number(shot.from) + Number(shot.len) - 1)} (${esc(shot.len)}f)</td><td>${esc(shot.scale)}</td><td>${esc(shot.camera?.cadence)}</td><td>${esc(shot.transition?.kind)} ${esc(shot.transition?.frames)}f</td><td>${esc((shot.references ?? []).join(', '))}</td></tr>`).join('')
+  : '';
+const productionSection = `
+<section class="block">
+  <h2 class="block-title">Production direction</h2>
+  ${direction ? `<p><strong>${esc(direction.preset)}</strong> · ${esc(direction.reason)}</p>
+  <p class="differentiator">Metaphor: ${esc(direction.visualMetaphor ?? 'not recorded')} · Sound: ${esc(direction.soundIntent ?? 'not recorded')}</p>
+  <p class="label">Stage evidence</p><p class="differentiator">Style frame: ${esc(direction.styleFrame?.artifact ?? 'missing')} / review: ${esc(direction.styleFrame?.review ?? 'missing')}<br>Animatic: ${esc(direction.animatic?.artifact ?? 'missing')} / review: ${esc(direction.animatic?.review ?? 'missing')}</p>` : '<p class="muted">No direction.json recorded.</p>'}
+  <p class="label">References and intended attributes</p>
+  ${referenceRows ? `<table><thead><tr><th>ID</th><th>Use from reference</th><th>Provenance</th><th>Source</th></tr></thead><tbody>${referenceRows}</tbody></table>` : '<p class="muted">No references recorded.</p>'}
+</section>
+<section class="block">
+  <h2 class="block-title">Shot grammar</h2>
+  ${shotRows ? `<table><thead><tr><th>Shot</th><th>Purpose</th><th>Frames</th><th>Scale</th><th>Camera</th><th>Transition</th><th>Refs</th></tr></thead><tbody>${shotRows}</tbody></table>` : '<p class="muted">No shot-plan.json recorded.</p>'}
+</section>`;
 
 // --- sections ----------------------------------------------------------------
 // strategies[i] labels [headline, ...altHeadlines][i] with its hook category.
@@ -502,6 +545,7 @@ const html = `<!doctype html>
   </header>
 
   ${hookSection}
+  ${productionSection}
   ${featuresSection}
   ${narrationSection}
   ${socialSection}
@@ -514,6 +558,6 @@ const html = `<!doctype html>
 </html>
 `;
 
-const outPath = join(root, 'out', brandId, 'marketing', 'storyboard.html');
+const outPath = join(workspace.marketingDir, 'storyboard.html');
 writeFileSync(outPath, html);
-console.log(`wrote out/${brandId}/marketing/storyboard.html`);
+console.log(`wrote ${outPath}`);

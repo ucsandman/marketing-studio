@@ -2,7 +2,7 @@
 // Quality judge #6 — cross-asset brand drift.
 //
 // Every other judge in this repo scores ONE asset and answers "is this file
-// good". This one scores the whole out/<brand>/ directory and answers a question
+// good". This one scores the whole product-owned brand asset directory and answers a question
 // none of them can: "do these twenty files look like one brand".
 //
 // Why a set judge has to exist: drift is invisible per asset. Two hundred
@@ -41,16 +41,16 @@
 //                 point it at assets you have approved, and drift becomes
 //                 "distance from approved" rather than "distance from average".
 //                 Mission Control fills that directory for you: every approve
-//                 snapshots the artifact into out/<brand>/approved/<YYYY-MM-DD>/,
-//                 so `--ref out/<brand>/approved/<latest>/` needs no curation.
-// Output: out/<brand>/marketing/judge-drift.json
-//         out/<brand>/marketing/drift-sheet.html   review page, worst first
+//                 snapshots the artifact into approved/<YYYY-MM-DD>/ under the brand.
+// Output: <product-repo>/marketing/assets/<brand>/marketing/judge-drift.json
+//         <product-repo>/marketing/assets/<brand>/marketing/drift-sheet.html
 import {execFileSync} from 'node:child_process';
 import {existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join, extname, relative, basename} from 'node:path';
 import {decodePng, hexToRgb} from './lib/png.mjs';
 import {describe as describeImage, scoreSet, MIN_SET} from './lib/drift.mjs';
+import {projectArg, resolveWorkspace, resolveWorkspacePath} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -313,10 +313,17 @@ function main() {
   const includeVideo = !argv.includes('--no-video');
   const refIdx = argv.indexOf('--ref');
   const refDir = refIdx >= 0 ? argv[refIdx + 1] : null;
-  const brand = argv.find((a, i) => !a.startsWith('--') && argv[i - 1] !== '--ref');
+  const brand = argv.find((a, i) => !a.startsWith('--') && argv[i - 1] !== '--ref' && argv[i - 1] !== '--project');
 
   if (!brand) {
-    console.error('usage: node scripts/judge-drift.mjs <brand> [--ref <dir>] [--no-video] [--strict] [--json]');
+    console.error('usage: node scripts/judge-drift.mjs <brand> --project <product-repo> [--ref <dir>] [--no-video] [--strict] [--json]');
+    process.exit(1);
+  }
+  let ws;
+  try {
+    ws = resolveWorkspace(root, {brand, project: projectArg(argv)});
+  } catch (err) {
+    console.error(`judge-drift: ${err.message}`);
     process.exit(1);
   }
 
@@ -328,24 +335,24 @@ function main() {
   const brandDef = JSON.parse(readFileSync(brandPath, 'utf8'));
   const tokens = Object.values(brandDef.colors).map(hexToRgb);
 
-  const assetRoot = join(root, 'out', brand);
+  const assetRoot = ws.brandOut;
   if (!existsSync(assetRoot)) {
-    console.error(`judge-drift: no rendered assets at out/${brand}/ — render something first.`);
+    console.error(`judge-drift: no rendered assets at ${assetRoot} — render something first.`);
     process.exit(1);
   }
 
-  const framesDir = join(root, 'out', 'drift-frames');
+  const framesDir = join(ws.marketingDir, 'drift-frames');
   rmSync(framesDir, {recursive: true, force: true});
   mkdirSync(framesDir, {recursive: true});
 
   const {found: assets, excluded} = collectAssets(assetRoot, {includeVideo});
   if (assets.length === 0) {
-    console.error(`judge-drift: found no scoreable assets under out/${brand}/`);
+    console.error(`judge-drift: found no scoreable assets under ${assetRoot}`);
     process.exit(1);
   }
   const {items, skipped} = describeAll(assets, tokens, framesDir);
   if (items.length === 0) {
-    console.error(`judge-drift: every candidate under out/${brand}/ failed to decode`);
+    console.error(`judge-drift: every candidate under ${assetRoot} failed to decode`);
     process.exit(1);
   }
 
@@ -353,7 +360,13 @@ function main() {
   let refCentroid = null;
   let refInfo = null;
   if (refDir) {
-    const rd = existsSync(refDir) ? refDir : join(root, refDir);
+    let rd;
+    try {
+      rd = resolveWorkspacePath(ws, refDir);
+    } catch (err) {
+      console.error(`judge-drift: ${err.message}`);
+      process.exit(1);
+    }
     if (!existsSync(rd)) {
       console.error(`judge-drift: --ref directory not found: ${refDir}`);
       process.exit(1);
@@ -429,7 +442,7 @@ function main() {
     findings,
   };
 
-  const outDir = join(root, 'out', brand, 'marketing');
+  const outDir = ws.marketingDir;
   mkdirSync(outDir, {recursive: true});
   writeFileSync(join(outDir, 'judge-drift.json'), JSON.stringify(report, null, 2));
   const sheetPath = writeSheet(outDir, brand, report);
@@ -447,7 +460,7 @@ function main() {
     if (findings.length === 0) console.log('  no drift findings — the set reads as one brand');
     for (const s of skipped) console.log(`  [SKIP] ${s.file}: ${s.reason}`);
     if (excluded.length) console.log(`  excluded ${excluded.length} tooling artifact(s) (judge diagnostics / proof screenshots), not brand assets`);
-    console.log(`  report -> out/${brand}/marketing/judge-drift.json`);
+    console.log(`  report -> ${join(outDir, 'judge-drift.json')}`);
     console.log(`  sheet  -> ${relToRoot(sheetPath)}`);
   }
 

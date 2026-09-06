@@ -39,10 +39,11 @@
 // Advisor like the other judges: exit 0; `--strict` exits 1 on a FAIL verdict.
 //
 // Usage: node scripts/judge-motion.mjs [brand] [--strict] [--json]
-// Output: out/<brand>/marketing/judge-motion.json (or out/judge-motion.json without a brand)
+// Output: <product-repo>/marketing/assets/<brand>/marketing/judge-motion.json
 import {existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join, relative} from 'node:path';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -96,7 +97,10 @@ const SOURCE_RULES = [
   {
     check: 'css-transition',
     level: 'ERROR',
-    re: /\btransition\s*:/,
+    // A CSS transition value names a duration. Plain domain fields such as
+    // shot.transition or z.object({transition: ...}) are production grammar,
+    // not browser animation and must not false-positive this source judge.
+    re: /\btransition\s*:\s*['"`][^'"`]*(?:\d(?:\.\d+)?m?s)\b/,
     message: 'CSS transition in a Remotion component; transitions do not advance with rendered frames.',
   },
   {
@@ -292,7 +296,15 @@ function main() {
   const argv = process.argv.slice(2);
   const strict = argv.includes('--strict');
   const asJson = argv.includes('--json');
-  const brand = argv.find((a) => !a.startsWith('--')) ?? null;
+  const brand = argv.find((a, i) => !a.startsWith('--') && argv[i - 1] !== '--project') ?? null;
+  const outputBrand = brand ?? 'all';
+  let ws;
+  try {
+    ws = resolveWorkspace(root, {brand: outputBrand, project: projectArg(argv)});
+  } catch (err) {
+    console.error(`judge-motion: ${err.message}`);
+    process.exit(1);
+  }
 
   const srcDir = join(root, 'studio', 'src');
   if (!existsSync(srcDir)) {
@@ -350,7 +362,7 @@ function main() {
     findings,
   };
 
-  const outDir = brand ? join(root, 'out', brand, 'marketing') : join(root, 'out');
+  const outDir = ws.marketingDir;
   mkdirSync(outDir, {recursive: true});
   const outPath = join(outDir, 'judge-motion.json');
   writeFileSync(outPath, JSON.stringify(report, null, 2));

@@ -1,8 +1,8 @@
 // GATHERER for the Content Brief spine. No LLM calls — this only collects raw
-// grounding from a product repo into out/<brand>/marketing/brief-inputs.json;
+// grounding from a product repo into its product-owned marketing workspace;
 // the agent in the main loop synthesizes brief.json from it later.
 //
-//   node scripts/derive-brief.mjs <brandId> <productRepoPath> [--url <landingUrl>]
+//   node scripts/derive-brief.mjs <brandId> --project <productRepoPath> [--url <landingUrl>]
 //
 // Token-redaction rule (PLAYBOOK): NEVER read or print .env contents from the
 // product repo. This script only reads README.md, CHANGELOG.md, package.json,
@@ -18,6 +18,7 @@ import {readFileSync, existsSync, readdirSync, statSync, mkdirSync, writeFileSyn
 import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -34,16 +35,16 @@ for (let i = 0; i < argv.length; i++) {
   if (argv[i] === '--url') {
     url = argv[++i] ?? null;
     if (!url) fail('--url given without a value');
-  } else {
+  } else if (argv[i] === '--project') {
+    i += 1;
+  } else if (!argv[i].startsWith('--')) {
     positional.push(argv[i]);
   }
 }
-const [brandId, productRepoPath] = positional;
-if (!brandId) fail('missing <brandId> (usage: derive-brief.mjs <brandId> <productRepoPath> [--url <url>])');
-if (!productRepoPath) fail('missing <productRepoPath>');
-if (!existsSync(productRepoPath) || !statSync(productRepoPath).isDirectory()) {
-  fail(`product repo path does not exist or is not a directory: ${productRepoPath}`);
-}
+const [brandId] = positional;
+if (!brandId) fail('missing <brandId> (usage: derive-brief.mjs <brandId> --project <productRepoPath> [--url <url>])');
+const workspace = resolveWorkspace(root, {brand: brandId, project: projectArg(argv)});
+const productRepoPath = workspace.projectRoot;
 
 // --- README -------------------------------------------------------------
 function readReadme(repo) {
@@ -233,8 +234,8 @@ if (url) {
   }
 }
 
-const outDir = join(root, 'out', brandId, 'marketing');
+const outDir = workspace.marketingDir;
 mkdirSync(outDir, {recursive: true});
 const outPath = join(outDir, 'brief-inputs.json');
 writeFileSync(outPath, JSON.stringify(inputs, null, 2) + '\n');
-console.log(`wrote out/${brandId}/marketing/brief-inputs.json`);
+console.log(`wrote ${outPath}`);

@@ -9,19 +9,16 @@
 // Playwright is not a root dependency; this script resolves the install
 // under feeders/capture/node_modules instead of adding a new dependency.
 //
-// Usage: node scripts/build-magnetic-icon.mjs
-// Output (staged handoff, gitignored under out/):
-//   out/magnetic/handoff/icon.png     (512x512)
-//   out/magnetic/handoff/icon@2x.png  (1024x1024)
-//   out/magnetic/handoff/icon.ico
-//   out/magnetic/handoff/icon.icns
+// Usage: node scripts/build-magnetic-icon.mjs [--project REPO] [--out DIR]
+// Output defaults to the resolved product workspace's marketing/handoff dir.
 import {createRequire} from 'node:module';
 import {execFileSync} from 'node:child_process';
 import {existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
-import {dirname, join} from 'node:path';
+import {dirname, join, resolve} from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {decodePng} from './lib/png.mjs';
+import {projectArg, resolveWorkspace, resolveWorkspacePath} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -30,7 +27,31 @@ process.on('unhandledRejection', (reason) => {
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CAPTURE_PKG = join(ROOT, 'feeders', 'capture', 'package.json');
-const OUT_DIR = join(ROOT, 'out', 'magnetic', 'handoff');
+
+const optionValue = (args, name) => {
+  const index = args.indexOf(name);
+  if (index >= 0) {
+    const value = args[index + 1];
+    if (!value || value.startsWith('--')) throw new Error(`${name} requires a value`);
+    return value;
+  }
+  const prefix = `${name}=`;
+  const arg = args.find((item) => item.startsWith(prefix));
+  if (arg && arg.length === prefix.length) throw new Error(`${name} requires a value`);
+  return arg?.slice(prefix.length) ?? null;
+};
+
+export const resolveIconOutput = (args = [], cwd = process.cwd()) => {
+  const workspace = resolveWorkspace(ROOT, {
+    brand: 'magnetic',
+    project: projectArg(args),
+    cwd,
+  });
+  return resolveWorkspacePath(
+    workspace,
+    optionValue(args, '--out') ?? join(workspace.marketingDir, 'handoff'),
+  );
+};
 
 // Approved geometry, copied verbatim from studio/src/brands/MagneticMark.tsx
 // (viewBox 0 0 24 24, strokeWidth 1.6, round caps/joins, no fills).
@@ -84,16 +105,17 @@ function assertCornersTransparent(pngPath) {
 
 const require = createRequire(CAPTURE_PKG);
 
-async function main() {
-  mkdirSync(OUT_DIR, {recursive: true});
+async function main(args = process.argv.slice(2)) {
+  const outDir = resolveIconOutput(args);
+  mkdirSync(outDir, {recursive: true});
 
   const {chromium} = require('playwright');
   const browser = await chromium.launch();
   const tmpDir = mkdtempSync(join(tmpdir(), 'magnetic-icon-'));
   try {
     const targets = [
-      {size: 512, file: join(OUT_DIR, 'icon.png')},
-      {size: 1024, file: join(OUT_DIR, 'icon@2x.png')},
+      {size: 512, file: join(outDir, 'icon.png')},
+      {size: 1024, file: join(outDir, 'icon@2x.png')},
     ];
     for (const {size, file} of targets) {
       const htmlPath = join(tmpDir, `icon-${size}.html`);
@@ -110,14 +132,14 @@ async function main() {
   }
 
   // Corner-alpha proof on both sizes.
-  for (const file of [join(OUT_DIR, 'icon.png'), join(OUT_DIR, 'icon@2x.png')]) {
+  for (const file of [join(outDir, 'icon.png'), join(outDir, 'icon@2x.png')]) {
     const n = assertCornersTransparent(file);
     console.log(`verified ${n} transparent corners: ${file}`);
   }
 
   // Pack .ico/.icns from the 1024 source via one-shot npx (not a dependency).
-  const src = join(OUT_DIR, 'icon@2x.png');
-  const outBase = join(OUT_DIR, 'icon');
+  const src = join(outDir, 'icon@2x.png');
+  const outBase = join(outDir, 'icon');
   execFileSync('npx', ['png2icons', src, outBase, '-allwe'], {
     cwd: ROOT,
     stdio: 'inherit',
@@ -128,10 +150,13 @@ async function main() {
     const f = outBase + ext;
     if (!existsSync(f)) throw new Error(`png2icons did not produce ${f}`);
   }
-  console.log('done: out/magnetic/handoff/{icon.png,icon@2x.png,icon.ico,icon.icns}');
+  console.log(`done: ${outDir} ({icon.png,icon@2x.png,icon.ico,icon.icns})`);
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isMain) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

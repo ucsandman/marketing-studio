@@ -4,9 +4,11 @@ import {execSync} from 'node:child_process';
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {requireAudioWorkspace} from './lib/sound-design.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const outDir = join(root, 'studio', 'public', 'paperroute', 'audio');
+const workspace = requireAudioWorkspace(root, 'paperroute');
+const outDir = join(workspace.publicDir, 'audio');
 
 // --force              regenerate every line + music
 // --force <id,id,...>  regenerate only the listed acts (and/or "music"), e.g.
@@ -40,7 +42,7 @@ const MUSIC_PROMPT =
   'bpm, no drum build, no synth pads, no vocals, calm and understated throughout';
 
 // total duration in ms; constants mirror studio/src/lib/launchTiming.ts
-const telemetry = JSON.parse(readFileSync(join(root, 'props', 'paperroute-demo.json'), 'utf8')).telemetry;
+const telemetry = JSON.parse(readFileSync(join(workspace.propsDir, 'paperroute-demo.json'), 'utf8')).telemetry;
 const demoLen = Math.ceil((telemetry.durationMs / 1000) * 30) + 24;
 // the `2 *` must track this brand's feature count in build-launch-props.mjs
 const totalFrames = 150 + 186 + demoLen + 2 * 180 + 150;
@@ -54,10 +56,10 @@ const run = (cmd) => execSync(cmd, {cwd: root, encoding: 'utf8', stdio: ['ignore
 // VO: generate missing lines (or forced ones)
 const pending = LINES.filter((l) => shouldForce(l.id) || !existsSync(join(outDir, `${l.id}.mp3`)));
 if (pending.length > 0) {
-  const scriptPath = join(root, 'out', 'paperroute', 'vo-script.json');
+  const scriptPath = join(workspace.marketingDir, 'vo-script.json');
   mkdirSync(dirname(scriptPath), {recursive: true});
   writeFileSync(scriptPath, JSON.stringify({lines: pending}));
-  const out = run(`node feeders/audio/client.mjs vo --script "${scriptPath}" --out "${outDir}"`);
+  const out = run(`node feeders/audio/client.mjs vo --project "${workspace.projectRoot}" --script "${scriptPath}" --out "${outDir}"`);
   process.stdout.write(out);
   for (const m of out.matchAll(/vo OK: (.+)\.mp3 (\d+)ms/g)) durations[m[1]] = Number(m[2]);
 }
@@ -77,7 +79,7 @@ for (const l of LINES) {
 const musicFile = join(outDir, 'music.mp3');
 if (shouldForce('music') || !existsSync(musicFile)) {
   const out = run(
-    `node feeders/audio/client.mjs music --prompt "${MUSIC_PROMPT}" --length-ms ${totalMs} --out "${musicFile}"`,
+    `node feeders/audio/client.mjs music --project "${workspace.projectRoot}" --prompt "${MUSIC_PROMPT}" --length-ms ${totalMs} --out "${musicFile}"`,
   );
   process.stdout.write(out);
   const m = out.match(/music OK: .+ (\d+)ms/);
@@ -98,13 +100,14 @@ if (!durations.music) {
 }
 
 const manifest = {
-  music: {src: 'paperroute/audio/music.mp3', durationMs: durations.music},
+  music: {src: 'audio/music.mp3', durationMs: durations.music},
   lines: LINES.map((l) => ({
     act: l.id,
-    src: `paperroute/audio/${l.id}.mp3`,
+    src: `audio/${l.id}.mp3`,
     durationMs: durations[l.id],
     text: l.text,
   })),
 };
-writeFileSync(join(root, 'props', 'paperroute-audio.json'), JSON.stringify(manifest, null, 2) + '\n');
-console.log(`wrote props/paperroute-audio.json (${totalMs}ms track, ${LINES.length} lines)`);
+mkdirSync(workspace.propsDir, {recursive: true});
+writeFileSync(join(workspace.propsDir, 'paperroute-audio.json'), JSON.stringify(manifest, null, 2) + '\n');
+console.log(`wrote ${join(workspace.propsDir, 'paperroute-audio.json')} (${totalMs}ms track, ${LINES.length} lines)`);

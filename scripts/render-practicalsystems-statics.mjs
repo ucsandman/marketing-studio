@@ -23,6 +23,7 @@ import {mkdirSync, statSync, writeFileSync} from 'node:fs';
 import {execSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -30,7 +31,8 @@ process.on('unhandledRejection', (reason) => {
 });
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const outDir = join(root, 'out', 'practicalsystems');
+const workspace = resolveWorkspace(root, {brand: 'practicalsystems', project: projectArg(process.argv.slice(2))});
+const outDir = workspace.brandRoot;
 mkdirSync(outDir, {recursive: true});
 
 const studioDir = join(root, 'studio');
@@ -56,26 +58,26 @@ const propsPath = join(outDir, 'og-props.json');
 writeFileSync(propsPath, JSON.stringify(baseProps));
 
 console.log('still: og.png (native 1200x630 -- no --width/--height, no-op flags per PLAYBOOK.md)');
-execSync(`npx remotion still AnimatedOG "${join(outDir, 'og.png')}" --props="${staticPropsPath}"`, {
+execSync(`npx remotion still AnimatedOG "${join(outDir, 'og.png')}" --props="${staticPropsPath}" --public-dir="${workspace.publicDir}"`, {
   cwd: studioDir,
   stdio: 'inherit',
 });
 
 console.log('render: og.mp4');
-execSync(`npx remotion render AnimatedOG "${join(outDir, 'og.mp4')}" --props="${propsPath}"`, {
+execSync(`npx remotion render AnimatedOG "${join(outDir, 'og.mp4')}" --props="${propsPath}" --public-dir="${workspace.publicDir}"`, {
   cwd: studioDir,
   stdio: 'inherit',
 });
 
 console.log('render: og.gif');
 execSync(
-  `npx remotion render AnimatedOG "${join(outDir, 'og.gif')}" --props="${propsPath}" --codec=gif --every-nth-frame=2`,
+  `npx remotion render AnimatedOG "${join(outDir, 'og.gif')}" --props="${propsPath}" --public-dir="${workspace.publicDir}" --codec=gif --every-nth-frame=2`,
   {cwd: studioDir, stdio: 'inherit'},
 );
 
 console.log('render: readme.gif');
 execSync(
-  `npx remotion render AnimatedOG "${join(outDir, 'readme.gif')}" --props="${propsPath}" --codec=gif --every-nth-frame=2 --scale=0.5`,
+  `npx remotion render AnimatedOG "${join(outDir, 'readme.gif')}" --props="${propsPath}" --public-dir="${workspace.publicDir}" --codec=gif --every-nth-frame=2 --scale=0.5`,
   {cwd: studioDir, stdio: 'inherit'},
 );
 

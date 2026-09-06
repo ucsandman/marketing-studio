@@ -10,13 +10,14 @@
 // Shells to plain `ffmpeg` on PATH, not `npx remotion ffmpeg` — Remotion's bundled
 // build lacks the alimiter/ebur128 filters this script depends on.
 //
-// Usage: node scripts/master-audio.mjs <in.mp4> [--out <path>]
+// Usage: node scripts/master-audio.mjs <in.mp4> --project <product-repo> [--out <path>]
 // Default out is a versioned sibling (in.mp4 -> in-v2.mp4, in-v2.mp4 -> in-v3.mp4);
 // an existing file is never overwritten.
 import {spawnSync} from 'node:child_process';
 import {existsSync} from 'node:fs';
 import {dirname, join, basename, extname, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {projectArg, resolveWorkspace, resolveWorkspacePath} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -35,16 +36,27 @@ const I_TOLERANCE = 0.5;
 
 function main() {
   const argv = process.argv.slice(2);
+  const project = projectArg(argv);
   const outIdx = argv.indexOf('--out');
   const outArg = outIdx >= 0 ? argv[outIdx + 1] : null;
-  const outSkip = new Set(outIdx >= 0 ? [outIdx, outIdx + 1] : []);
+  const projectIdx = argv.indexOf('--project');
+  const outSkip = new Set([
+    ...(outIdx >= 0 ? [outIdx, outIdx + 1] : []),
+    ...(projectIdx >= 0 ? [projectIdx, projectIdx + 1] : []),
+  ]);
   const input = argv.find((a, i) => !outSkip.has(i) && !a.startsWith('--'));
 
-  if (!input || !existsSync(resolve(input))) {
-    console.error('usage: node scripts/master-audio.mjs <in.mp4> [--out <path>]');
+  if (!input || !project) {
+    console.error('usage: node scripts/master-audio.mjs <in.mp4> --project <product-repo> [--out <path>]');
     process.exit(1);
   }
-  const inputAbs = resolve(input);
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const workspace = resolveWorkspace(root, {brand: 'audio-master', project});
+  const inputAbs = resolveWorkspacePath(workspace, input);
+  if (!existsSync(inputAbs)) {
+    console.error(`master-audio: missing ${inputAbs}`);
+    process.exit(1);
+  }
 
   // in.mp4 -> in-v2.mp4; in-v3.mp4 -> in-v4.mp4; skip any name already on disk.
   function versionedOut(inPath) {
@@ -62,7 +74,7 @@ function main() {
     return candidate;
   }
 
-  const outputAbs = resolve(outArg ?? versionedOut(inputAbs));
+  const outputAbs = outArg ? resolveWorkspacePath(workspace, outArg) : versionedOut(inputAbs);
   if (existsSync(outputAbs)) {
     console.error(`refusing to overwrite existing file: ${outputAbs}`);
     process.exit(1);

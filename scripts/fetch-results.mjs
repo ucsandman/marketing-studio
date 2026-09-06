@@ -38,6 +38,7 @@ import {dirname, join} from 'node:path';
 import {readEnvVar} from './lib/env.mjs';
 import {normalizeBskyMetrics, parsePostUrl} from './publish-bluesky.mjs';
 import {accessToken as youtubeAccessToken, hasYoutubeToken, normalizeYtMetrics, videoIdFromUrl} from './publish-youtube.mjs';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -120,13 +121,14 @@ async function fetchYtMetrics(ids) {
 async function main() {
   const argv = process.argv.slice(2);
   const asJson = argv.includes('--json');
-  const brand = argv.find((a) => !a.startsWith('--'));
+  const brand = argv.find((a, i) => !a.startsWith('--') && argv[i - 1] !== '--project');
+  const project = projectArg(argv);
   if (!brand) {
-    console.error('usage: node scripts/fetch-results.mjs <brand> [--json]');
+    console.error('usage: node scripts/fetch-results.mjs <brand> --project <product-repo> [--json]');
     process.exit(1);
   }
 
-  const marketingDir = join(root, 'out', brand, 'marketing');
+  const marketingDir = resolveWorkspace(root, {brand, project}).marketingDir;
   const postsPath = join(marketingDir, 'posts.json');
   if (!existsSync(postsPath)) {
     console.log(`fetch-results [${brand}]: no out/${brand}/marketing/posts.json yet (run build-postkit.mjs) — 0 of 0 rows published, skipping.`);

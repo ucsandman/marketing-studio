@@ -17,6 +17,7 @@ import {fileURLToPath} from 'node:url';
 // Color math lives in lib/ so it is covered by `node --test scripts/lib/*.test.mjs`
 // instead of hiding behind this script's fetch + execSync side effects.
 import {groundFromLogoFills, norm, teaserColors} from './lib/teaser-colors.mjs';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const args = Object.fromEntries(
@@ -34,6 +35,7 @@ const need = (k) => {
 };
 
 const id = need('id').toLowerCase().replace(/[^a-z0-9-]/g, '-');
+const workspace = resolveWorkspace(root, {brand: id, project: projectArg(process.argv.slice(2))});
 const name = need('name');
 const site = need('site');
 const logo = need('logo');
@@ -45,7 +47,7 @@ const showName = args.showName !== 'false';
 // Fetch the logo first: an SVG's own fill colors decide the ground when --theme
 // is not given (a navy wordmark on a navy ground is invisible; measured on the
 // first render of this lane). Raster logos default to dark unless told otherwise.
-const pubDir = join(root, 'studio', 'public', 'teasers', id);
+const pubDir = join(workspace.publicDir, 'teasers', id);
 mkdirSync(pubDir, {recursive: true});
 let ext = extname(logo.split('?')[0]).toLowerCase();
 if (!['.svg', '.png', '.webp', '.jpg', '.jpeg'].includes(ext)) ext = '.png';
@@ -83,7 +85,7 @@ const brand = {
   voice: `Teaser lane. Accent sampled from ${site} on ${args.date || 'an unrecorded date'}; neutrals derived. Not a registered brand, never reused for another asset without onboarding.`,
 };
 
-const outDir = join(root, 'out', 'teasers', id);
+const outDir = workspace.brandRoot;
 mkdirSync(outDir, {recursive: true});
 const props = {
   brandId: id,
@@ -102,7 +104,7 @@ const propsPath = join(outDir, 'og-props.json');
 writeFileSync(propsPath, JSON.stringify(props, null, 1));
 writeFileSync(join(outDir, 'brand.json'), JSON.stringify(brand, null, 1));
 
-const run = (cmd) => execSync(cmd, {cwd: join(root, 'studio'), stdio: 'inherit'});
+const run = (cmd) => execSync(`${cmd} --public-dir="${workspace.publicDir}"`, {cwd: join(root, 'studio'), stdio: 'inherit'});
 const t0 = Date.now();
 if (args.still === 'true') {
   const still = join(outDir, 'still.png');

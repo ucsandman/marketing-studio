@@ -2,13 +2,12 @@
 /**
  * Diagram feeder. Compiles a .d2 spec into a brand-colored SVG + PNG.
  *
- * Usage: node feeders/diagram/render.mjs <brand> <spec.d2> [--out DIR] [--width N]
+ * Usage: node feeders/diagram/render.mjs <brand> <spec.d2> [--project REPO] [--out DIR] [--width N]
  */
 import {copyFileSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {basename, dirname, extname, join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {D2} from '@d2lang/d2';
-import {Resvg} from '@resvg/resvg-js';
+import {projectArg, resolveWorkspace, resolveWorkspacePath} from '../../scripts/lib/workspace.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '..', '..');
@@ -41,7 +40,37 @@ export const stylePrelude = ({bg, surface, line, ink, brand}) =>
 /** PNG IHDR width: 4 big-endian bytes at offset 16. */
 export const pngWidth = (buf) => buf.readUInt32BE(16);
 
+const optionValue = (args, name) => {
+  const index = args.indexOf(name);
+  if (index >= 0) {
+    const value = args[index + 1];
+    if (!value || value.startsWith('--')) throw new Error(`${name} requires a value`);
+    return value;
+  }
+  const prefix = `${name}=`;
+  const arg = args.find((item) => item.startsWith(prefix));
+  if (arg && arg.length === prefix.length) throw new Error(`${name} requires a value`);
+  return arg?.slice(prefix.length) ?? null;
+};
+
+export const resolveDiagramPaths = (brandId, specPath, args = [], cwd = process.cwd()) => {
+  const workspace = resolveWorkspace(ROOT, {
+    brand: brandId,
+    project: projectArg(args),
+    cwd,
+  });
+  return {
+    workspace,
+    specPath: resolveWorkspacePath(workspace, specPath),
+    outDir: resolveWorkspacePath(
+      workspace,
+      optionValue(args, '--out') ?? join(workspace.marketingDir, 'diagrams'),
+    ),
+  };
+};
+
 export const renderDiagram = async (brand, spec, width = DEFAULT_WIDTH) => {
+  const [{D2}, {Resvg}] = await Promise.all([import('@d2lang/d2'), import('@resvg/resvg-js')]);
   const d2 = new D2();
   const compiled = await d2.compile(stylePrelude(brand.colors) + spec, {layout: 'dagre'});
   const svg = await d2.render(compiled.diagram, {...compiled.renderOptions, pad: 40});
@@ -74,13 +103,12 @@ if (isMain) {
   const args = process.argv.slice(2);
   const [brandId, specPath] = args;
   if (!brandId || !specPath) {
-    console.error('usage: node feeders/diagram/render.mjs <brand> <spec.d2> [--out DIR] [--width N]');
+    console.error('usage: node feeders/diagram/render.mjs <brand> <spec.d2> [--project REPO] [--out DIR] [--width N]');
     process.exit(1);
   }
-  const outIdx = args.indexOf('--out');
-  const widthIdx = args.indexOf('--width');
-  const outDir =
-    outIdx >= 0 ? resolve(args[outIdx + 1]) : join(ROOT, 'out', brandId, 'marketing', 'diagrams');
-  const width = widthIdx >= 0 ? Number(args[widthIdx + 1]) : DEFAULT_WIDTH;
-  await run(brandId, resolve(specPath), outDir, width);
+  const widthRaw = optionValue(args, '--width');
+  const width = widthRaw === null ? DEFAULT_WIDTH : Number(widthRaw);
+  if (!Number.isFinite(width) || width <= 0) throw new Error('--width must be a positive number');
+  const paths = resolveDiagramPaths(brandId, specPath, args);
+  await run(brandId, paths.specPath, paths.outDir, width);
 }

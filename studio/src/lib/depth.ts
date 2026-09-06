@@ -1,18 +1,17 @@
-import {random} from 'remotion';
 import type {Motion} from './motion';
 
 // Depth cues that give flat compositions believable dimension without touching a
 // single rest position. Two independent pieces, both pure and both gated by a
 // brand knob that defaults to 0 (so the default output is a flat, hard cut):
 //
-//   parallaxOffset — a slow, smooth, seeded drift applied to a depth LAYER's
-//     container. Background layers drift more than foreground, selling depth.
+//   parallaxOffset — a slow authored operator arc applied to a depth LAYER's
+//     container. Background layers move more than foreground, selling depth.
 //   settleOn — a short overshoot-and-settle kicker applied to an act container
 //     right after a cut, so a cut lands like a real operator eased it in.
 //
-// Determinism: drift phases come from Remotion's `random(seed)` (NEVER Math.random
-// / Date), so a given (seed, frame) always yields the same offset — required for
-// deterministic renders and byte-stable output.
+// There is no random phase or per-brand wander. Semantic layer suffixes define
+// stable directions; a string hash is only a deterministic fallback for callers
+// with another named layer.
 
 export type Offset = {x: number; y: number};
 export type SettleTransform = {x: number; y: number; scale: number};
@@ -45,17 +44,31 @@ export const parallaxOffset = (
   const amp = motion.parallax * layerDepth * PARALLAX_AMP_PX;
   if (amp === 0) return {x: 0, y: 0};
   const t = frame / fps; // seconds
-  const phaseX = random(`${seed}:px`) * Math.PI * 2;
-  const phaseY = random(`${seed}:py`) * Math.PI * 2;
-  const x = amp * Math.sin((2 * Math.PI * t) / DRIFT_PERIOD_X_S + phaseX);
-  const y = amp * VERTICAL_RATIO * Math.sin((2 * Math.PI * t) / DRIFT_PERIOD_Y_S + phaseY);
+  const parts = seed.split(':');
+  const role = parts[parts.length - 1];
+  const authored =
+    role === 'bg'
+      ? {x: 1, y: -0.35}
+      : role === 'wash'
+        ? {x: -0.55, y: 0.7}
+        : role === 'content'
+          ? {x: 0.28, y: 0.2}
+          : null;
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  const angle = ((hash % 360) * Math.PI) / 180;
+  const direction = authored ?? {x: Math.cos(angle), y: Math.sin(angle)};
+  // Both arcs start at the authored rest position. No random initial offset.
+  const x = amp * direction.x * Math.sin((2 * Math.PI * t) / DRIFT_PERIOD_X_S);
+  const y =
+    amp * direction.y * VERTICAL_RATIO * Math.sin((2 * Math.PI * t) / DRIFT_PERIOD_Y_S);
   return {x, y};
 };
 
 // Kicker amplitudes at settle = 1, right at the cut. A "few px" translate and a
 // sub-1% scale, decaying fast so the whole gesture is spent inside ~20 frames.
-const SETTLE_KICK_PX = 8;
-const SETTLE_SCALE_AMP = 0.008; // 0.8% — stays under 1%
+const SETTLE_KICK_PX = 5;
+const SETTLE_SCALE_AMP = 0.004; // 0.4% — felt, not announced
 const SETTLE_TAU_FRAMES = 6; // decay time constant (env ≈ 0.007 by frame 30)
 const SETTLE_RING_FRAMES = 13; // one ring ≈ 13 frames -> ~1.5 rings before it dies
 

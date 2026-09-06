@@ -56,7 +56,10 @@ import {copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFil
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {evaluateProduction} from './judge-production.mjs';
+import {sha256File} from './lib/production-quality.mjs';
 import {lintJson, formatReport} from './lint-copy.mjs';
+import {projectArg, resolveWorkspace, resolveWorkspacePath} from './lib/workspace.mjs';
 
 // --- platform table ---------------------------------------------------------
 // aspect matches extract-thumbs.mjs's thumb-<aspect>.jpg naming. videoSource is a
@@ -442,8 +445,15 @@ function main() {
 
   const root = join(dirname(fileURLToPath(import.meta.url)), '..');
   const brand = process.argv[2];
+  const production = process.argv.includes('--production');
+  const project = projectArg(process.argv.slice(2));
   if (!brand) {
-    console.error('usage: node scripts/build-postkit.mjs <brand>');
+    console.error('usage: node scripts/build-postkit.mjs <brand> --project <product-repo> [--production]');
+    process.exit(1);
+  }
+  const workspace = resolveWorkspace(root, {brand, project});
+  if (!existsSync(workspace.projectRoot)) {
+    console.error(`build-postkit: --project must name an existing product repository: ${workspace.projectRoot}`);
     process.exit(1);
   }
 
@@ -454,7 +464,7 @@ function main() {
   }
   const brandData = JSON.parse(readFileSync(brandPath, 'utf8'));
 
-  const briefPath = join(root, 'out', brand, 'marketing', 'brief.json');
+  const briefPath = join(workspace.marketingDir, 'brief.json');
   let brief = null;
   if (existsSync(briefPath)) {
     try {
@@ -477,13 +487,57 @@ function main() {
 
   // Audio manifest, for LICENCES.md's music/SFX lines only (build-captions.mjs and
   // render-matrix.mjs are the consumers that drive the actual render/caption path).
-  const audioPropsPath = join(root, 'props', `${brand}-audio.json`);
+  const audioPropsPath = join(workspace.propsDir, `${brand}-audio.json`);
   const audioManifest = existsSync(audioPropsPath) ? JSON.parse(readFileSync(audioPropsPath, 'utf8')) : null;
 
-  const matrixDir = join(root, 'out', brand, 'matrix');
-  const thumbsDir = join(root, 'out', brand, 'thumbs');
-  const captionsDir = join(root, 'out', brand, 'captions');
-  const postkitDir = join(root, 'out', brand, 'postkit');
+  const matrixDir = workspace.matrixDir;
+  const thumbsDir = workspace.thumbsDir;
+  const captionsDir = workspace.captionsDir;
+  const postkitDir = workspace.postkitDir;
+  let productionEvidence = null;
+  let productionPlanPath = null;
+  if (production) {
+    const evidencePath = join(workspace.marketingDir, 'delivery-evidence.json');
+    if (!existsSync(evidencePath)) {
+      console.error(`build-postkit: --production requires out/${brand}/marketing/delivery-evidence.json from render-matrix.mjs --production`);
+      process.exit(1);
+    }
+    try {
+      productionEvidence = JSON.parse(readFileSync(evidencePath, 'utf8'));
+    } catch (error) {
+      console.error(`build-postkit: invalid delivery evidence: ${error.message}`);
+      process.exit(1);
+    }
+    productionPlanPath = resolveWorkspacePath(workspace, productionEvidence?.plan ?? join(workspace.marketingDir, 'production-plan.json'));
+    if (productionEvidence?.version !== 1 || !Array.isArray(productionEvidence.exports) || !existsSync(productionPlanPath) || productionEvidence.planSha256 !== sha256File(productionPlanPath)) {
+      console.error('build-postkit: production evidence is incomplete or stale for the current production plan');
+      process.exit(1);
+    }
+  }
+  const verifyProductionVideo = (id, videoSrc) => {
+    const evidence = productionEvidence.exports.find((entry) => entry.id === id);
+    const expectedPath = `marketing/assets/${brand}/matrix/${id}.mp4`;
+    if (!evidence || evidence.path !== expectedPath || evidence.sha256 !== sha256File(videoSrc)) {
+      console.error(`build-postkit: production refuses ${id}; its matrix bytes have no matching current approval evidence`);
+      process.exit(1);
+    }
+    if (!evidence.evidence || !evidence.review) {
+      console.error(`build-postkit: row-specific production evidence or review is missing for ${id}`);
+      process.exit(1);
+    }
+    const report = evaluateProduction({
+      workspace,
+      brand,
+      productionPlanPath,
+      renderPath: videoSrc,
+      evidencePath: resolveWorkspacePath(workspace, evidence.evidence),
+      reviewPath: resolveWorkspacePath(workspace, evidence.review),
+    });
+    if (report.verdict !== 'PASS' || report.input?.renderSha256 !== evidence.sha256 || report.input?.sourceBundleSha256 !== evidence.sourceBundleSha256) {
+      console.error(`build-postkit: current production sources, evidence, or trusted review do not PASS for ${id}`);
+      process.exit(1);
+    }
+  };
 
   let assembledCount = 0;
   const manifestPlatforms = {};
@@ -508,8 +562,8 @@ function main() {
 
     // Video, plus a silent -an cut for muted-autoplay embeds (see header comment).
     let videoSrc = join(matrixDir, `${cfg.videoSource}.mp4`);
-    for (const direct of cfg.directSources ?? []) {
-      const candidate = join(root, 'out', brand, `${direct}.mp4`);
+    for (const direct of production ? [] : cfg.directSources ?? []) {
+      const candidate = join(workspace.brandRoot, `${direct}.mp4`);
       if (existsSync(candidate)) {
         videoSrc = candidate;
         console.log(`postkit: ${platformKey}: using per-platform clip ${direct}.mp4 over matrix/${cfg.videoSource}.mp4`);
@@ -519,6 +573,7 @@ function main() {
     let videoStatus;
     let silentFile = null;
     if (existsSync(videoSrc)) {
+      if (production) verifyProductionVideo(cfg.videoSource, videoSrc);
       const destVideo = join(dir, `${cfg.videoSource}.mp4`);
       copyFileSync(videoSrc, destVideo);
       videoStatus = `${cfg.videoSource}.mp4`;
@@ -530,6 +585,10 @@ function main() {
         assembledCount += 1;
       }
     } else {
+      if (production) {
+        console.error(`build-postkit: production requires approved matrix/${cfg.videoSource}.mp4 for ${platformKey}`);
+        process.exit(1);
+      }
       videoStatus = `NOT INCLUDED (missing out/${brand}/matrix/${cfg.videoSource}.mp4 — run render-matrix.mjs)`;
       console.log(`postkit: ${platformKey}: skipped video, ${cfg.videoSource}.mp4 not found in out/${brand}/matrix/`);
     }
@@ -609,7 +668,7 @@ function main() {
   // Seed out/<brand>/marketing/posts.json, once — the operator (or launch-engine)
   // fills in url/published after actually posting, so a rebuild must never
   // clobber that. Only write it when it doesn't exist yet.
-  const postsPath = join(root, 'out', brand, 'marketing', 'posts.json');
+  const postsPath = join(workspace.marketingDir, 'posts.json');
   if (existsSync(postsPath)) {
     console.log(`postkit: out/${brand}/marketing/posts.json already exists, left unchanged`);
   } else {
@@ -713,7 +772,7 @@ function main() {
   // hasCapture drives one line in the disclosure: real screen footage must NOT be
   // labelled generated, and the kit should say so explicitly rather than let a
   // blanket "AI video" label get applied to a genuine recording.
-  const hasCapture = existsSync(join(root, 'studio', 'public', brand, 'demo.webm'));
+  const hasCapture = existsSync(join(workspace.publicDir, brand, 'demo.webm'));
   writeFileSync(
     join(postkitDir, 'DISCLOSURE.md'),
     buildDisclosureMd(brandData.name ?? brand, audioManifest, hasCapture),

@@ -1,5 +1,5 @@
-// Stages rendered Blender PNG sequences into the studio's public dir.
-// Usage: node scripts/stage-blender-assets.mjs [brandId] [--force]   (default brand: noban)
+// Stages rendered Blender PNG sequences into the product workspace's public dir.
+// Usage: node scripts/stage-blender-assets.mjs <brandId> --project <product-repo> [--force]
 //
 // Content-hash cache: when the source assets and this script are byte-identical to
 // the last run AND the staged files are all still present, staging is a no-op.
@@ -8,13 +8,24 @@ import {cpSync, existsSync, readFileSync, readdirSync, statSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
 import {cacheKey, checkCache, storeCache} from './lib/cache.mjs';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
 const force = args.includes('--force');
-const brandId = args.find((a) => !a.startsWith('--')) ?? 'noban';
-const src = join(root, 'assets', brandId);
-const dest = join(root, 'studio', 'public', brandId);
+const brandId = args.find((a, i) => !a.startsWith('--') && args[i - 1] !== '--project');
+const project = projectArg(args);
+if (!brandId || !project) {
+  console.error('usage: node scripts/stage-blender-assets.mjs <brandId> --project <product-repo> [--force]');
+  process.exit(1);
+}
+const workspace = resolveWorkspace(root, {brand: brandId, project});
+if (!existsSync(workspace.projectRoot) || !statSync(workspace.projectRoot).isDirectory()) {
+  console.error(`blender staging: --project must name an existing product repository: ${workspace.projectRoot}`);
+  process.exit(1);
+}
+const src = workspace.assetsDir;
+const dest = join(workspace.publicDir, brandId);
 
 if (!existsSync(src)) {
   console.error(`nothing to stage: ${src} does not exist (run the blender feeder first)`);
@@ -51,7 +62,7 @@ const KEY = cacheKey({sources, script: readFileSync(fileURLToPath(import.meta.ur
 const artifacts = sources.map((s) => join(dest, ...s.rel.split('/')));
 
 if (!force) {
-  const {hit} = checkCache(brandId, 'blender-stage', KEY, artifacts);
+  const {hit} = checkCache(workspace, 'blender-stage', KEY, artifacts);
   if (hit) {
     console.log(`blender staging cache hit — reusing ${dest} (${artifacts.length} files, copied nothing)`);
     process.exit(0);
@@ -62,4 +73,4 @@ for (const dir of dirs) {
   cpSync(join(src, dir), join(dest, dir), {recursive: true});
   console.log(`staged ${brandId}/${dir}`);
 }
-storeCache(brandId, 'blender-stage', KEY, artifacts);
+storeCache(workspace, 'blender-stage', KEY, artifacts);

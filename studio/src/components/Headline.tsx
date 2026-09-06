@@ -4,8 +4,10 @@ import {alphaHex} from '../lib/brand';
 import type {Brand} from '../lib/brand';
 import {loadBrandFonts} from '../lib/fonts';
 import {entrance} from '../lib/motion';
-import {revealFragment, revealUnit} from '../lib/textReveal';
+import {lineMaskFragment, revealFragment, revealUnit} from '../lib/textReveal';
 import {useFormat} from '../lib/layout';
+import {headlineLayout} from '../lib/typography';
+import type {HeadlineTreatment} from '../lib/typography';
 
 const easeOutExpo = Easing.out(Easing.exp);
 
@@ -30,10 +32,12 @@ export const Headline: React.FC<{
   // collide with a two-line headline the way an absolutely-placed row would.
   // Undefined -> byte-identical (nothing rendered, no extra gap).
   footer?: React.ReactNode;
-}> = ({kicker, headline, brand, hideKicker, scrim, topAlign, cueFrames, footer}) => {
+  treatment?: HeadlineTreatment;
+}> = ({kicker, headline, brand, hideKicker, scrim, topAlign, cueFrames, footer, treatment}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
-  const {scale, width, height, safe} = useFormat();
+  const format = useFormat();
+  const {scale, height, safe} = format;
   const fonts = loadBrandFonts(brand);
   // `ctaStyle: 'block'` brands forbid the accent from ever being TEXT on paper
   // (only a filled block with ink text — see EndCard/FeaturePanel/Caption/
@@ -41,8 +45,22 @@ export const Headline: React.FC<{
   // to an ink tone instead of textAccent. Defaults to 'text', so every other
   // brand's kicker renders byte-identically.
   const block = brand.ctaStyle === 'block';
-  const words = headline.split(' ');
-  const preset = brand.motion.textReveal;
+  const type = headlineLayout(
+    headline,
+    format,
+    treatment ?? 'editorial',
+    Boolean(topAlign),
+    fonts.display,
+    Boolean(scrim),
+  );
+  const lineWords = type.lines.map((line) => line.split(/\s+/));
+  const words = lineWords.flat();
+  const preset =
+    treatment === 'precision'
+      ? 'maskWipe'
+      : treatment === 'playful'
+        ? 'charStagger'
+        : brand.motion.textReveal;
   // Word cues are per WORD, so a cued headline reveals by word even on a
   // charStagger brand — a per-character cascade has nothing to lock to.
   const byChar = revealUnit(preset, headline) === 'char' && !cueFrames;
@@ -57,8 +75,9 @@ export const Headline: React.FC<{
   const wordStyle: React.CSSProperties = {
     fontFamily: fonts.display,
     fontWeight: 800,
-    fontSize: Math.round(120 * scale),
-    lineHeight: 1.08,
+    fontSize: type.fontSize,
+    lineHeight: type.lineHeight,
+    letterSpacing: type.letterSpacing,
     color: brand.colors.ink,
     display: 'inline-block',
   };
@@ -88,6 +107,8 @@ export const Headline: React.FC<{
             // for other templates that still read it as text).
             color: block ? brand.colors.ink2 : brand.colors[brand.textAccent],
             opacity: kickerIn,
+            width: treatment === 'precision' ? type.maxWidth : undefined,
+            textAlign: treatment === 'precision' ? 'left' : 'center',
           }}
         >
           {kicker.toUpperCase()}
@@ -96,14 +117,16 @@ export const Headline: React.FC<{
       <div
         style={{
           display: 'flex',
-          flexWrap: 'wrap',
-          justifyContent: 'center',
-          gap: `0 ${Math.round(28 * scale)}px`,
+          flexDirection: 'column',
+          alignItems: type.textAlign === 'left' ? 'stretch' : 'center',
+          gap: Math.round(5 * scale),
           // Wider cap when pinned to the top band: fewer, wider lines fit the
           // shallower band above the content below. Only raises the cap (never
           // narrows it), and on portrait the frame-width term is already the
           // binding constraint, so only a wide landscape frame is affected.
-          maxWidth: Math.min(topAlign ? 1900 : 1500, width - 2 * safe.left),
+          width: type.maxWidth,
+          maxWidth: type.maxWidth,
+          boxSizing: 'border-box',
           ...(scrim
             ? {
                 background: `${brand.colors.bg}${alphaHex(0.88)}`,
@@ -113,41 +136,61 @@ export const Headline: React.FC<{
             : null),
         }}
       >
-        {words.map((w, i) => {
-          if (!byChar) {
-            const frag = revealFragment(preset, {
-              frame,
-              fps,
-              motion: brand.motion,
-              index: i,
-              total: words.length,
-              scale,
-              delayOverride: cueFrames?.[i] ?? null,
-            });
-            return (
-              <span key={i} style={{...wordStyle, ...frag}}>
-                {w}
-              </span>
-            );
-          }
-          return (
-            <span key={i} style={wordStyle}>
-              {w.split('').map((ch, j) => {
-                const frag = revealFragment(preset, {
+        {lineWords.map((line, lineIndex) => {
+          const before = lineWords.slice(0, lineIndex).reduce((sum, item) => sum + item.length, 0);
+          const lineMask =
+            treatment === 'editorial' && type.maskLines && !cueFrames
+              ? lineMaskFragment({
                   frame,
                   fps,
                   motion: brand.motion,
-                  index: wordCharStart[i] + j,
-                  total: totalChars,
+                  index: lineIndex,
                   scale,
-                });
+                })
+              : null;
+          return (
+            <div
+              key={`${line.join('-')}-${lineIndex}`}
+              style={{
+                display: 'flex',
+                justifyContent: type.textAlign === 'left' ? 'flex-start' : 'center',
+                gap: type.wordGap,
+                whiteSpace: 'nowrap',
+                ...lineMask,
+              }}
+            >
+              {line.map((w, localIndex) => {
+                const i = before + localIndex;
+                if (lineMask) return <span key={i} style={wordStyle}>{w}</span>;
+                if (!byChar) {
+                  const frag = revealFragment(preset, {
+                    frame,
+                    fps,
+                    motion: brand.motion,
+                    index: i,
+                    total: words.length,
+                    scale,
+                    delayOverride: cueFrames?.[i] ?? null,
+                  });
+                  return <span key={i} style={{...wordStyle, ...frag}}>{w}</span>;
+                }
                 return (
-                  <span key={j} style={{display: 'inline-block', ...frag}}>
-                    {ch}
+                  <span key={i} style={wordStyle}>
+                    {w.split('').map((ch, j) => {
+                      const frag = revealFragment(preset, {
+                        frame,
+                        fps,
+                        motion: brand.motion,
+                        index: wordCharStart[i] + j,
+                        total: totalChars,
+                        scale,
+                      });
+                      return <span key={j} style={{display: 'inline-block', ...frag}}>{ch}</span>;
+                    })}
                   </span>
                 );
               })}
-            </span>
+            </div>
           );
         })}
       </div>

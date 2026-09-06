@@ -11,9 +11,11 @@ import {execSync} from 'node:child_process';
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {requireAudioWorkspace} from './lib/sound-design.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const outDir = join(root, 'studio', 'public', 'costclaw', 'audio');
+const workspace = requireAudioWorkspace(root, 'costclaw');
+const outDir = join(workspace.publicDir, 'audio');
 
 // --force              regenerate every line + music
 // --force <id,id,...>  regenerate only the listed acts (and/or "music"), e.g.
@@ -80,9 +82,9 @@ const MUSIC_PROMPT =
 // total duration in ms: costclaw's picture is locked to a custom actLengths
 // override (props/costclaw-launch.json), not the shared defaults — read it
 // here rather than hardcode so this stays correct if the override ever moves.
-const launchProps = JSON.parse(readFileSync(join(root, 'props', 'costclaw-launch.json'), 'utf8'));
+const launchProps = JSON.parse(readFileSync(join(workspace.propsDir, 'costclaw-launch.json'), 'utf8'));
 const actLengths = launchProps.actLengths ?? {};
-const telemetry = JSON.parse(readFileSync(join(root, 'props', 'costclaw-demo.json'), 'utf8')).telemetry;
+const telemetry = JSON.parse(readFileSync(join(workspace.propsDir, 'costclaw-demo.json'), 'utf8')).telemetry;
 const demoLen = Math.ceil((telemetry.durationMs / 1000) * 30) + (actLengths.demoTail ?? 24);
 const featureLens = [0, 1, 2].map((i) => actLengths.features?.[i] ?? 180);
 const totalFrames =
@@ -101,11 +103,11 @@ const run = (cmd) => execSync(cmd, {cwd: root, encoding: 'utf8', stdio: ['ignore
 // VO: generate missing lines (or forced ones)
 const pending = LINES.filter((l) => shouldForce(l.id) || !existsSync(join(outDir, `${l.id}.mp3`)));
 if (pending.length > 0) {
-  const scriptPath = join(root, 'out', 'costclaw', 'vo-script.json');
+  const scriptPath = join(workspace.marketingDir, 'vo-script.json');
   mkdirSync(dirname(scriptPath), {recursive: true});
   writeFileSync(scriptPath, JSON.stringify({lines: pending}));
   const out = run(
-    `node feeders/audio/client.mjs vo --script "${scriptPath}" --out "${outDir}"${WANT_TIMESTAMPS ? ' --timestamps' : ''}`,
+    `node feeders/audio/client.mjs vo --project "${workspace.projectRoot}" --script "${scriptPath}" --out "${outDir}"${WANT_TIMESTAMPS ? ' --timestamps' : ''}`,
   );
   process.stdout.write(out);
   for (const m of out.matchAll(/vo OK: (.+)\.mp3 (\d+)ms/g)) durations[m[1]] = Number(m[2]);
@@ -137,7 +139,7 @@ for (const l of LINES) {
   if (!WANT_TIMESTAMPS) continue; // explicit opt-out -> no words -> constants mode
   if (!existsSync(join(outDir, `${l.id}.mp3`))) continue; // caught by the completeness check below
   const out = run(
-    `node feeders/audio/client.mjs words --file "${join(outDir, `${l.id}.mp3`)}" --text "${l.text.replaceAll('"', '\\"')}" --out "${sidecar}"`,
+      `node feeders/audio/client.mjs words --project "${workspace.projectRoot}" --file "${join(outDir, `${l.id}.mp3`)}" --text "${l.text.replaceAll('"', '\\"')}" --out "${sidecar}"`,
   );
   process.stdout.write(out);
   const j = JSON.parse(readFileSync(sidecar, 'utf8'));
@@ -147,7 +149,7 @@ for (const l of LINES) {
 const musicFile = join(outDir, 'music.mp3');
 if (shouldForce('music') || !existsSync(musicFile)) {
   const out = run(
-    `node feeders/audio/client.mjs music --prompt "${MUSIC_PROMPT}" --length-ms ${totalMs} --out "${musicFile}"`,
+    `node feeders/audio/client.mjs music --project "${workspace.projectRoot}" --prompt "${MUSIC_PROMPT}" --length-ms ${totalMs} --out "${musicFile}"`,
   );
   process.stdout.write(out);
   const m = out.match(/music OK: .+ (\d+)ms/);
@@ -168,13 +170,13 @@ if (!durations.music) {
 }
 
 const manifest = {
-  music: {src: 'costclaw/audio/music.mp3', durationMs: durations.music},
+  music: {src: 'audio/music.mp3', durationMs: durations.music},
   // Spread-only-when-present: an explicit `words: undefined` serializes the key away
   // in some paths, and an explicit `wordsEstimated: false` would dirty every existing
   // manifest diff.
   lines: LINES.map((l) => ({
     act: l.id,
-    src: `costclaw/audio/${l.id}.mp3`,
+    src: `audio/${l.id}.mp3`,
     durationMs: durations[l.id],
     text: l.text,
     ...(wordTables[l.id] ? {words: wordTables[l.id].words} : {}),
@@ -184,11 +186,12 @@ const manifest = {
 
 // Sound-design cue gate: enable the sfx layer only when the shared library is staged
 // (run scripts/build-sfx.mjs first).
-const sfxLib = ['whoosh', 'tick', 'riser'].map((k) => join(root, 'studio', 'public', 'sfx', `${k}.mp3`));
+const sfxLib = ['whoosh', 'tick', 'riser'].map((k) => join(workspace.publicDir, 'sfx', `${k}.mp3`));
 if (sfxLib.every((f) => existsSync(f))) {
   manifest.sfx = {enabled: true};
   console.log('sfx: library present -> manifest.sfx.enabled = true');
 }
 
-writeFileSync(join(root, 'props', 'costclaw-audio.json'), JSON.stringify(manifest, null, 2) + '\n');
-console.log(`wrote props/costclaw-audio.json (${totalMs}ms track, ${LINES.length} lines)`);
+mkdirSync(workspace.propsDir, {recursive: true});
+writeFileSync(join(workspace.propsDir, 'costclaw-audio.json'), JSON.stringify(manifest, null, 2) + '\n');
+console.log(`wrote ${join(workspace.propsDir, 'costclaw-audio.json')} (${totalMs}ms track, ${LINES.length} lines)`);

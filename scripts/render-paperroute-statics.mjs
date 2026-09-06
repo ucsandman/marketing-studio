@@ -7,8 +7,10 @@ import {mkdirSync, writeFileSync} from 'node:fs';
 import {execSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const workspace = resolveWorkspace(root, {brand: 'paperroute', project: projectArg(process.argv.slice(2))});
 
 const props = {
   brandId: 'paperroute',
@@ -18,13 +20,13 @@ const props = {
   loopSequence: null,
   loopFrames: 1,
 };
-const propsPath = join(root, 'out', 'paperroute', 'og-props.json');
+const propsPath = join(workspace.brandRoot, 'og-props.json');
 mkdirSync(dirname(propsPath), {recursive: true});
 writeFileSync(propsPath, JSON.stringify(props));
 
 const render = (args, out) => {
   console.log(`render: ${out}`);
-  execSync(`npx remotion render AnimatedOG "${join(root, 'out', 'paperroute', out)}" --props="${propsPath}" ${args}`, {
+  execSync(`npx remotion render AnimatedOG "${join(workspace.brandRoot, out)}" --props="${propsPath}" --public-dir="${workspace.publicDir}" ${args}`, {
     cwd: join(root, 'studio'),
     stdio: 'inherit',
   });

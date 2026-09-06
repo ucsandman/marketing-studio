@@ -21,6 +21,7 @@ import {execSync} from 'node:child_process';
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {requireAudioWorkspace} from './lib/sound-design.mjs';
 import {sessionTiming, welcomeBoxHeight} from '../studio/src/lib/sessionTiming.ts';
 
 process.on('unhandledRejection', (reason) => {
@@ -29,8 +30,9 @@ process.on('unhandledRejection', (reason) => {
 });
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const workspace = requireAudioWorkspace(root, 'offlocalhost');
 const FPS = 30;
-const session = JSON.parse(readFileSync(join(root, 'props', 'offlocalhost-session.json'), 'utf8'));
+const session = JSON.parse(readFileSync(join(workspace.propsDir, 'offlocalhost-session.json'), 'utf8'));
 const timeline = sessionTiming(FPS, session.beats, {
   endHoldFrames: session.endHoldFrames,
   welcomeHeight: welcomeBoxHeight(session.header.tips.length),
@@ -67,7 +69,7 @@ const forceIdx = argv.indexOf('--force');
 const forceList = forceIdx >= 0 ? (argv[forceIdx + 1] && !argv[forceIdx + 1].startsWith('--') ? argv[forceIdx + 1].split(',') : ['*']) : [];
 const shouldForce = (id) => forceList.includes('*') || forceList.includes(id);
 
-const publicDir = join(root, 'studio', 'public', 'offlocalhost', 'session-audio');
+const publicDir = join(workspace.publicDir, 'session-audio');
 mkdirSync(publicDir, {recursive: true});
 const run = (cmd) => execSync(cmd, {cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit']});
 
@@ -76,7 +78,7 @@ const pending = LINES.filter((l) => shouldForce(l.id) || !existsSync(join(public
 if (pending.length) {
   const scriptPath = join(publicDir, 'script.json');
   writeFileSync(scriptPath, JSON.stringify({lines: pending}));
-  const out = run(`node feeders/audio/client.mjs vo --script "${scriptPath}" --out "${publicDir}" --brand offlocalhost`);
+  const out = run(`node feeders/audio/client.mjs vo --project "${workspace.projectRoot}" --script "${scriptPath}" --out "${publicDir}" --brand offlocalhost`);
   process.stdout.write(out);
 }
 
@@ -84,7 +86,7 @@ if (pending.length) {
 const filmMs = Math.round((timeline.durationInFrames / FPS) * 1000);
 const musicFile = join(publicDir, 'music.mp3');
 if (shouldForce('music') || !existsSync(musicFile)) {
-  const out = run(`node feeders/audio/client.mjs music --prompt "${MUSIC_PROMPT}" --length-ms ${filmMs} --out "${musicFile}"`);
+  const out = run(`node feeders/audio/client.mjs music --project "${workspace.projectRoot}" --prompt "${MUSIC_PROMPT}" --length-ms ${filmMs} --out "${musicFile}"`);
   process.stdout.write(out);
 }
 
@@ -98,7 +100,7 @@ const probeMs = (file) => {
 const lines = LINES.map((l) => ({
   id: l.id,
   text: l.text,
-  src: `offlocalhost/session-audio/${l.id}.mp3`,
+  src: `session-audio/${l.id}.mp3`,
   startMs: Math.round(l.at * 1000),
   durationMs: probeMs(join(publicDir, `${l.id}.mp3`)),
 }));
@@ -116,11 +118,12 @@ const manifest = {
   composition: 'AgentSession',
   fps: FPS,
   totalFrames: timeline.durationInFrames,
-  music: {src: 'offlocalhost/session-audio/music.mp3', durationMs: musicMs},
+  music: {src: 'session-audio/music.mp3', durationMs: musicMs},
   lines,
   sfx: [],
 };
-const outPath = join(root, 'props', 'offlocalhost-session-audio.json');
+mkdirSync(workspace.propsDir, {recursive: true});
+const outPath = join(workspace.propsDir, 'offlocalhost-session-audio.json');
 writeFileSync(outPath, JSON.stringify(manifest, null, 2) + '\n');
 console.log(`wrote ${outPath}: ${lines.length} VO lines, no sfx cues, music ${manifest.music.durationMs}ms`);
 // The gap column is what a trim has to buy: score-film wants 150ms of breath before

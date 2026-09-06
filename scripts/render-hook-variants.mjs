@@ -16,6 +16,7 @@ import {fileURLToPath} from 'node:url';
 import {dirname, join, relative} from 'node:path';
 import {posterFor, registerVariants, renderTake} from './lib/takes.mjs';
 import {resolveBaseProps} from './lib/matrix-props.mjs';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -25,7 +26,8 @@ process.on('unhandledRejection', (reason) => {
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 const argv = process.argv.slice(2);
-const brand = argv.find((a) => !a.startsWith('--'));
+const brand = argv.find((a, i) => !a.startsWith('--') && !['--project', '--headlines'].includes(argv[i - 1]));
+const workspace = brand ? resolveWorkspace(root, {brand, project: projectArg(argv)}) : null;
 const headlinesIdx = argv.indexOf('--headlines');
 const headlinesFlag = headlinesIdx >= 0 ? argv[headlinesIdx + 1] : null;
 
@@ -36,7 +38,7 @@ if (!brand) {
 
 // resolveBaseProps exits the process with a clear error if props/<brand>-launch.json
 // is missing (same guard render-matrix.mjs/extract-thumbs.mjs rely on).
-const launchPath = resolveBaseProps(root, brand, 'LaunchVideo');
+const launchPath = resolveBaseProps(workspace, brand, 'LaunchVideo');
 const launch = JSON.parse(readFileSync(launchPath, 'utf8'));
 
 // Returns [{headline, strategy|null}] — strategy is the hook category from
@@ -57,7 +59,7 @@ function resolveHeadlines() {
     }
     return {hooks: parsed.slice(0, 3).map((h) => ({headline: h, strategy: null})), source: '--headlines flag'};
   }
-  const briefPath = join(root, 'out', brand, 'marketing', 'brief.json');
+  const briefPath = join(workspace.marketingDir, 'brief.json');
   if (existsSync(briefPath)) {
     try {
       const brief = JSON.parse(readFileSync(briefPath, 'utf8'));
@@ -125,17 +127,17 @@ async function main() {
   );
   const frames = `${timing.hook.from}-${timing.hook.from + timing.hook.len - 1}`;
 
-  const outDir = join(root, 'out', brand, 'marketing', 'hooks');
+  const outDir = join(workspace.marketingDir, 'hooks');
   const variants = [];
   const rows = [];
   hooks.forEach(({headline, strategy}, i) => {
     const n = i + 1;
     const props = {...launch, headline, formatWidth: 1920, formatHeight: 1080};
     const outPath = join(outDir, `hook-${n}.mp4`);
-    const {path, bytes} = renderTake({comp: 'LaunchVideo', outPath, props, frames});
+    const {path, bytes} = renderTake({comp: 'LaunchVideo', outPath, props, frames, publicDir: workspace.publicDir});
     const posterPath = posterFor(outPath);
-    const relPath = relative(root, path).replace(/\\/g, '/');
-    const relPoster = relative(root, posterPath).replace(/\\/g, '/');
+    const relPath = relative(workspace.projectRoot, path).replace(/\\/g, '/');
+    const relPoster = relative(workspace.projectRoot, posterPath).replace(/\\/g, '/');
     variants.push({id: `hook-${n}`, path: relPath, label: strategy ? `[${strategy}] ${headline}` : headline, strategy});
     rows.push({headline, strategy, videoRel: `hook-${n}.mp4`, posterRel: `hook-${n}.jpg`});
     console.log(`render-hook-variants: hook-${n}${strategy ? ` (${strategy})` : ''} -> ${relPath} (${bytes} bytes); poster ${relPoster}`);
@@ -143,9 +145,9 @@ async function main() {
 
   const pickerPath = join(outDir, 'picker.html');
   writeFileSync(pickerPath, buildPickerHtml(brand, rows));
-  console.log(`render-hook-variants: wrote ${relative(root, pickerPath).replace(/\\/g, '/')}`);
+  console.log(`render-hook-variants: wrote ${relative(workspace.projectRoot, pickerPath).replace(/\\/g, '/')}`);
 
-  const registered = registerVariants(brand, 'launch-video', variants);
+  const registered = registerVariants(workspace, 'launch-video', variants);
   console.log(
     registered
       ? `render-hook-variants: registered ${variants.length} variant(s) on asset "launch-video" in run.json`

@@ -13,6 +13,7 @@ export const SpecularSweep: React.FC<{
   skew?: number; // deg
 }> = ({beats, dur = 24, peak = 0.11, skew = -14}) => {
   const frame = useCurrentFrame();
+  const safePeak = Math.min(0.16, Math.max(0, peak));
   const beat = beats.find((b) => frame >= b && frame <= b + dur);
   if (beat === undefined) return null;
   const x = interpolate(frame, [beat, beat + dur], [-140, 260], {
@@ -40,7 +41,8 @@ export const SpecularSweep: React.FC<{
           height: '148%', // skewed corners never enter the canvas
           width: '40%',
           transform: `translateX(${x}%) skewX(${skew}deg)`,
-          background: `linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,${peak}) 50%, rgba(255,255,255,0))`,
+          background: `linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,${safePeak}) 50%, rgba(255,255,255,0))`,
+          mixBlendMode: 'soft-light',
           opacity: fadeIn * fadeOut,
         }}
       />

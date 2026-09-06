@@ -15,12 +15,13 @@
 // FAIL verdict.
 //
 // Usage: node scripts/judge-demo-pacing.mjs <brand> [--strict] [--json]
-// Output: out/<brand>/marketing/judge-demo-pacing.json
+// Output: <product-repo>/marketing/assets/<brand>/marketing/judge-demo-pacing.json
 import {execFileSync} from 'node:child_process';
 import {existsSync, mkdirSync, readFileSync, writeFileSync, rmSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
 import {decodePng, meanAbsDelta} from './lib/png.mjs';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -111,13 +112,20 @@ async function main() {
   const argv = process.argv.slice(2);
   const strict = argv.includes('--strict');
   const asJson = argv.includes('--json');
-  const brand = argv.find((a) => !a.startsWith('--'));
+  const brand = argv.find((a, i) => !a.startsWith('--') && argv[i - 1] !== '--project');
   if (!brand) {
-    console.error('usage: node scripts/judge-demo-pacing.mjs <brand> [--strict] [--json]');
+    console.error('usage: node scripts/judge-demo-pacing.mjs <brand> --project <product-repo> [--strict] [--json]');
+    process.exit(1);
+  }
+  let ws;
+  try {
+    ws = resolveWorkspace(root, {brand, project: projectArg(argv)});
+  } catch (err) {
+    console.error(`judge-demo-pacing: ${err.message}`);
     process.exit(1);
   }
 
-  const demoPath = join(root, 'props', `${brand}-demo.json`);
+  const demoPath = join(ws.propsDir, `${brand}-demo.json`);
   if (!existsSync(demoPath)) {
     console.error(`judge-demo-pacing: missing ${demoPath}`);
     process.exit(1);
@@ -129,12 +137,12 @@ async function main() {
 
   const findings = [...computeDwells(events, durationMs)];
 
-  const webm = join(studio, 'public', brand, 'demo.webm');
+  const webm = join(ws.publicDir, 'demo.webm');
   const webmPresent = existsSync(webm);
   const holdReports = [];
 
   if (webmPresent) {
-    const framesDir = join(root, 'out', brand, 'marketing', 'pacing-frames');
+    const framesDir = join(ws.marketingDir, 'pacing-frames');
     rmSync(framesDir, {recursive: true, force: true});
     mkdirSync(framesDir, {recursive: true});
     const holds = computeHolds(events, durationMs);
@@ -190,7 +198,7 @@ async function main() {
     findings,
   };
 
-  const outDir = join(root, 'out', brand, 'marketing');
+  const outDir = ws.marketingDir;
   mkdirSync(outDir, {recursive: true});
   const outPath = join(outDir, 'judge-demo-pacing.json');
   writeFileSync(outPath, JSON.stringify(report, null, 2));
@@ -203,7 +211,7 @@ async function main() {
       console.log(`  hold ${h.startMs}-${h.endMs}ms deltas=[${h.deltas.join(', ')}] max=${h.maxDelta}`);
     }
     for (const f of findings) console.log(`  [${f.level}] ${f.check}: ${f.message}`);
-    console.log(`  report -> out/${brand}/marketing/judge-demo-pacing.json`);
+    console.log(`  report -> ${outPath}`);
   }
 
   process.exit(strict && verdict === 'FAIL' ? 1 : 0);

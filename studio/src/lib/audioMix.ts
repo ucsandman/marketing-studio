@@ -1,6 +1,6 @@
 import {z} from 'zod';
 import {VO_LEAD, type Act} from './launchTiming.ts';
-import type {SfxCue, SfxKind} from './sfxCues';
+import type {AudioShot, SfxCue, SfxKind} from './sfxCues';
 
 // Word-level VO timestamps (feeders/audio/client.mjs --timestamps, or the
 // even-distribution `words` fallback). OPTIONAL and never defaulted: `undefined`
@@ -15,7 +15,23 @@ export const wordSchema = z.object({
 export type Word = z.infer<typeof wordSchema>;
 
 export const audioSchema = z.object({
-  music: z.object({src: z.string(), durationMs: z.number().positive()}).nullable(),
+  music: z
+    .object({
+      src: z.string(),
+      durationMs: z.number().positive(),
+      // Edit markers are picture-time requests. score-film measures the actual bed
+      // and reports the nearest detected beat; it never invents a BPM.
+      markers: z
+        .array(
+          z.object({
+            id: z.string().min(1),
+            frame: z.number().int().nonnegative(),
+            kind: z.enum(['hold', 'lift', 'resolve']),
+          }),
+        )
+        .optional(),
+    })
+    .nullable(),
   lines: z.array(
     z.object({
       act: z.string(),
@@ -57,6 +73,35 @@ const actFor = (key: string, timing: Timing): Act => {
   const m = key.match(/^feature-(\d+)$/);
   if (m && timing.features[Number(m[1])]) return timing.features[Number(m[1])];
   throw new Error(`audio manifest references unknown act "${key}"`);
+};
+
+/** Map stable shot ids back to the act-keyed audio contract after shot reordering. */
+export const timingFromShots = (shots: AudioShot[], requiredActs?: string[]): Timing => {
+  const byId = new Map<string, Act>();
+  for (const shot of shots) {
+    const audioRef = shot.audioRef === undefined ? shot.id : shot.audioRef;
+    if (audioRef == null) continue;
+    if (byId.has(audioRef)) throw new Error(`shot plan assigns audio act "${audioRef}" more than once`);
+    byId.set(audioRef, {from: shot.from, len: shot.len});
+  }
+  for (const id of requiredActs ?? []) {
+    if (!byId.has(id)) throw new Error(`shot plan is missing audio act "${id}"`);
+  }
+  // Zero-length sentinels keep the long-standing full Timing shape compatible with
+  // captionCues. They are never read because every manifest act is validated above.
+  const empty = {from: 0, len: 0};
+  const featureIndexes = [...byId.keys()]
+    .map((id) => id.match(/^feature-(\d+)$/))
+    .filter((match): match is RegExpMatchArray => match != null)
+    .map((match) => Number(match[1]));
+  const features = Array.from({length: Math.max(-1, ...featureIndexes) + 1}, (_, i) => byId.get(`feature-${i}`) ?? empty);
+  return {
+    logo: byId.get('logo') ?? empty,
+    hook: byId.get('hook') ?? empty,
+    demo: byId.get('demo') ?? empty,
+    features,
+    end: byId.get('end') ?? empty,
+  };
 };
 
 export const voWindows = (
@@ -129,5 +174,9 @@ export const resolveSfxLayers = (
   fileExists: (src: string) => boolean,
 ): SfxLayer[] =>
   cues
-    .map((c) => ({src: SFX_SRC[c.kind], frame: c.frame, volume: SFX_VOLUME[c.kind]}))
+    .map((c) => ({
+      src: SFX_SRC[c.kind],
+      frame: c.frame,
+      volume: SFX_VOLUME[c.kind] * (c.gain ?? 1),
+    }))
     .filter((layer) => fileExists(layer.src));

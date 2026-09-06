@@ -14,9 +14,11 @@ import {execSync} from 'node:child_process';
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {requireAudioWorkspace} from './lib/sound-design.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const outDir = join(root, 'studio', 'public', 'truckside', 'audio');
+const workspace = requireAudioWorkspace(root, 'truckside');
+const outDir = join(workspace.publicDir, 'audio');
 
 const forceFlagIdx = process.argv.indexOf('--force');
 const forceArg = forceFlagIdx >= 0 ? process.argv[forceFlagIdx + 1] : undefined;
@@ -68,9 +70,9 @@ const MUSIC_PROMPT =
 
 // Total duration: truckside's picture is locked to a custom actLengths override in
 // props/truckside-launch.json; read it here so this stays correct if the lock moves.
-const launchProps = JSON.parse(readFileSync(join(root, 'props', 'truckside-launch.json'), 'utf8'));
+const launchProps = JSON.parse(readFileSync(join(workspace.propsDir, 'truckside-launch.json'), 'utf8'));
 const actLengths = launchProps.actLengths ?? {};
-const telemetry = JSON.parse(readFileSync(join(root, 'props', 'truckside-demo.json'), 'utf8')).telemetry;
+const telemetry = JSON.parse(readFileSync(join(workspace.propsDir, 'truckside-demo.json'), 'utf8')).telemetry;
 const demoLen = Math.ceil((telemetry.durationMs / 1000) * 30) + (actLengths.demoTail ?? 24);
 const featureLens = [0, 1, 2].map((i) => actLengths.features?.[i] ?? 180);
 const totalFrames =
@@ -90,10 +92,10 @@ const run = (cmd) => execSync(cmd, {cwd: root, encoding: 'utf8', stdio: ['ignore
 // brand voice (unset -> global unset -> default Rachel; the feeder logs which won).
 const pending = LINES.filter((l) => shouldForce(l.id) || !existsSync(join(outDir, `${l.id}.mp3`)));
 if (pending.length > 0) {
-  const scriptPath = join(root, 'out', 'truckside', 'vo-script.json');
+  const scriptPath = join(workspace.marketingDir, 'vo-script.json');
   mkdirSync(dirname(scriptPath), {recursive: true});
   writeFileSync(scriptPath, JSON.stringify({lines: pending}));
-  const out = run(`node feeders/audio/client.mjs vo --brand truckside --script "${scriptPath}" --out "${outDir}"`);
+  const out = run(`node feeders/audio/client.mjs vo --project "${workspace.projectRoot}" --brand truckside --script "${scriptPath}" --out "${outDir}"`);
   process.stdout.write(out);
   for (const m of out.matchAll(/vo OK: (.+)\.mp3 (\d+)ms/g)) durations[m[1]] = Number(m[2]);
 }
@@ -111,7 +113,7 @@ for (const l of LINES) {
 const musicFile = join(outDir, 'music.mp3');
 if (shouldForce('music') || !existsSync(musicFile)) {
   const out = run(
-    `node feeders/audio/client.mjs music --prompt "${MUSIC_PROMPT}" --length-ms ${totalMs} --out "${musicFile}"`,
+    `node feeders/audio/client.mjs music --project "${workspace.projectRoot}" --prompt "${MUSIC_PROMPT}" --length-ms ${totalMs} --out "${musicFile}"`,
   );
   process.stdout.write(out);
   const m = out.match(/music OK: .+ (\d+)ms/);
@@ -132,20 +134,21 @@ if (!durations.music) {
 }
 
 const manifest = {
-  music: {src: 'truckside/audio/music.mp3', durationMs: durations.music},
+  music: {src: 'audio/music.mp3', durationMs: durations.music},
   lines: LINES.map((l) => ({
     act: l.id,
-    src: `truckside/audio/${l.id}.mp3`,
+    src: `audio/${l.id}.mp3`,
     durationMs: durations[l.id],
     text: l.text,
   })),
 };
 
-const sfxLib = ['whoosh', 'tick', 'riser'].map((k) => join(root, 'studio', 'public', 'sfx', `${k}.mp3`));
+const sfxLib = ['whoosh', 'tick', 'riser'].map((k) => join(workspace.publicDir, 'sfx', `${k}.mp3`));
 if (sfxLib.every((f) => existsSync(f))) {
   manifest.sfx = {enabled: true};
   console.log('sfx: library present -> manifest.sfx.enabled = true');
 }
 
-writeFileSync(join(root, 'props', 'truckside-audio.json'), JSON.stringify(manifest, null, 2) + '\n');
-console.log(`wrote props/truckside-audio.json (${totalMs}ms track, ${LINES.length} lines)`);
+mkdirSync(workspace.propsDir, {recursive: true});
+writeFileSync(join(workspace.propsDir, 'truckside-audio.json'), JSON.stringify(manifest, null, 2) + '\n');
+console.log(`wrote ${join(workspace.propsDir, 'truckside-audio.json')} (${totalMs}ms track, ${LINES.length} lines)`);

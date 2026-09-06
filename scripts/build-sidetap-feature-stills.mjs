@@ -1,6 +1,6 @@
 // Feature-act stills for the sidetap launch video. All three panels show REAL
 // surfaces only, cropped out of the already-approved demo capture
-// (studio/public/sidetap/demo.webm, 1600x1000, 25 fps):
+// (product public workspace, 1600x1000, 25 fps):
 //   feature-tree    <- the activity beat at t=23s: phone streaming while the feed
 //                      lists what the agent just did, char counts and all
 //   feature-stop    <- the STOP beat at t=39s: red bezel, STOPPED badge, RESUME
@@ -13,14 +13,14 @@
 // Crops are in the capture's own pixels and are landscape (~16:10) because
 // FeaturePanel's landscape row layout sizes the panel off the image's aspect.
 // Nothing is re-captured and nothing is invented; this script is the source of truth
-// for studio/public/sidetap/feature-*.png (gitignored, like every other brand's
-// screenshots).
+// for product-owned public/sidetap/feature-*.png.
 //
-// Usage: node scripts/build-sidetap-feature-stills.mjs
+// Usage: node scripts/build-sidetap-feature-stills.mjs --project <repo>
 import {execFileSync} from 'node:child_process';
 import {existsSync, mkdirSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -29,7 +29,9 @@ process.on('unhandledRejection', (reason) => {
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const studio = join(root, 'studio');
-const dest = join(studio, 'public', 'sidetap');
+const remotionCli = join(studio, 'node_modules', '@remotion', 'cli', 'remotion-cli.js');
+const workspace = resolveWorkspace(root, {brand: 'sidetap', project: projectArg(process.argv.slice(2))});
+const dest = join(workspace.publicDir, 'sidetap');
 const capture = join(dest, 'demo.webm');
 
 // FeaturePanel zooms the still to 1.04 about origin 50%/30%, which eats ~2.8% off the
@@ -51,11 +53,11 @@ mkdirSync(dest, {recursive: true});
 for (const {name, crop, ss} of shots) {
   const out = join(dest, name);
   // Arg-array invocation with the win32 shell hop, same as judge-palette.mjs.
-  const args = ['remotion', 'ffmpeg', '-y', '-ss', ss, '-i', capture, '-frames:v', '1', '-update', '1', '-vf', `crop=${crop}`, out];
-  execFileSync('npx', args, {cwd: studio, stdio: 'ignore', shell: process.platform === 'win32'});
+  const args = ['ffmpeg', '-y', '-ss', ss, '-i', capture, '-frames:v', '1', '-update', '1', '-vf', `crop=${crop}`, out];
+  execFileSync(process.execPath, [remotionCli, ...args], {cwd: studio, stdio: 'ignore'});
   if (!existsSync(out)) {
     console.error(`build-sidetap-feature-stills: ffmpeg produced no output for ${name}`);
     process.exit(1);
   }
-  console.log(`wrote studio/public/sidetap/${name} (t=${ss}s crop ${crop})`);
+  console.log(`wrote ${out} (t=${ss}s crop ${crop})`);
 }

@@ -3,12 +3,22 @@
 // Run: node --test scripts/build-magnetic-demo-media.test.mjs
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {join} from 'node:path';
 import {
   assertScriptedPauses,
   frameInventory,
+  magneticMediaPaths,
   parseSilenceDurations,
   sameConfig,
 } from './build-magnetic-demo-media.mjs';
+
+test('magneticMediaPaths matches the recorder media contract', () => {
+  const workspace = {assetsDir: join('product', 'marketing', 'assets', 'magnetic', 'assets')};
+  const paths = magneticMediaPaths(workspace);
+  assert.equal(paths.mediaDir, join(workspace.assetsDir, 'demo-media'));
+  assert.equal(paths.footageDir, join(paths.mediaDir, 'frames'));
+  assert.equal(paths.voDir, join(paths.mediaDir, 'vo'));
+});
 
 test('frameInventory: contiguous sequence has no strays', () => {
   const names = ['frame_0001.png', 'frame_0002.png', 'frame_0003.png', 'render-config.json'];

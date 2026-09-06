@@ -6,14 +6,17 @@
  * @playwright/test the record-*-demo scripts do. Prereq: the app running:
  *   cd C:\Projects\tradesdesk && DEMO_MODE=1 npm run dev:next   (port 3007)
  *
- * Output: studio/public/truckside/feature-{reception,quoting,followup}.png
+ * Output: <project>/marketing/assets/truckside/{assets,public}/feature-*.png
  */
 import {chromium} from '@playwright/test';
-import {mkdirSync} from 'node:fs';
+import {copyFileSync, mkdirSync} from 'node:fs';
 import {join, resolve, dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {projectArg, resolveWorkspace} from '../../scripts/lib/workspace.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const argv = process.argv.slice(2);
+const workspace = resolveWorkspace(ROOT, {brand: 'truckside', project: projectArg(argv) ?? process.env.TS_ROOT ?? 'C:/Projects/tradesdesk'});
 const PORT = process.env.TS_PORT ?? '3007';
 const PASSCODE = process.env.TS_PASSCODE ?? 'trucksidedemo';
 const base = `http://localhost:${PORT}`;
@@ -40,8 +43,9 @@ const shots = [
   {sel: 'section:has(h2:has-text("Follow-ups"))', out: 'feature-followup.png'},
 ];
 
-const destDir = join(ROOT, 'studio', 'public', 'truckside');
-mkdirSync(destDir, {recursive: true});
+mkdirSync(workspace.assetsDir, {recursive: true});
+const publicDir = join(workspace.publicDir, 'truckside');
+mkdirSync(publicDir, {recursive: true});
 let browser;
 try {
   browser = await chromium.launch();
@@ -61,8 +65,11 @@ try {
     if (!box) throw new Error(`no bounding box for ${sel}`);
     const x = Math.round(Math.max(0, Math.min(box.x + box.width / 2 - CW / 2, VIEWPORT.width - CW)));
     const y = Math.round(Math.max(0, Math.min(box.y - 20, VIEWPORT.height - CH)));
-    await page.screenshot({path: join(destDir, out), clip: {x, y, width: CW, height: CH}});
-    console.log(`wrote studio/public/truckside/${out}  clip {x:${x},y:${y},w:${CW},h:${CH}}`);
+    const assetOut = join(workspace.assetsDir, out);
+    const publicOut = join(publicDir, out);
+    await page.screenshot({path: assetOut, clip: {x, y, width: CW, height: CH}});
+    copyFileSync(assetOut, publicOut);
+    console.log(`wrote ${assetOut} and ${publicOut}  clip {x:${x},y:${y},w:${CW},h:${CH}}`);
   }
   console.log('feature stills OK');
 } catch (err) {

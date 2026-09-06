@@ -14,14 +14,14 @@ its `.launch/` state lands there. This skill is the pipeline.
 ## Steps
 
 1. **Find the brand + kit.** Brand id = the product's brand in `${CLAUDE_SKILL_DIR}/../../brands/<id>.json`
-   (ask the user if ambiguous). Kit = `${CLAUDE_SKILL_DIR}/../../out/<brand>/postkit/manifest.json`.
+   (ask only if ambiguous). Kit = `<product>/marketing/assets/<brand>/postkit/manifest.json`.
 2. **Render if needed.** If the manifest is missing, run `/marketing` first (full pipeline, its own
    approval gates). If it exists, show its `generatedAt` and ask: reuse or re-render? Staleness is
    the user's judgment call, never a heuristic.
 3. **Launch flow.** In the product repo, run the launch sequence — `launch init` (if no
    `.launch/launch.config.json`), then research, copy scaffold/fill, validate. Wire the kit:
    either set `postkitDir` in the config (the dashboard marketing tab does this with a picker) or
-   pass `--kit "${CLAUDE_SKILL_DIR}/../../out/<brand>/postkit"` to `launch post`.
+   pass `--kit "<product>/marketing/assets/<brand>/postkit"` to `launch post`.
 4. **Dry-run, then post.** `launch post <dir> --all --dry-run` and show the user the previews —
    X and LinkedIn must show the video upload step. Live posting only after the user confirms,
    through the normal gates (ledger, validation, typed confirmation in the dashboard).
@@ -35,5 +35,9 @@ its `.launch/` state lands there. This skill is the pipeline.
 
 - Never skip the dry-run step. Never post live without explicit user confirmation.
 - If the kit manifest promises a video whose file is missing, posting refuses — fix by re-running
-  `render-matrix.mjs` + `build-postkit.mjs` in the animations repo, not by unwiring the kit silently.
+  `render-matrix.mjs <brand> --project <product> --production` and
+  `build-postkit.mjs <brand> --project <product> --production`, not by unwiring the kit.
+- Live publishing remains blocked until the current media, production plan, per-row
+  evidence, and named full-film review are hash-bound and PASS. A dry run may preview an
+  incomplete kit but never weakens the live gate.
 - Drafts own the copy; the kit contributes media. Do not paste kit captions over validated drafts.

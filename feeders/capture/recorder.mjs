@@ -47,6 +47,19 @@ export class Recorder {
     });
   }
 
+  /**
+   * Measures a real visible subject and records its padded bounds. Capture
+   * scripts should prefer this over hand-copying a click point into focusAt().
+   */
+  async focus(locator, {padding = 0, minWidth = 1, minHeight = 1} = {}) {
+    const box = await locator.boundingBox();
+    if (!box) throw new Error('Recorder: focus locator has no bounding box (not visible?)');
+    this.focusAt(box.x + box.width / 2, box.y + box.height / 2, {
+      w: Math.max(minWidth, Math.round(box.width + padding * 2)),
+      h: Math.max(minHeight, Math.round(box.height + padding * 2)),
+    });
+  }
+
   finish(viewport) {
     return {viewport, durationMs: this.#now(), events: this.#events};
   }

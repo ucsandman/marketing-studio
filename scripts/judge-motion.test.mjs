@@ -1,12 +1,16 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
+import {mkdirSync, mkdtempSync} from 'node:fs';
+import {tmpdir} from 'node:os';
 import {join, dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {scanSource, checkMotionTokens, checkGradeTokens, stripComments} from './judge-motion.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const cli = join(here, 'judge-motion.mjs');
+const project = mkdtempSync(join(tmpdir(), 'judge-motion-project-'));
+mkdirSync(join(project, '.git'));
 
 function findingsFor(check, findings) {
   return findings.filter((f) => f.check === check);
@@ -195,11 +199,11 @@ test('missing motion block (zod defaults) produces no findings', () => {
 // --- CLI ------------------------------------------------------------------
 
 test('CLI passes on the real repo and exits 0', () => {
-  const stdout = execFileSync('node', [cli], {encoding: 'utf8'});
+  const stdout = execFileSync('node', [cli, '--project', project], {encoding: 'utf8'});
   assert.match(stdout, /judge-motion: PASS/);
 });
 
 test('CLI --strict still exits 0 while the repo is clean', () => {
-  const stdout = execFileSync('node', [cli, '--strict'], {encoding: 'utf8'});
+  const stdout = execFileSync('node', [cli, '--strict', '--project', project], {encoding: 'utf8'});
   assert.match(stdout, /PASS/);
 });

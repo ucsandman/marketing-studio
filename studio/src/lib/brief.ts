@@ -1,4 +1,6 @@
 import {z} from 'zod';
+import {directionSpecSchema, referenceSchema} from './direction.ts';
+import {launchShotInputSchema} from './shotPlan.ts';
 
 // A Content Brief is the upstream source of truth for a product's launch copy.
 // `scripts/derive-brief.mjs` gathers raw grounding into brief-inputs.json; the
@@ -114,6 +116,13 @@ export const briefSchema = z.object({
       }),
     )
     .default([]),
+  // Production intent travels with the grounded copy so the builder emits an
+  // executable direction and ordered shot plan rather than rediscovering taste.
+  direction: directionSpecSchema.nullable().default(null),
+  shots: z.array(launchShotInputSchema).default([]),
+  references: z.array(referenceSchema).default([]),
+  visualMetaphor: z.string().nullable().default(null),
+  soundIntent: z.string().nullable().default(null),
   social: z
     .object({
       x: platformCopy.nullable(),

@@ -95,7 +95,7 @@ in `skills/marketing-studio/SKILL.md`.
     comm -23 dirty.txt real.txt | xargs -d '\n' git checkout --
 
 **Also.** In this shell, sed does not see `\\` as a literal backslash, so
-`s|C:\\Projects\\x|...|` silently matches nothing while `grep -F` finds the string.
+`s|X:\\repo|...|` silently matches nothing while `grep -F` finds the string.
 Use `.` for the separator instead: `s|C:.Projects.x|...|`.
 
 ## judge-audio false positives: merged segments and mangled brand words
@@ -378,3 +378,55 @@ a READ-ONLY demo session (no Simulate button, static fixture); film the OWNER da
 via `/api/login` with a passcode set in the server env (never read `.env`). Section header
 renamed "Follow-ups due" -> "Follow-ups"; capture selectors updated. cropdetect finds no
 crop on an off-white composite, so hero crops come from the raw dashboard capture.
+
+## 2026-09-05 — Every runtime check could pass while the suite still looked templated
+
+**What worked.** Immutable copies of the existing scored Postflop and Truckside outputs,
+representative frames from every registered composition, and full source coverage made
+the visual ceiling reviewable after concurrent rebuild work began. The audit covered 13
+compositions, 14 template files, 34 bespoke-film files, and 22 shared components.
+
+**What did not.** Frame-zero smoke, schema tests, loudness checks, and palette/motion
+judges could establish runtime and property compliance without establishing authorship or
+viewer value. Eight of 13 representative surfaces resolved to centered lockups or
+UI/deck frames. The dominant reusable grammar was small product UI, large generic copy,
+radial wash, mono chrome, and the same end-card/progress treatment across brands.
+
+**The one change.** Production delivery now fails closed unless a product-owned,
+hash-bound chain connects direction and references to a locally attested style frame and
+audio-bearing animatic, an authored shot plan, three rendered samples per shot, the exact
+final render, and a local full-film-with-sound operator attestation. Typed reviewer names
+and roles are audit labels, not authenticated identities. Mechanical measurement remains
+separate from the perceptual “would I share this?” decision.
+
+## 2026-09-05 — A product proof was written to the wrong neighboring repository
+
+**Symptom.** The first product-owned Postflop beauty still and staged copy were written
+under the nearby PokerClaw worktree. The image itself passed render and pixel checks,
+but that repository is not the Postflop product.
+
+**Root cause.** Product ownership was inferred from a related project name instead of
+checking live git identity before the first write. A later remote check established that
+the canonical Postflop worktree tracks `ucsandman/postflop.git`; the neighboring repo
+tracks `ucsandman/PokerClaw.git`.
+
+**Fix.** The approved still and provenance were hash-verified into the Postflop
+workspace, staged from there, and the exact wrong-worktree media and cache entry were
+removed without touching pre-existing files.
+
+**Prevention.** Resolve the product by live git identity before writing any artifact.
+
+## 2026-09-05 — Windows command shims and orphaned probes blocked real verification
+
+**Symptom.** Spawning `npx.cmd` directly returned `EINVAL` on Windows during the card
+render proof. A later `npm ci` failed with `EBUSY` because a still-running `--help`
+probe held an installed native file open.
+
+**Fix.** Invoke the checked-in Remotion CLI with `process.execPath` instead of the
+Windows command shim. That route completed a real BMP encode. For the install lock,
+identify and stop only the exact orphan PID, then rerun the install; `npm ci` completed
+with 348 packages.
+
+**Prevention.** Call JavaScript CLIs through Node on Windows, retain child-process
+identity for probes, and stop only the verified orphan rather than killing by process
+name.

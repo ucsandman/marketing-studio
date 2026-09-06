@@ -13,7 +13,7 @@
  * We sign in as OWNER with the same throwaway passcode (the session key derives from it); the
  * real .env passcode is never read.
  *
- * Output: ../../studio/public/truckside/demo.webm + ../../props/truckside-demo.json
+ * Output: <project>/marketing/assets/truckside/{assets,public,props}/
  *
  * Camera focus rects are MEASURED from each target element's real boundingBox (viewport px ==
  * webm px because recordVideo.size == viewport), never derived from click points. Clicks are
@@ -26,13 +26,16 @@ import {fileURLToPath} from 'node:url';
 import {Recorder} from './recorder.mjs';
 import {cacheKey, checkCache, storeCache} from '../../scripts/lib/cache.mjs';
 import {captureKeyParts} from './capture-cache.mjs';
+import {projectArg, resolveWorkspace} from '../../scripts/lib/workspace.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const argv = process.argv.slice(2);
 const PORT = process.env.TS_PORT ?? '3007';
 // Owner sign-in. The signing key derives from OWNER_PASSCODE, so the local server is started
 // with a known throwaway passcode (never the real .env one) and we log in with the same value.
 const PASSCODE = process.env.TS_PASSCODE ?? 'trucksidedemo';
-const TS_ROOT = process.env.TS_ROOT ?? 'C:/Projects/tradesdesk';
+const workspace = resolveWorkspace(ROOT, {brand: 'truckside', project: projectArg(argv) ?? process.env.TS_ROOT ?? 'C:/Projects/tradesdesk'});
+const TS_ROOT = workspace.projectRoot;
 const base = `http://localhost:${PORT}`;
 const VIEWPORT = {width: 1440, height: 900};
 const SETTLE_MS = 650; // after a smooth scroll, let the page come to rest
@@ -40,12 +43,13 @@ const APPROACH_MS = 1000; // camera stable + cursor eases the last 700ms into th
 const CHANGE_HOLD_MS = 1600; // after a click, hold long enough to read the consequence
 const REVEAL_HOLD_MS = 2000; // hold on a revealed section (scene 1 new row, scene 5 outbox)
 
-const argv = process.argv.slice(2);
 const FORCE = argv.includes('--force');
 const CHECK_ONLY = argv.includes('--cache-check-only');
-const videoOut = join(ROOT, 'studio', 'public', 'truckside', 'demo.webm');
-const propsOut = join(ROOT, 'props', 'truckside-demo.json');
-const CACHE_ARTIFACTS = [videoOut, propsOut];
+const publicDir = join(workspace.publicDir, 'truckside');
+const videoOut = join(publicDir, 'demo.webm');
+const assetOut = join(workspace.assetsDir, 'demo.webm');
+const propsOut = join(workspace.propsDir, 'truckside-demo.json');
+const CACHE_ARTIFACTS = [videoOut, assetOut, propsOut];
 const keyParts = captureKeyParts({
   repo: TS_ROOT,
   scriptPath: fileURLToPath(import.meta.url),
@@ -55,14 +59,14 @@ const CACHE_KEY = cacheKey(keyParts);
 const CACHE_ENABLED = keyParts.productHead !== null;
 
 if (CHECK_ONLY) {
-  const {hit} = CACHE_ENABLED ? checkCache('truckside', 'capture', CACHE_KEY, CACHE_ARTIFACTS) : {hit: false};
+  const {hit} = CACHE_ENABLED ? checkCache(workspace, 'capture', CACHE_KEY, CACHE_ARTIFACTS) : {hit: false};
   console.log(hit ? 'HIT' : 'MISS');
   process.exit(0);
 }
 if (!CACHE_ENABLED) {
   console.log(`capture cache: product git state unavailable at ${TS_ROOT} - caching disabled this run`);
 } else if (!FORCE) {
-  const {hit} = checkCache('truckside', 'capture', CACHE_KEY, CACHE_ARTIFACTS);
+  const {hit} = checkCache(workspace, 'capture', CACHE_KEY, CACHE_ARTIFACTS);
   if (hit) {
     console.log(`capture cache hit - reusing ${videoOut}`);
     process.exit(0);
@@ -101,7 +105,7 @@ const clampFocus = (box, {padX = 48, padY = 48} = {}) => {
   return {x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h)};
 };
 
-const videoDir = join(ROOT, 'out', 'capture');
+const videoDir = join(workspace.assetsDir, '.capture');
 mkdirSync(videoDir, {recursive: true});
 let browser;
 try {
@@ -257,9 +261,10 @@ try {
   await context.close(); // flushes the webm
   const src = await video.path();
 
-  const destDir = join(ROOT, 'studio', 'public', 'truckside');
-  mkdirSync(destDir, {recursive: true});
-  copyFileSync(src, join(destDir, 'demo.webm'));
+  for (const destDir of [workspace.assetsDir, publicDir]) {
+    mkdirSync(destDir, {recursive: true});
+    copyFileSync(src, join(destDir, 'demo.webm'));
+  }
 
   const props = {
     brandId: 'truckside',
@@ -267,10 +272,11 @@ try {
     cta: 'See it live at truckside.io',
     telemetry,
   };
+  mkdirSync(workspace.propsDir, {recursive: true});
   writeFileSync(propsOut, JSON.stringify(props, null, 2) + '\n');
-  if (CACHE_ENABLED) storeCache('truckside', 'capture', CACHE_KEY, CACHE_ARTIFACTS, {productRepo: TS_ROOT, productHead: keyParts.productHead});
+  if (CACHE_ENABLED) storeCache(workspace, 'capture', CACHE_KEY, CACHE_ARTIFACTS, {productRepo: TS_ROOT, productHead: keyParts.productHead});
   console.log(`capture OK: ${telemetry.durationMs}ms, ${telemetry.events.length} events`);
-  console.log('wrote studio/public/truckside/demo.webm and props/truckside-demo.json');
+  console.log(`wrote ${assetOut}, ${videoOut}, and ${propsOut}`);
 } catch (err) {
   console.error(String(err?.message ?? err));
   process.exitCode = 1;

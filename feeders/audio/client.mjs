@@ -4,11 +4,11 @@
  * NON-LOAD-BEARING: missing key exits 2 with guidance; videos render silent.
  *
  * Usage:
- *   node feeders/audio/client.mjs vo --script <script.json> --out <dir> [--timestamps] [--brand <id>]
- *   node feeders/audio/client.mjs music --prompt "<text>" --length-ms <n> --out <file>
- *   node feeders/audio/client.mjs sfx --prompt "<text>" --duration-sec <n> --out <file>
+ *   node feeders/audio/client.mjs vo --project <repo> --script <script.json> --out <dir> [--timestamps] [--brand <id>]
+ *   node feeders/audio/client.mjs music --project <repo> --prompt "<text>" --length-ms <n> --out <file>
+ *   node feeders/audio/client.mjs sfx --project <repo> --prompt "<text>" --duration-sec <n> --out <file>
  *   node feeders/audio/client.mjs probe --file <mp3>
- *   node feeders/audio/client.mjs words --file <mp3> --text "<spoken text>" --out <words.json>
+ *   node feeders/audio/client.mjs words --project <repo> --file <mp3> --text "<spoken text>" --out <words.json>
  *
  * --brand <id> (vo only) selects ELEVENLABS_VOICE_ID_<BRAND> (id uppercased,
  * dashes -> underscores) over the global ELEVENLABS_VOICE_ID/default voice.
@@ -17,6 +17,7 @@ import {mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {basename, dirname, join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
+import {projectArg, resolveWorkspace, resolveWorkspacePath} from '../../scripts/lib/workspace.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const API = 'https://api.elevenlabs.io';
@@ -138,33 +139,15 @@ export const parseFfprobeDuration = (text) => {
 export const redact = (text, secret) =>
   secret ? String(text).replaceAll(secret, '<redacted>') : String(text);
 
-const readEnv = () => {
-  const out = {};
-  let raw;
-  try {
-    raw = readFileSync(join(ROOT, '.env'), 'utf8');
-  } catch {
-    return out;
-  }
-  for (const line of raw.split('\n')) {
-    const t = line.trim();
-    if (t && !t.startsWith('#') && t.includes('=')) {
-      const i = t.indexOf('=');
-      out[t.slice(0, i).trim()] = t.slice(i + 1).trim();
-    }
-  }
-  return out;
-};
-
 export const measureMs = (file) => {
-  // remotion bundles ffprobe; it prints stream info (incl. Duration) to stderr
-  const proc = spawnSync('npx', ['remotion', 'ffprobe', `"${resolve(file)}"`], {
-    cwd: join(ROOT, 'studio'),
-    shell: true,
+  const proc = spawnSync('ffprobe', [
+    '-v', 'error', '-show_entries', 'format=duration', '-of', 'default=nw=1:nk=1', resolve(file),
+  ], {
     encoding: 'utf8',
     timeout: 60_000,
   });
-  return parseFfprobeDuration(`${proc.stdout}\n${proc.stderr}`);
+  const seconds = Number(String(proc.stdout).trim());
+  return proc.status === 0 && Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds * 1000) : null;
 };
 
 const generate = async (url, body, key, timeout) => {
@@ -238,6 +221,12 @@ export const resolveWordsArgs = (args) => {
 const main = async () => {
   const args = process.argv.slice(2);
   const mode = args[0];
+  const brand = argValue(args, '--brand') ?? 'audio';
+  const productWorkspace = () => {
+    const project = projectArg(args);
+    if (!project) throw new Error(`${mode} requires --project <product-repo>`);
+    return resolveWorkspace(ROOT, {brand, project});
+  };
 
   if (mode === 'probe') {
     try {
@@ -257,19 +246,22 @@ const main = async () => {
   if (mode === 'words') {
     try {
       const {file, text, out} = resolveWordsArgs(args);
-      const durationMs = measureMs(file);
+      const workspace = productWorkspace();
+      const inputFile = resolveWorkspacePath(workspace, file);
+      const outFile = resolveWorkspacePath(workspace, out);
+      const durationMs = measureMs(inputFile);
       if (!durationMs) throw new Error(`could not measure duration of ${file}`);
       const words = estimateWords(text, durationMs);
       const payload = {
-        id: basename(file, '.mp3'),
+        id: basename(inputFile, '.mp3'),
         text,
         durationMs,
         words,
         estimated: true,
       };
-      mkdirSync(dirname(resolve(out)), {recursive: true});
-      writeFileSync(resolve(out), JSON.stringify(payload, null, 2) + '\n');
-      console.log(`words OK: ${out} ${words.length} words ${durationMs}ms (estimated)`);
+      mkdirSync(dirname(outFile), {recursive: true});
+      writeFileSync(outFile, JSON.stringify(payload, null, 2) + '\n');
+      console.log(`words OK: ${outFile} ${words.length} words ${durationMs}ms (estimated)`);
     } catch (err) {
       console.error(String(err?.message ?? err));
       process.exit(1);
@@ -277,7 +269,7 @@ const main = async () => {
     return;
   }
 
-  const env = readEnv();
+  const env = process.env;
   const key = env.ELEVENLABS_API_KEY;
   if (!key) {
     console.error(
@@ -285,7 +277,6 @@ const main = async () => {
     );
     process.exit(2);
   }
-  const brand = argValue(args, '--brand');
   const {voice, source} = resolveVoiceId(env, brand);
   console.log(`voice source: ${source}`);
 
@@ -294,11 +285,14 @@ const main = async () => {
       const scriptPath = argValue(args, '--script');
       const outDir = argValue(args, '--out');
       if (!scriptPath || !outDir) throw new Error('vo requires --script and --out');
+      const workspace = productWorkspace();
+      const scriptFile = resolveWorkspacePath(workspace, scriptPath);
+      const outputDir = resolveWorkspacePath(workspace, outDir);
       const wantTimestamps = args.includes('--timestamps');
-      const script = JSON.parse(readFileSync(resolve(scriptPath), 'utf8'));
-      mkdirSync(resolve(outDir), {recursive: true});
+      const script = JSON.parse(readFileSync(scriptFile, 'utf8'));
+      mkdirSync(outputDir, {recursive: true});
       for (const line of script.lines) {
-        const dest = join(resolve(outDir), `${line.id}.mp3`);
+        const dest = join(outputDir, `${line.id}.mp3`);
         let words = null;
         if (wantTimestamps) {
           // Same model as the plain path: a model change re-times every word.
@@ -323,7 +317,7 @@ const main = async () => {
         if (!ms) throw new Error(`could not measure duration of ${line.id}.mp3`);
         if (words) {
           writeFileSync(
-            join(resolve(outDir), `${line.id}.words.json`),
+            join(outputDir, `${line.id}.words.json`),
             JSON.stringify(
               {id: line.id, text: line.text, durationMs: ms, words, estimated: false},
               null,
@@ -340,18 +334,20 @@ const main = async () => {
       const outFile = argValue(args, '--out');
       if (!prompt || !Number.isFinite(lengthMs) || lengthMs <= 0 || !outFile)
         throw new Error('music requires --prompt, --length-ms > 0, --out');
+      const outputFile = resolveWorkspacePath(productWorkspace(), outFile);
       const bytes = await generate(`${API}/v1/music?output_format=mp3_44100_128`, buildMusicBody(prompt, Math.round(lengthMs)), key, MUSIC_TIMEOUT);
-      mkdirSync(dirname(resolve(outFile)), {recursive: true});
-      writeFileSync(resolve(outFile), bytes);
-      const ms = measureMs(outFile);
+      mkdirSync(dirname(outputFile), {recursive: true});
+      writeFileSync(outputFile, bytes);
+      const ms = measureMs(outputFile);
       if (!ms) throw new Error(`could not measure duration of ${outFile}`);
-      console.log(`music OK: ${resolve(outFile)} ${ms}ms`);
+      console.log(`music OK: ${outputFile} ${ms}ms`);
     } else if (mode === 'sfx') {
       const prompt = argValue(args, '--prompt');
       const durationSec = Number(argValue(args, '--duration-sec'));
       const outFile = argValue(args, '--out');
       if (!prompt || !Number.isFinite(durationSec) || durationSec <= 0 || !outFile)
         throw new Error('sfx requires --prompt, --duration-sec > 0, --out');
+      const outputFile = resolveWorkspacePath(productWorkspace(), outFile);
       // The cue layer is a non-essential accent: if sound-generation is unavailable
       // on this plan/account or errors for any reason, fall back SILENTLY (exit 2, the
       // repo's documented missing-audio convention) instead of hard-failing the run.
@@ -369,11 +365,11 @@ const main = async () => {
         );
         process.exit(2);
       }
-      mkdirSync(dirname(resolve(outFile)), {recursive: true});
-      writeFileSync(resolve(outFile), bytes);
-      const ms = measureMs(outFile);
+      mkdirSync(dirname(outputFile), {recursive: true});
+      writeFileSync(outputFile, bytes);
+      const ms = measureMs(outputFile);
       if (!ms) throw new Error(`could not measure duration of ${outFile}`);
-      console.log(`sfx OK: ${resolve(outFile)} ${ms}ms`);
+      console.log(`sfx OK: ${outputFile} ${ms}ms`);
     } else {
       throw new Error('usage: client.mjs vo --script <json> --out <dir> [--timestamps] [--brand <id>] | music --prompt <p> --length-ms <n> --out <file> | sfx --prompt <p> --duration-sec <n> --out <file> | probe --file <mp3> | words --file <mp3> --text "<spoken text>" --out <words.json>');
     }

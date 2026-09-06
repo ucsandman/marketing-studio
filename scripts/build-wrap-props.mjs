@@ -3,10 +3,10 @@
 // scripts/lib/wrap-contract.mjs) into per-segment WrapClip props
 // (studio/src/templates/WrapClip.tsx / wrapClipSchema).
 //
-// Usage: node scripts/build-wrap-props.mjs <brand> <handoffDir>
+// Usage: node scripts/build-wrap-props.mjs <brand> <handoffDir> --project <repo>
 //   1. reads + validates <handoffDir>/segments.json, reads the SRT it names
-//   2. stages the handoff's video to studio/public/<brand>/wrap-<basename(handoffDir)>.mp4
-//   3. reads out/<brand>/marketing/brief.json for cta (fail loudly if missing —
+//   2. stages the handoff's video to the product public/<brand>/ namespace
+//   3. reads the product-owned brief.json for cta (fail loudly if missing —
 //      copy is always brief-sourced, never invented here)
 //   4. emits props/<brand>-wrap-<segmentId>.json per segment
 //   5. spawns scripts/lint-copy.mjs on every emitted file; exits 1 on any violation
@@ -15,6 +15,7 @@ import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {dirname, join, resolve} from 'node:path';
 import {validateManifest, parseSrt, windowCues} from './lib/wrap-contract.mjs';
+import {projectArg, resolveWorkspace, resolveWorkspacePath} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -67,11 +68,18 @@ function readJson(path, label) {
 }
 
 function main() {
-  const [brand, handoffDir] = process.argv.slice(2);
-  if (!brand || !handoffDir) {
-    console.error('Usage: node scripts/build-wrap-props.mjs <brand> <handoffDir>');
+  const argv = process.argv.slice(2);
+  const projectFlag = argv.indexOf('--project');
+  const positional = argv.filter(
+    (arg, index) => !arg.startsWith('--') && !(projectFlag !== -1 && index === projectFlag + 1),
+  );
+  const [brand, handoffArg] = positional;
+  if (!brand || !handoffArg) {
+    console.error('Usage: node scripts/build-wrap-props.mjs <brand> <handoffDir> --project <repo>');
     process.exit(1);
   }
+  const workspace = resolveWorkspace(root, {brand, project: projectArg(argv)});
+  const handoffDir = resolveWorkspacePath(workspace, handoffArg);
 
   const manifest = validateManifest(readJson(join(handoffDir, 'segments.json'), 'segments.json'));
 
@@ -89,14 +97,14 @@ function main() {
     throw new Error(`build-wrap-props: manifest.video "${manifest.video}" not found at ${videoSrc}`);
   }
   const stagedName = stagedVideoName(handoffDir);
-  const publicDir = join(root, 'studio', 'public', brand);
+  const publicDir = join(workspace.publicDir, brand);
   mkdirSync(publicDir, {recursive: true});
   const stagedDest = join(publicDir, stagedName);
   copyFileSync(videoSrc, stagedDest);
   console.log(`staged video -> ${stagedDest}`);
   const videoRel = `${brand}/${stagedName}`;
 
-  const briefPath = join(root, 'out', brand, 'marketing', 'brief.json');
+  const briefPath = join(workspace.marketingDir, 'brief.json');
   if (!existsSync(briefPath)) {
     throw new Error(`build-wrap-props: brief.json missing at ${briefPath} — copy must be brief-sourced, refusing to invent a cta`);
   }
@@ -106,7 +114,7 @@ function main() {
   }
   const cta = brief.cta;
 
-  const propsDir = join(root, 'props');
+  const propsDir = workspace.propsDir;
   mkdirSync(propsDir, {recursive: true});
 
   const emitted = [];

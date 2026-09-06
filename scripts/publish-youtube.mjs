@@ -33,6 +33,8 @@ import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {readEnvVar} from './lib/env.mjs';
 import {applyPosted} from './mission-control.mjs';
+import {publicationApproval} from './publish-bluesky.mjs';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const TOKEN_PATH = join(root, '.youtube-token.json');
@@ -85,16 +87,22 @@ export function normalizeYtMetrics(stats) {
   };
 }
 
+export function youtubeCredentialError(clientId, clientSecret, tokenPresent = true) {
+  if (!clientId || !clientSecret) return 'YOUTUBE_CLIENT_ID / YOUTUBE_CLIENT_SECRET missing from .env (see .env.example) — nothing uploaded.';
+  if (!tokenPresent) return `no ${TOKEN_PATH} — run node scripts/publish-youtube.mjs --auth once, then retry.`;
+  return null;
+}
+
 // Pure over a root so the test can point it at a temp dir.
-export function loadPostkit(rootDir, brand) {
-  const dir = join(rootDir, 'out', brand, 'postkit', 'youtube');
-  if (!existsSync(dir)) return {ok: false, reason: `no out/${brand}/postkit/youtube/ yet — run node scripts/build-postkit.mjs ${brand}`};
+export function loadPostkit(rootDir, workspace, brand) {
+  const dir = join(workspace.postkitDir, 'youtube');
+  if (!existsSync(dir)) return {ok: false, reason: `no product-owned postkit for ${brand} at ${dir} yet — run node scripts/build-postkit.mjs ${brand} --project <product-repo>`};
   const video = join(dir, 'launch-16x9.mp4');
   if (!existsSync(video)) return {ok: false, reason: `missing ${video} (render the matrix first: node scripts/render-matrix.mjs ${brand} --comp LaunchVideo)`};
   const captionPath = join(dir, 'caption.txt');
   const description = existsSync(captionPath) ? readFileSync(captionPath, 'utf8').trim() : '';
   let title = '';
-  const briefPath = join(rootDir, 'out', brand, 'marketing', 'brief.json');
+  const briefPath = join(workspace.marketingDir, 'brief.json');
   if (existsSync(briefPath)) {
     try {
       title = JSON.parse(readFileSync(briefPath, 'utf8')).hook?.headline ?? '';
@@ -201,49 +209,59 @@ async function main() {
   const doAuth = argv.includes('--auth');
   const privacy = flag('--privacy') ?? 'private';
   const variant = flag('--variant');
-  const brand = argv.find((a, i) => !a.startsWith('--') && !['--privacy', '--variant'].includes(argv[i - 1]));
+  const brand = argv.find((a, i) => !a.startsWith('--') && !['--privacy', '--variant', '--project'].includes(argv[i - 1]));
+  const project = projectArg(argv);
 
-  const clientId = readEnvVar('YOUTUBE_CLIENT_ID');
-  const clientSecret = readEnvVar('YOUTUBE_CLIENT_SECRET');
   if (doAuth) {
+    const clientId = readEnvVar('YOUTUBE_CLIENT_ID');
+    const clientSecret = readEnvVar('YOUTUBE_CLIENT_SECRET');
     if (!clientId || !clientSecret) {
       console.error('publish-youtube: YOUTUBE_CLIENT_ID / YOUTUBE_CLIENT_SECRET missing from .env (see .env.example).');
       process.exit(2);
     }
     await authorize(clientId, clientSecret);
-    if (!brand) return;
+    return;
   }
   if (!brand) {
-    console.error('usage: node scripts/publish-youtube.mjs <brand> [--dry-run] [--json] [--auth] [--privacy private|unlisted|public] [--variant <id>]');
+    console.error('usage: node scripts/publish-youtube.mjs <brand> --project <product-repo> [--dry-run] [--json] [--auth] [--privacy private|unlisted|public] [--variant <id>]');
     process.exit(1);
   }
 
-  const kit = loadPostkit(root, brand);
+  const workspace = resolveWorkspace(root, {brand, project});
+  const kit = loadPostkit(root, workspace, brand);
   if (!kit.ok) {
     console.error(`publish-youtube [${brand}]: ${kit.reason}`);
     process.exit(2);
   }
   const resource = buildVideoResource({title: kit.title, description: kit.description, privacy});
+  const approval = publicationApproval(workspace, brand, 'launch-16x9', kit.video);
 
   if (dryRun) {
-    const summary = {brand, dryRun: true, video: kit.video, bytes: kit.bytes, srt: kit.srt, resource};
+    const summary = {brand, dryRun: true, publishApproved: approval.approved, blockedReason: approval.reason, video: kit.video, bytes: kit.bytes, srt: kit.srt, resource};
     if (asJson) console.log(JSON.stringify(summary, null, 2));
-    else console.log(`publish-youtube [${brand}] dry run: "${resource.snippet.title}" (${privacy}), ${kit.bytes} bytes, description ${resource.snippet.description.length} chars${kit.srt ? ', srt present' : ''}`);
+    else {
+      console.log(`publish-youtube [${brand}] dry run: "${resource.snippet.title}" (${privacy}), ${kit.bytes} bytes, description ${resource.snippet.description.length} chars${kit.srt ? ', srt present' : ''}`);
+      if (!approval.approved) console.log(`publish-youtube [${brand}] preview only; live publish blocked: ${approval.reason}`);
+    }
     process.exit(0);
   }
 
-  if (!clientId || !clientSecret) {
-    console.error('publish-youtube: YOUTUBE_CLIENT_ID / YOUTUBE_CLIENT_SECRET missing from .env (see .env.example) — nothing uploaded.');
+  if (!approval.approved) {
+    console.error(`publish-youtube [${brand}]: live publish blocked before credentials/network: ${approval.reason}`);
     process.exit(2);
   }
-  if (!existsSync(TOKEN_PATH)) {
-    console.error(`publish-youtube: no ${TOKEN_PATH} — run node scripts/publish-youtube.mjs --auth once, then retry.`);
+
+  const clientId = readEnvVar('YOUTUBE_CLIENT_ID');
+  const clientSecret = readEnvVar('YOUTUBE_CLIENT_SECRET');
+  const credentialError = youtubeCredentialError(clientId, clientSecret, existsSync(TOKEN_PATH));
+  if (credentialError) {
+    console.error(`publish-youtube: ${credentialError}`);
     process.exit(2);
   }
   const token = await accessToken(clientId, clientSecret);
   const id = await upload(token, kit, resource);
   const url = videoUrl(id);
-  const posted = applyPosted(join(root, 'out', brand, 'marketing', 'posts.json'), {platform: 'youtube', url, variant});
+  const posted = applyPosted(join(workspace.marketingDir, 'posts.json'), {platform: 'youtube', url, variant});
   if (posted.status !== 200) {
     console.error(`publish-youtube: uploaded but could not record it: ${posted.body.error}`);
     process.exit(1);

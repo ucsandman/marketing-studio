@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // review-in-magnetic — proposes a "review reel" of a run's VIDEO assets into
 // an open Magnetic editor over the agent sidecar. Imports every VIDEO asset
-// (.mp4/.webm) from out/<brand>/marketing/run.json (the same inventory
+// (.mp4/.webm) from the product workspace's marketing/run.json (the same inventory
 // Mission Control reads), then proposes ONE batch that appends each clip to
 // the spine in inventory order with a green marker at its cumulative start
 // (named by the asset's run.json id — Task 6's verdict puller keys on this).
-// Writes out/<brand>/marketing/magnetic-review.json so Task 6 can diff the
+// Writes product-owned marketing/magnetic-review.json so Task 6 can diff the
 // user's edit against what was proposed. Nothing lands on the timeline until
 // the human clicks Accept in the editor (propose_edits semantics) — this
 // script only proposes.
@@ -19,7 +19,7 @@
 //           launch.mp4 vs audio-track launch-final.mp4 — the same 55s content
 //           remixed) but never auto-skips.
 //
-// Duration source (probed against the live out/dashclaw/marketing/run.json):
+// Duration source (probed against the product-owned run.json):
 // every asset whose "artifact" is a single video file already carries a
 // "duration" string (e.g. "28.39s") written by the phase-2 pilot run. That
 // metadata is used directly to compute cumulative marker seconds; there is no
@@ -30,6 +30,7 @@ import {readFileSync, writeFileSync, mkdirSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {basename, dirname, join, resolve} from 'node:path';
 import {callTool} from './lib/magnetic-sidecar.mjs';
+import {projectArg, resolveWorkspace, resolveWorkspacePath} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -116,12 +117,12 @@ export function duplicateDurationWarnings(assets) {
 }
 
 // Orchestrates the whole driver against a given repo root (overridable in
-// tests so a fixture run.json + stub sidecar never touch the real out/ tree).
+// tests so a fixture run.json + stub sidecar never touch real product media).
 // `skip` names run.json asset ids to exclude from import/proposal; they are
 // recorded in the manifest as {key, skipped: true}. Returns the written
 // manifest.
-export async function runDriver({root, brand, skip = []}) {
-  const marketingDir = join(root, 'out', brand, 'marketing');
+export async function runDriver({root, brand, workspace, skip = []}) {
+  const marketingDir = workspace.marketingDir;
   const runPath = join(marketingDir, 'run.json');
   let run;
   try {
@@ -149,7 +150,7 @@ export async function runDriver({root, brand, skip = []}) {
 
   for (const w of duplicateDurationWarnings(assets)) console.error(w);
 
-  const paths = assets.map((a) => resolve(root, a.file));
+  const paths = assets.map((a) => resolveWorkspacePath(workspace, a.file));
   console.log(`review-in-magnetic: importing ${paths.length} video asset(s)...`);
   const imported = await callTool('import_media', {paths});
   const importedAssets = Array.isArray(imported?.assets) ? imported.assets : [];
@@ -199,6 +200,10 @@ async function main() {
         return;
       }
       skip.push(...value.split(',').map((s) => s.trim()).filter(Boolean));
+    } else if (a === '--project') {
+      i += 1;
+    } else if (a.startsWith('--project=')) {
+      continue;
     } else if (!a.startsWith('-') && !brand) {
       brand = a;
     } else {
@@ -208,11 +213,12 @@ async function main() {
     }
   }
   if (!brand) {
-    console.error('Usage: node scripts/review-in-magnetic.mjs <brand> [--skip <key[,key]>]');
+    console.error('Usage: node scripts/review-in-magnetic.mjs <brand> --project <product-repo> [--skip <key[,key]>]');
     process.exit(1);
     return;
   }
-  await runDriver({root, brand, skip});
+  const workspace = resolveWorkspace(root, {brand, project: projectArg(argv)});
+  await runDriver({root, brand, workspace, skip});
 }
 
 // Import-safe (the test file imports the pure/orchestration helpers above):

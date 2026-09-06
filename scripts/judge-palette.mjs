@@ -17,12 +17,13 @@
 // Advisor to the Phase-4 judge: exit 0; `--strict` exits 1 on a FAIL verdict.
 //
 // Usage: node scripts/judge-palette.mjs <brand> <video-or-png> [--frames N] [--mask-region x,y,w,h] [--strict] [--json]
-// Output: out/<brand>/marketing/judge-palette.json
+// Output: <product-repo>/marketing/assets/<brand>/marketing/judge-palette.json
 import {execFileSync} from 'node:child_process';
 import {existsSync, mkdirSync, readFileSync, writeFileSync, rmSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
-import {dirname, join, extname, resolve} from 'node:path';
+import {dirname, join, extname} from 'node:path';
 import {decodePng, quantize, rgbToHsv, hexToRgb, colorDistance} from './lib/png.mjs';
+import {projectArg, resolveWorkspace, resolveWorkspacePath} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -97,7 +98,7 @@ export function analyzeFrame(img, {tokens, forbiddenRanges, mask}) {
 
 // ---- frame sources ----------------------------------------------------------
 
-function extractVideoFrames(videoPath, n) {
+function extractVideoFrames(videoPath, n, framesDir) {
   // Parse duration from ffmpeg's stderr (it prints "Duration: HH:MM:SS.ss").
   let durSec = 0;
   try {
@@ -112,7 +113,6 @@ function extractVideoFrames(videoPath, n) {
     if (m) durSec = Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]);
   }
   if (!durSec) throw new Error(`judge-palette: could not read duration of ${videoPath}`);
-  const framesDir = join(root, 'out', 'palette-frames');
   rmSync(framesDir, {recursive: true, force: true});
   mkdirSync(framesDir, {recursive: true});
   const imgs = [];
@@ -148,11 +148,18 @@ function main() {
   const positional = argv.filter((a, i) => {
     if (a.startsWith('--')) return false;
     const prev = argv[i - 1];
-    return prev !== '--frames' && prev !== '--mask-region';
+    return prev !== '--frames' && prev !== '--mask-region' && prev !== '--project';
   });
   const [brand, input] = positional;
   if (!brand || !input) {
-    console.error('usage: node scripts/judge-palette.mjs <brand> <video-or-png> [--frames N] [--mask-region x,y,w,h] [--strict] [--json]');
+    console.error('usage: node scripts/judge-palette.mjs <brand> <video-or-png> --project <product-repo> [--frames N] [--mask-region x,y,w,h] [--strict] [--json]');
+    process.exit(1);
+  }
+  let ws;
+  try {
+    ws = resolveWorkspace(root, {brand, project: projectArg(argv)});
+  } catch (err) {
+    console.error(`judge-palette: ${err.message}`);
     process.exit(1);
   }
 
@@ -169,7 +176,13 @@ function main() {
   // Absolute either way: extractVideoFrames shells out to ffmpeg with cwd=studio, so
   // a cwd-relative path that exists here (the documented "run from the repo root"
   // case) would resolve against studio/ and fail to open.
-  const inputPath = existsSync(input) ? resolve(input) : join(root, input);
+  let inputPath;
+  try {
+    inputPath = resolveWorkspacePath(ws, input);
+  } catch (err) {
+    console.error(`judge-palette: ${err.message}`);
+    process.exit(1);
+  }
   if (!existsSync(inputPath)) {
     console.error(`judge-palette: input not found: ${input}`);
     process.exit(1);
@@ -179,7 +192,7 @@ function main() {
   const isPng = ext === '.png';
   const frameImgs = isPng
     ? [{timeMs: null, img: decodePng(readFileSync(inputPath))}]
-    : extractVideoFrames(inputPath, frames);
+    : extractVideoFrames(inputPath, frames, join(ws.marketingDir, 'palette-frames'));
 
   const frameReports = frameImgs.map((fi, index) => {
     const {forbiddenFraction, offending} = analyzeFrame(fi.img, {tokens, forbiddenRanges, mask});
@@ -220,7 +233,7 @@ function main() {
     findings,
   };
 
-  const outDir = join(root, 'out', brand, 'marketing');
+  const outDir = ws.marketingDir;
   mkdirSync(outDir, {recursive: true});
   const outPath = join(outDir, 'judge-palette.json');
   writeFileSync(outPath, JSON.stringify(report, null, 2));
@@ -233,7 +246,7 @@ function main() {
     );
     for (const f of findings) console.log(`  [${f.level}] ${f.check}: ${f.message}`);
     if (findings.length === 0) console.log('  no forbidden-color findings');
-    console.log(`  report -> out/${brand}/marketing/judge-palette.json`);
+    console.log(`  report -> ${outPath}`);
   }
 
   process.exit(strict && verdict === 'FAIL' ? 1 : 0);

@@ -1,7 +1,8 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {mkdirSync, rmSync, writeFileSync, readFileSync, readdirSync, existsSync} from 'node:fs';
+import {mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync, readdirSync, existsSync} from 'node:fs';
+import {tmpdir} from 'node:os';
 import {join, dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {
@@ -17,10 +18,17 @@ import {
   seedPostsRows,
   PLATFORM_MAP,
 } from './build-postkit.mjs';
+import {resolveWorkspace} from './lib/workspace.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
 const cli = join(here, 'build-postkit.mjs');
+
+function tempProduct(brandId) {
+  const project = mkdtempSync(join(tmpdir(), 'postkit-product-'));
+  mkdirSync(join(project, '.git'));
+  return {project, workspace: resolveWorkspace(root, {brand: brandId, project})};
+}
 
 // --- trimToBudget ---
 
@@ -233,12 +241,11 @@ test('seedPostsRows returns one unpublished row per PLATFORM_MAP key', () => {
   }
 });
 
-test('CLI seeds out/<brand>/marketing/posts.json once and never overwrites it on rebuild', () => {
-  const outDir = join(root, 'out', 'noban');
-  rmSync(outDir, {recursive: true, force: true});
+test('CLI seeds product-owned marketing/posts.json once and never overwrites it on rebuild', () => {
+  const {project, workspace} = tempProduct('noban');
   try {
-    execFileSync('node', [cli, 'noban'], {encoding: 'utf8'});
-    const postsPath = join(outDir, 'marketing', 'posts.json');
+    execFileSync('node', [cli, 'noban', '--project', project], {encoding: 'utf8'});
+    const postsPath = join(workspace.marketingDir, 'posts.json');
     const seeded = JSON.parse(readFileSync(postsPath, 'utf8'));
     assert.deepEqual(seeded.map((r) => r.platform), Object.keys(PLATFORM_MAP));
     assert.ok(seeded.every((r) => r.url === null && r.variant === null && r.published === false));
@@ -247,12 +254,12 @@ test('CLI seeds out/<brand>/marketing/posts.json once and never overwrites it on
     seeded[0].url = 'https://x.com/noban/status/123';
     seeded[0].published = true;
     writeFileSync(postsPath, JSON.stringify(seeded, null, 2));
-    execFileSync('node', [cli, 'noban'], {encoding: 'utf8'});
+    execFileSync('node', [cli, 'noban', '--project', project], {encoding: 'utf8'});
     const after = JSON.parse(readFileSync(postsPath, 'utf8'));
     assert.equal(after[0].url, 'https://x.com/noban/status/123');
     assert.equal(after[0].published, true);
   } finally {
-    rmSync(outDir, {recursive: true, force: true});
+    rmSync(project, {recursive: true, force: true});
   }
 });
 

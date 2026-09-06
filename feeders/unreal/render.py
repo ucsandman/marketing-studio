@@ -1,7 +1,7 @@
 """Headless Unreal Engine render wrapper: runs a scene script and verifies output.
 
 Usage:
-    python feeders/unreal/render.py <scene.py> --out <dir> [--frame N | --animation] [scene-specific flags...]
+    python feeders/unreal/render.py <scene.py> --project <repo> --brand <slug> [--out <dir>] [--frame N | --animation] [scene-specific flags...]
 
 Any flag not recognized by this wrapper (e.g. a scene's --brand/--seed knobs) is
 forwarded verbatim to the scene script.
@@ -20,6 +20,9 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "feeders"))
+from workspace import resolve_feeder_output  # noqa: E402
+
 UPROJECT = Path(__file__).resolve().parent / "project" / "StoryStage.uproject"
 
 # Fallback install location if UNREAL_PATH is unset (the install this feeder was
@@ -175,8 +178,13 @@ def run(line: str, timeout: float | None) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("scene", help="path to an unreal-python scene script")
+    parser.add_argument("--out", help="product-relative or absolute output directory")
+    parser.add_argument("--project", help="external product git repository")
+    parser.add_argument("--brand", help="brand slug for the product output namespace")
     parser.add_argument(
-        "--out", required=True, help="output directory for frame_%%04d.png"
+        "--diagnostic-temp",
+        action="store_true",
+        help="allow a non-product probe, constrained to the OS temp directory",
     )
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--frame", type=int, help="render a single frame")
@@ -197,6 +205,20 @@ def main() -> int:
         print(f"scene script not found: {scene}", file=sys.stderr)
         return 1
 
+    try:
+        out_dir, _project_root = resolve_feeder_output(
+            engine_root=ROOT,
+            feeder="unreal",
+            scene=scene,
+            out=args.out,
+            project=args.project,
+            brand=args.brand,
+            diagnostic_temp=args.diagnostic_temp,
+        )
+    except ValueError as exc:
+        print(f"invalid output workspace: {exc}", file=sys.stderr)
+        return 1
+
     if not UPROJECT.is_file():
         print(f"project not found: {UPROJECT}", file=sys.stderr)
         return 1
@@ -209,8 +231,6 @@ def main() -> int:
             file=sys.stderr,
         )
         return 1
-
-    out_dir = Path(args.out).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
     cmd = build_cmd(

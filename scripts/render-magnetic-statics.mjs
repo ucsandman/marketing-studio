@@ -22,9 +22,11 @@ import {mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync} from 'node
 import {execSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const outDir = join(root, 'out', 'magnetic');
+const workspace = resolveWorkspace(root, {brand: 'magnetic', project: projectArg(process.argv.slice(2))});
+const outDir = workspace.brandRoot;
 mkdirSync(outDir, {recursive: true});
 
 const brief = JSON.parse(readFileSync(join(outDir, 'marketing', 'brief.json'), 'utf8'));
@@ -44,7 +46,7 @@ const studioDir = join(root, 'studio');
 const still = (out, width, height) => {
   console.log(`still: ${out} (${width}x${height})`);
   execSync(
-    `npx remotion still AnimatedOG "${join(outDir, out)}" --props="${propsPath}" --width=${width} --height=${height}`,
+    `npx remotion still AnimatedOG "${join(outDir, out)}" --props="${propsPath}" --public-dir="${workspace.publicDir}" --width=${width} --height=${height}`,
     {cwd: studioDir, stdio: 'inherit'},
   );
 };
@@ -53,7 +55,7 @@ still('og-image.png', 1200, 630); // native AnimatedOG size
 still('github-social-preview.png', 1280, 640); // GitHub repo social card
 
 console.log('render: og.mp4');
-execSync(`npx remotion render AnimatedOG "${join(outDir, 'og.mp4')}" --props="${propsPath}"`, {
+execSync(`npx remotion render AnimatedOG "${join(outDir, 'og.mp4')}" --props="${propsPath}" --public-dir="${workspace.publicDir}"`, {
   cwd: studioDir,
   stdio: 'inherit',
 });
@@ -71,7 +73,7 @@ const logoRevealProps = {
 const logoRevealPropsPath = join(outDir, 'logo-reveal-props.json');
 writeFileSync(logoRevealPropsPath, JSON.stringify(logoRevealProps));
 execSync(
-  `npx remotion render LogoReveal "${join(outDir, 'logo-reveal.mp4')}" --props="${logoRevealPropsPath}"`,
+  `npx remotion render LogoReveal "${join(outDir, 'logo-reveal.mp4')}" --props="${logoRevealPropsPath}" --public-dir="${workspace.publicDir}"`,
   {cwd: studioDir, stdio: 'inherit'},
 );
 

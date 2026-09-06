@@ -11,13 +11,14 @@
 //
 // Crops are in each source's own pixels and stay landscape, because FeaturePanel's
 // row layout sizes the panel off the image's aspect. Outputs land in
-// studio/public/tenwords/ (gitignored, like every other brand's screenshots).
+// the product-owned public/tenwords/ namespace.
 //
-// Usage: node scripts/build-tenwords-feature-stills.mjs
+// Usage: node scripts/build-tenwords-feature-stills.mjs --project <repo>
 import {execFileSync} from 'node:child_process';
 import {existsSync, mkdirSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -26,9 +27,11 @@ process.on('unhandledRejection', (reason) => {
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const studio = join(root, 'studio');
-const dest = join(studio, 'public', 'tenwords');
+const remotionCli = join(studio, 'node_modules', '@remotion', 'cli', 'remotion-cli.js');
+const workspace = resolveWorkspace(root, {brand: 'tenwords', project: projectArg(process.argv.slice(2))});
+const dest = join(workspace.publicDir, 'tenwords');
 const capture = join(dest, 'demo.mp4');
-const optionsShot = join('C:', 'Projects', 'tenwords', 'docs', 'store-assets', 'shot-options.png');
+const optionsShot = join(workspace.projectRoot, 'docs', 'store-assets', 'shot-options.png');
 
 // FeaturePanel zooms each still to 1.04 about 50%/30%, eating ~2.8% off the bottom,
 // so every crop ends in page background rather than across a control.
@@ -64,7 +67,7 @@ mkdirSync(dest, {recursive: true});
 
 for (const {name, src, crop, vf, ss, plainFfmpeg} of shots) {
   const out = join(dest, name);
-  // Arg-array invocation with the win32 shell hop, same as judge-palette.mjs.
+  // Both ffmpeg runners receive the transform as an argv element.
   const ffArgs = [
     '-y', '-hide_banner', '-loglevel', 'error',
     ...(ss ? ['-ss', ss] : []),
@@ -75,16 +78,15 @@ for (const {name, src, crop, vf, ss, plainFfmpeg} of shots) {
   if (plainFfmpeg) {
     execFileSync('ffmpeg', ffArgs, {cwd: studio, stdio: 'inherit'});
   } else {
-    // Arg-array invocation with the win32 shell hop, same as judge-palette.mjs.
-    execFileSync('npx', ['remotion', 'ffmpeg', ...ffArgs], {
+    // The bundled binary handles the capture-only crops without a system dependency.
+    execFileSync(process.execPath, [remotionCli, 'ffmpeg', ...ffArgs], {
       cwd: studio,
       stdio: 'inherit',
-      shell: process.platform === 'win32',
     });
   }
   if (!existsSync(out)) {
     console.error(`build-tenwords-feature-stills: ffmpeg produced no output for ${name}`);
     process.exit(1);
   }
-  console.log(`wrote studio/public/tenwords/${name} (${vf ?? `crop=${crop}`}${ss ? ` at t=${ss}s` : ''})`);
+  console.log(`wrote ${out} (${vf ?? `crop=${crop}`}${ss ? ` at t=${ss}s` : ''})`);
 }

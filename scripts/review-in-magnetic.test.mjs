@@ -13,6 +13,9 @@ import {
   duplicateDurationWarnings,
   runDriver,
 } from './review-in-magnetic.mjs';
+import {resolveWorkspace} from './lib/workspace.mjs';
+
+const engineRoot = join(import.meta.dirname, '..');
 
 // --- parseDurationSec ------------------------------------------------------
 
@@ -34,19 +37,19 @@ test('parseDurationSec: null for missing/unparseable/non-string values', () => {
 test('videoAssets: keeps only single-file .mp4/.webm artifacts, in inventory order', () => {
   const run = {
     assets: [
-      {id: 'logo-reveal', artifact: 'out/dashclaw/logo-reveal.mp4', duration: '5.06s'},
-      {id: 'og-assets', artifact: 'out/dashclaw/og-image.png + og.mp4 + readme-demo.gif', duration: '5.06s'},
-      {id: 'demo', artifact: 'out/dashclaw/demo.webm', duration: '28.39s'},
+      {id: 'logo-reveal', artifact: 'marketing/assets/dashclaw/logo-reveal.mp4', duration: '5.06s'},
+      {id: 'og-assets', artifact: 'marketing/assets/dashclaw/og-image.png + og.mp4 + readme-demo.gif', duration: '5.06s'},
+      {id: 'demo', artifact: 'marketing/assets/dashclaw/demo.webm', duration: '28.39s'},
     ],
   };
   assert.deepEqual(videoAssets(run), [
-    {key: 'logo-reveal', file: 'out/dashclaw/logo-reveal.mp4', fileName: 'logo-reveal.mp4', durationSec: 5.06},
-    {key: 'demo', file: 'out/dashclaw/demo.webm', fileName: 'demo.webm', durationSec: 28.39},
+    {key: 'logo-reveal', file: 'marketing/assets/dashclaw/logo-reveal.mp4', fileName: 'logo-reveal.mp4', durationSec: 5.06},
+    {key: 'demo', file: 'marketing/assets/dashclaw/demo.webm', fileName: 'demo.webm', durationSec: 28.39},
   ]);
 });
 
 test('videoAssets: throws naming a video asset with no parseable duration', () => {
-  const run = {assets: [{id: 'broken', artifact: 'out/dashclaw/broken.mp4', duration: null}]};
+  const run = {assets: [{id: 'broken', artifact: 'marketing/assets/dashclaw/broken.mp4', duration: null}]};
   assert.throws(() => videoAssets(run), /"broken".*no parseable "duration"/s);
 });
 
@@ -121,20 +124,24 @@ test('duplicateDurationWarnings: does not fire when all durations are distinct',
 // --- runDriver (fixture run.json + stub HTTP sidecar) -----------------------
 
 function tmpRoot() {
-  return mkdtempSync(join(tmpdir(), 'review-in-magnetic-test-'));
+  const root = mkdtempSync(join(tmpdir(), 'review-in-magnetic-test-'));
+  mkdirSync(join(root, '.git'));
+  return root;
 }
 
 function writeRunJson(root, brand, run) {
-  const dir = join(root, 'out', brand, 'marketing');
+  const workspace = resolveWorkspace(engineRoot, {brand, project: root});
+  const dir = workspace.marketingDir;
   mkdirSync(dir, {recursive: true});
   writeFileSync(join(dir, 'run.json'), JSON.stringify(run));
+  return workspace;
 }
 
 const FIXTURE_RUN = {
   assets: [
-    {id: 'logo-reveal', artifact: 'out/dashclaw/logo-reveal.mp4', duration: '5.06s'},
-    {id: 'og-assets', artifact: 'out/dashclaw/og-image.png + og.mp4 + readme-demo.gif', duration: '5.06s'},
-    {id: 'demo', artifact: 'out/dashclaw/demo.webm', duration: '28.39s'},
+    {id: 'logo-reveal', artifact: 'marketing/assets/dashclaw/logo-reveal.mp4', duration: '5.06s'},
+    {id: 'og-assets', artifact: 'marketing/assets/dashclaw/og-image.png + og.mp4 + readme-demo.gif', duration: '5.06s'},
+    {id: 'demo', artifact: 'marketing/assets/dashclaw/demo.webm', duration: '28.39s'},
   ],
 };
 
@@ -174,7 +181,7 @@ async function withEnv(overrides, fn) {
 
 test('runDriver: happy path — imports only video assets, proposes once, writes the manifest', async () => {
   const root = tmpRoot();
-  writeRunJson(root, 'dashclaw', FIXTURE_RUN);
+  const workspace = writeRunJson(root, 'dashclaw', FIXTURE_RUN);
   const {server, calls} = await startStub({
     import_media: (input) => ({
       status: 200,
@@ -192,7 +199,7 @@ test('runDriver: happy path — imports only video assets, proposes once, writes
   try {
     const {port} = server.address();
     const manifest = await withEnv({MAGNETIC_AGENT_PORT: String(port), MAGNETIC_AGENT_TOKEN: 'x'}, () =>
-      runDriver({root, brand: 'dashclaw'}),
+      runDriver({root: engineRoot, brand: 'dashclaw', workspace}),
     );
 
     const importCall = calls.find((c) => c.tool === 'import_media');
@@ -209,12 +216,12 @@ test('runDriver: happy path — imports only video assets, proposes once, writes
     ]);
 
     assert.deepEqual(manifest.assets, [
-      {key: 'logo-reveal', file: 'out/dashclaw/logo-reveal.mp4', fileName: 'logo-reveal.mp4', assetId: 'asset-logo-reveal.mp4'},
-      {key: 'demo', file: 'out/dashclaw/demo.webm', fileName: 'demo.webm', assetId: 'asset-demo.webm'},
+      {key: 'logo-reveal', file: 'marketing/assets/dashclaw/logo-reveal.mp4', fileName: 'logo-reveal.mp4', assetId: 'asset-logo-reveal.mp4'},
+      {key: 'demo', file: 'marketing/assets/dashclaw/demo.webm', fileName: 'demo.webm', assetId: 'asset-demo.webm'},
     ]);
     assert.match(manifest.proposedAt, /^\d{4}-\d{2}-\d{2}T/);
 
-    const written = JSON.parse(readFileSync(join(root, 'out', 'dashclaw', 'marketing', 'magnetic-review.json'), 'utf8'));
+    const written = JSON.parse(readFileSync(join(workspace.marketingDir, 'magnetic-review.json'), 'utf8'));
     assert.deepEqual(written, manifest);
   } finally {
     server.close();
@@ -224,11 +231,11 @@ test('runDriver: happy path — imports only video assets, proposes once, writes
 
 test('runDriver: allowlist rejection surfaces the sidecar message verbatim and never proposes (whole-call semantics)', async () => {
   const root = tmpRoot();
-  writeRunJson(root, 'dashclaw', FIXTURE_RUN);
+  const workspace = writeRunJson(root, 'dashclaw', FIXTURE_RUN);
   const {server, calls} = await startStub({
     import_media: () => ({
       status: 200,
-      payload: {error: 'import_media rejected: "out/dashclaw/demo.webm" is outside every allowlisted folder'},
+      payload: {error: 'import_media rejected: "marketing/assets/dashclaw/demo.webm" is outside every allowlisted folder'},
     }),
     propose_edits: () => ({status: 200, payload: {result: {}}}),
   });
@@ -236,12 +243,12 @@ test('runDriver: allowlist rejection surfaces the sidecar message verbatim and n
     const {port} = server.address();
     await withEnv({MAGNETIC_AGENT_PORT: String(port), MAGNETIC_AGENT_TOKEN: 'x'}, () =>
       assert.rejects(
-        () => runDriver({root, brand: 'dashclaw'}),
+        () => runDriver({root: engineRoot, brand: 'dashclaw', workspace}),
         /is outside every allowlisted folder/,
       ),
     );
     assert.equal(calls.filter((c) => c.tool === 'propose_edits').length, 0, 'propose_edits must never run after import_media rejects');
-    assert.equal(existsSync(join(root, 'out', 'dashclaw', 'marketing', 'magnetic-review.json')), false);
+    assert.equal(existsSync(join(workspace.marketingDir, 'magnetic-review.json')), false);
   } finally {
     server.close();
     rmSync(root, {recursive: true, force: true});
@@ -250,16 +257,16 @@ test('runDriver: allowlist rejection surfaces the sidecar message verbatim and n
 
 test('runDriver: unreachable sidecar rejects with the enable-Agent-Access hint', async () => {
   const root = tmpRoot();
-  writeRunJson(root, 'dashclaw', FIXTURE_RUN);
+  const workspace = writeRunJson(root, 'dashclaw', FIXTURE_RUN);
   const appDataDir = mkdtempSync(join(tmpdir(), 'review-in-magnetic-appdata-'));
   try {
     await withEnv({APPDATA: appDataDir}, () =>
       assert.rejects(
-        () => runDriver({root, brand: 'dashclaw'}),
+        () => runDriver({root: engineRoot, brand: 'dashclaw', workspace}),
         /Magnetic is not reachable.*Agent Access.*sidebar/s,
       ),
     );
-    assert.equal(existsSync(join(root, 'out', 'dashclaw', 'marketing', 'magnetic-review.json')), false);
+    assert.equal(existsSync(join(workspace.marketingDir, 'magnetic-review.json')), false);
   } finally {
     rmSync(root, {recursive: true, force: true});
     rmSync(appDataDir, {recursive: true, force: true});
@@ -270,9 +277,9 @@ test('runDriver: unreachable sidecar rejects with the enable-Agent-Access hint',
 // and audio-track (launch-final.mp4) are the same 55s content remixed.
 const FIXTURE_RUN_DUP = {
   assets: [
-    {id: 'launch-video', artifact: 'out/dashclaw/launch.mp4', duration: '55.33s'},
-    {id: 'audio-track', artifact: 'out/dashclaw/launch-final.mp4', duration: '55.33s'},
-    {id: 'demo', artifact: 'out/dashclaw/demo.webm', duration: '28.39s'},
+    {id: 'launch-video', artifact: 'marketing/assets/dashclaw/launch.mp4', duration: '55.33s'},
+    {id: 'audio-track', artifact: 'marketing/assets/dashclaw/launch-final.mp4', duration: '55.33s'},
+    {id: 'demo', artifact: 'marketing/assets/dashclaw/demo.webm', duration: '28.39s'},
   ],
 };
 
@@ -307,14 +314,14 @@ const happyStub = {
 
 test('runDriver: --skip excludes the asset from import + ops, and the manifest records {key, skipped: true}', async () => {
   const root = tmpRoot();
-  writeRunJson(root, 'dashclaw', FIXTURE_RUN_DUP);
+  const workspace = writeRunJson(root, 'dashclaw', FIXTURE_RUN_DUP);
   const {server, calls} = await startStub(happyStub);
   try {
     const {port} = server.address();
     let manifest;
     const stderr = await captureStderr(async () => {
       manifest = await withEnv({MAGNETIC_AGENT_PORT: String(port), MAGNETIC_AGENT_TOKEN: 'x'}, () =>
-        runDriver({root, brand: 'dashclaw', skip: ['audio-track']}),
+        runDriver({root: engineRoot, brand: 'dashclaw', workspace, skip: ['audio-track']}),
       );
     });
 
@@ -329,11 +336,11 @@ test('runDriver: --skip excludes the asset from import + ops, and the manifest r
     assert.deepEqual(ops[3].input, {at_sec: 55.33, text: 'demo', color: 'green'});
 
     assert.deepEqual(manifest.assets, [
-      {key: 'launch-video', file: 'out/dashclaw/launch.mp4', fileName: 'launch.mp4', assetId: 'asset-launch.mp4'},
-      {key: 'demo', file: 'out/dashclaw/demo.webm', fileName: 'demo.webm', assetId: 'asset-demo.webm'},
+      {key: 'launch-video', file: 'marketing/assets/dashclaw/launch.mp4', fileName: 'launch.mp4', assetId: 'asset-launch.mp4'},
+      {key: 'demo', file: 'marketing/assets/dashclaw/demo.webm', fileName: 'demo.webm', assetId: 'asset-demo.webm'},
       {key: 'audio-track', skipped: true},
     ]);
-    const written = JSON.parse(readFileSync(join(root, 'out', 'dashclaw', 'marketing', 'magnetic-review.json'), 'utf8'));
+    const written = JSON.parse(readFileSync(join(workspace.marketingDir, 'magnetic-review.json'), 'utf8'));
     assert.deepEqual(written, manifest);
 
     assert.equal(stderr.filter((l) => l.startsWith('warning:')).length, 0, 'no duplicate warning once the duplicate is skipped');
@@ -345,13 +352,13 @@ test('runDriver: --skip excludes the asset from import + ops, and the manifest r
 
 test('runDriver: warns on stderr about identical-duration pairs when nothing is skipped (non-fatal)', async () => {
   const root = tmpRoot();
-  writeRunJson(root, 'dashclaw', FIXTURE_RUN_DUP);
+  const workspace = writeRunJson(root, 'dashclaw', FIXTURE_RUN_DUP);
   const {server, calls} = await startStub(happyStub);
   try {
     const {port} = server.address();
     const stderr = await captureStderr(() =>
       withEnv({MAGNETIC_AGENT_PORT: String(port), MAGNETIC_AGENT_TOKEN: 'x'}, () =>
-        runDriver({root, brand: 'dashclaw'}),
+        runDriver({root: engineRoot, brand: 'dashclaw', workspace}),
       ),
     );
     assert.deepEqual(
@@ -369,10 +376,10 @@ test('runDriver: warns on stderr about identical-duration pairs when nothing is 
 
 test('runDriver: an unknown --skip key fails loud naming it, never calls the sidecar', async () => {
   const root = tmpRoot();
-  writeRunJson(root, 'dashclaw', FIXTURE_RUN);
+  const workspace = writeRunJson(root, 'dashclaw', FIXTURE_RUN);
   try {
     await assert.rejects(
-      () => runDriver({root, brand: 'dashclaw', skip: ['not-an-asset']}),
+      () => runDriver({root: engineRoot, brand: 'dashclaw', workspace, skip: ['not-an-asset']}),
       /--skip key "not-an-asset" matches no VIDEO asset/,
     );
   } finally {
@@ -382,9 +389,9 @@ test('runDriver: an unknown --skip key fails loud naming it, never calls the sid
 
 test('runDriver: no VIDEO assets in run.json fails loud, never calls the sidecar', async () => {
   const root = tmpRoot();
-  writeRunJson(root, 'dashclaw', {assets: [{id: 'og-assets', artifact: 'out/dashclaw/og-image.png', duration: '1s'}]});
+  const workspace = writeRunJson(root, 'dashclaw', {assets: [{id: 'og-assets', artifact: 'marketing/assets/dashclaw/og-image.png', duration: '1s'}]});
   try {
-    await assert.rejects(() => runDriver({root, brand: 'dashclaw'}), /no VIDEO assets/);
+    await assert.rejects(() => runDriver({root: engineRoot, brand: 'dashclaw', workspace}), /no VIDEO assets/);
   } finally {
     rmSync(root, {recursive: true, force: true});
   }

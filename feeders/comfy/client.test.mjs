@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {fillTemplate, firstCheckpoint, imagesFromHistory} from './client.mjs';
+import {mkdirSync, mkdtempSync, rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {fillTemplate, firstCheckpoint, imagesFromHistory, resolveHeroOutput} from './client.mjs';
 
 test('fillTemplate substitutes string and numeric tokens and parses', () => {
   const text = '{"a": {"inputs": {"ckpt_name": "{{CHECKPOINT}}", "seed": "{{SEED}}", "text": "x {{POSITIVE}} y"}}}';
@@ -28,4 +31,22 @@ test('imagesFromHistory collects images across output nodes', () => {
     {filename: 'noban_hero_00001_.png', subfolder: '', type: 'output'},
   ]);
   assert.deepEqual(imagesFromHistory({}, 'p1'), []);
+});
+
+test('resolveHeroOutput defaults production output into the product workspace', (t) => {
+  const project = mkdtempSync(join(tmpdir(), 'comfy-product-'));
+  mkdirSync(join(project, '.git'));
+  t.after(() => rmSync(project, {recursive: true, force: true}));
+  const {outDir} = resolveHeroOutput(['hero', '--project', project, '--brand', 'example']);
+  assert.equal(outDir, join(project, 'marketing', 'assets', 'example', 'assets', 'comfy'));
+});
+
+test('resolveHeroOutput rejects production output outside the product workspace', (t) => {
+  const project = mkdtempSync(join(tmpdir(), 'comfy-product-'));
+  mkdirSync(join(project, '.git'));
+  t.after(() => rmSync(project, {recursive: true, force: true}));
+  assert.throws(
+    () => resolveHeroOutput(['hero', '--project', project, '--out', process.cwd()]),
+    /escapes product repository/,
+  );
 });

@@ -6,7 +6,7 @@
  * Prereq: the TenWords service running on :4710 with a funded key:
  *   cd C:\Projects\tenwords && npm start
  *
- * Output: ../../studio/public/tenwords/demo.webm + ../../props/tenwords-demo.json
+ * Output: <project>/marketing/assets/tenwords/{assets,public,props}/
  *
  * Two things are specific to this capture and load-bearing:
  *
@@ -31,9 +31,12 @@ import {fileURLToPath} from 'node:url';
 import {Recorder} from './recorder.mjs';
 import {cacheKey, checkCache, storeCache} from '../../scripts/lib/cache.mjs';
 import {captureKeyParts} from './capture-cache.mjs';
+import {projectArg, resolveWorkspace} from '../../scripts/lib/workspace.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const TW_ROOT = process.env.TW_ROOT ?? 'C:/Projects/tenwords';
+const argv = process.argv.slice(2);
+const workspace = resolveWorkspace(ROOT, {brand: 'tenwords', project: projectArg(argv) ?? process.env.TW_ROOT ?? 'C:/Projects/tenwords'});
+const TW_ROOT = workspace.projectRoot;
 const SERVICE = 'http://localhost:4710';
 const ARTICLE = 'https://en.wikipedia.org/wiki/Speed_reading';
 const ARTICLE_HOST_MATCH = 'https://en.wikipedia.org/*';
@@ -44,12 +47,13 @@ const HOLD = {read: 5000, wide: 2200, folded: 3400, detail: 4400, banner: 4400, 
 const CONDENSE_TIMEOUT_MS = 90_000;
 
 // --- Footage cache gate (before any browser launch or app-reachability check) ---
-const argv = process.argv.slice(2);
 const FORCE = argv.includes('--force');
 const CHECK_ONLY = argv.includes('--cache-check-only');
-const videoOut = join(ROOT, 'studio', 'public', 'tenwords', 'demo.mp4');
-const propsOut = join(ROOT, 'props', 'tenwords-demo.json');
-const CACHE_ARTIFACTS = [videoOut, propsOut];
+const publicDir = join(workspace.publicDir, 'tenwords');
+const videoOut = join(publicDir, 'demo.mp4');
+const assetOut = join(workspace.assetsDir, 'demo.mp4');
+const propsOut = join(workspace.propsDir, 'tenwords-demo.json');
+const CACHE_ARTIFACTS = [videoOut, assetOut, propsOut];
 const keyParts = captureKeyParts({
   repo: TW_ROOT,
   scriptPath: fileURLToPath(import.meta.url),
@@ -59,14 +63,14 @@ const CACHE_KEY = cacheKey(keyParts);
 const CACHE_ENABLED = keyParts.productHead !== null;
 
 if (CHECK_ONLY) {
-  const {hit} = CACHE_ENABLED ? checkCache('tenwords', 'capture', CACHE_KEY, CACHE_ARTIFACTS) : {hit: false};
+  const {hit} = CACHE_ENABLED ? checkCache(workspace, 'capture', CACHE_KEY, CACHE_ARTIFACTS) : {hit: false};
   console.log(hit ? 'HIT' : 'MISS');
   process.exit(0);
 }
 if (!CACHE_ENABLED) {
   console.log(`capture cache: product git state unavailable at ${TW_ROOT} - caching disabled this run`);
 } else if (!FORCE) {
-  const {hit} = checkCache('tenwords', 'capture', CACHE_KEY, CACHE_ARTIFACTS);
+  const {hit} = checkCache(workspace, 'capture', CACHE_KEY, CACHE_ARTIFACTS);
   if (hit) {
     console.log(`capture cache hit - reusing ${videoOut}`);
     process.exit(0);
@@ -84,7 +88,7 @@ try {
 // Scratch extension copy: production manifest + one host permission, so the
 // programmatic trigger has the access a real toolbar click would grant.
 const EXT_SRC = join(TW_ROOT, 'extension');
-const EXT_DIR = join(ROOT, 'out', 'capture', 'tenwords-ext');
+const EXT_DIR = join(workspace.assetsDir, '.capture', 'tenwords-ext');
 rmSync(EXT_DIR, {recursive: true, force: true});
 cpSync(EXT_SRC, EXT_DIR, {recursive: true});
 const manifest = JSON.parse(readFileSync(join(EXT_DIR, 'manifest.json'), 'utf8'));
@@ -150,9 +154,9 @@ const PARA_OFFSET = ([mode, i, targetY]) => {
   return el ? el.getBoundingClientRect().top - targetY : 0;
 };
 
-const videoDir = join(ROOT, 'out', 'capture');
+const videoDir = join(workspace.assetsDir, '.capture');
 mkdirSync(videoDir, {recursive: true});
-const userDataDir = join(ROOT, 'out', 'capture', 'tenwords-profile');
+const userDataDir = join(workspace.assetsDir, '.capture', 'tenwords-profile');
 rmSync(userDataDir, {recursive: true, force: true});
 
 let context;
@@ -336,8 +340,7 @@ try {
   // Both stop at the same instant (context.close right after finish), so the head lead
   // is exactly videoDuration - telemetryDuration. Trim it off, and the composition's
   // assumption that video time == telemetry time holds.
-  const destDir = join(ROOT, 'studio', 'public', 'tenwords');
-  mkdirSync(destDir, {recursive: true});
+  mkdirSync(publicDir, {recursive: true});
   const rawMs = durationMs(src);
   const leadS = Math.max(0, (rawMs - telemetry.durationMs) / 1000);
   execFileSync(
@@ -351,6 +354,8 @@ try {
   if (drift > 250) {
     throw new Error(`video/telemetry drift ${drift}ms after trimming ${leadS}s - camera and captions would desync`);
   }
+  mkdirSync(workspace.assetsDir, {recursive: true});
+  copyFileSync(videoOut, assetOut);
 
   const props = {
     brandId: 'tenwords',
@@ -358,15 +363,16 @@ try {
     cta: 'Condense any long page at tenwords.io',
     telemetry,
   };
+  mkdirSync(workspace.propsDir, {recursive: true});
   writeFileSync(propsOut, JSON.stringify(props, null, 2) + '\n');
   if (CACHE_ENABLED) {
-    storeCache('tenwords', 'capture', CACHE_KEY, CACHE_ARTIFACTS, {productRepo: TW_ROOT, productHead: keyParts.productHead});
+    storeCache(workspace, 'capture', CACHE_KEY, CACHE_ARTIFACTS, {productRepo: TW_ROOT, productHead: keyParts.productHead});
   }
   const s = (ms) => Math.round((ms / 1000) * 100) / 100;
   console.log(`capture OK: ${telemetry.durationMs}ms, ${telemetry.events.length} events, ${blockCount} paragraphs`);
   console.log(`beats: trigger ${s(beats.trigger)}s, fold ${s(beats.fold)}s, restore ${s(beats.restore)}s`);
   console.log(`trimmed ${leadS.toFixed(2)}s of pre-roll; video ${outMs}ms vs telemetry ${telemetry.durationMs}ms`);
-  console.log('wrote studio/public/tenwords/demo.mp4 and props/tenwords-demo.json');
+  console.log(`wrote ${assetOut}, ${videoOut}, and ${propsOut}`);
 } catch (err) {
   console.error(String(err?.stack ?? err));
   process.exitCode = 1;

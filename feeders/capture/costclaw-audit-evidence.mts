@@ -5,28 +5,35 @@
 // product's real ANSI bytes. Read-only: no history snapshot, no browser open, no
 // writes anywhere near the product repo.
 //
-// Needs the product repo's toolchain (TS sources + tsx), so run it FROM there:
-//   cd C:\Projects\costclaw
-//   npx tsx C:\Projects\animations\feeders\capture\costclaw-audit-evidence.mts \
-//     C:\Projects\animations\out\costclaw\marketing\demo
+// Needs the product repo's toolchain (TS sources + tsx). Pass --project, or run
+// it from that git worktree. Evidence defaults to the product-owned marketing
+// workspace; an optional positional output must remain inside that repository.
 //
 // The default capture path reuses whatever is already on disk instead of calling
 // this, because the audit reads LIVE logs: re-running changes every number, which
 // would desync the footage from the stills and copy approved alongside it.
-import { buildAudit } from "file:///C:/Projects/costclaw/packages/engine/src/index.ts";
-import { loadAuditInputs, resolvePlan } from "file:///C:/Projects/costclaw/apps/cli/src/audit-command.ts";
-import { formatAudit } from "file:///C:/Projects/costclaw/apps/cli/src/format.ts";
-import { renderHtml } from "file:///C:/Projects/costclaw/apps/cli/src/html-report.ts";
-import { readSetup } from "file:///C:/Projects/costclaw/apps/cli/src/read-setup.ts";
 import { mkdir, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { projectArg, resolveWorkspace, resolveWorkspacePath } from "../../scripts/lib/workspace.mjs";
 
-const outDir = process.argv[2];
-if (!outDir) {
-  console.error("usage: tsx costclaw-audit-evidence.mts <outDir>");
-  process.exit(1);
-}
+const ENGINE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const argv = process.argv.slice(2);
+const workspace = resolveWorkspace(ENGINE_ROOT, {brand: "costclaw", project: projectArg(argv)});
+const outputArg = argv.find((arg, index) => !arg.startsWith("-") && argv[index - 1] !== "--project");
+const outDir = outputArg
+  ? resolveWorkspacePath(workspace, outputArg)
+  : join(workspace.marketingDir, "demo");
+const productImport = (path: string) => import(pathToFileURL(join(workspace.projectRoot, path)).href);
+const [{buildAudit}, {loadAuditInputs, resolvePlan}, {formatAudit}, {renderHtml}, {readSetup}] =
+  await Promise.all([
+    productImport("packages/engine/src/index.ts"),
+    productImport("apps/cli/src/audit-command.ts"),
+    productImport("apps/cli/src/format.ts"),
+    productImport("apps/cli/src/html-report.ts"),
+    productImport("apps/cli/src/read-setup.ts"),
+  ]);
 
 const { logs, claudeMd, claudeMdSource, root, skipped } = await loadAuditInputs({});
 const setup = await readSetup();

@@ -3,7 +3,7 @@
 // subset via Remotion's `--frames` flag — registered as a candidate variant in
 // Mission Control's run.json so the operator picks the winner from the browser
 // (radio buttons + selectedVariant, mission-control.mjs's existing contract).
-import {execSync} from 'node:child_process';
+import {execFileSync} from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
@@ -17,6 +17,8 @@ import {basename, dirname, join} from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const studio = join(root, 'studio');
+const remotionCli = join(studio, 'node_modules', '@remotion', 'cli', 'remotion-cli.js');
+const compositions = new Set(['LaunchVideo', 'LogoReveal']);
 
 const stripExt = (p) => basename(p).replace(/\.[^.]+$/, '');
 
@@ -25,16 +27,17 @@ const stripExt = (p) => basename(p).replace(/\.[^.]+$/, '');
 // verifies the output landed. `frames` (optional) is a Remotion --frames range
 // string, e.g. '150-335' — used to render only one act (the hook A/B and
 // launch-hook takes). Omit it to render the full composition.
-export function renderTake({comp, outPath, props, frames}) {
+export function renderTake({comp, outPath, props, frames, publicDir}) {
+  if (!publicDir) throw new Error('renderTake requires a product workspace publicDir');
+  if (!compositions.has(comp)) throw new Error(`renderTake refuses unregistered composition ${JSON.stringify(comp)}`);
+  if (frames && !/^\d+(?:-\d+)?$/.test(frames)) throw new Error(`renderTake received an invalid frame range: ${frames}`);
   mkdirSync(dirname(outPath), {recursive: true});
   const propsDir = join(dirname(outPath), '.props');
   mkdirSync(propsDir, {recursive: true});
   const propsPath = join(propsDir, `${stripExt(outPath)}.json`);
   writeFileSync(propsPath, JSON.stringify(props));
-  const framesFlag = frames ? ` --frames=${frames}` : '';
-  const cmd = `npx remotion render ${comp} "${outPath}" --props="${propsPath}"${framesFlag}`;
   console.log(`takes: rendering ${comp} -> ${outPath}${frames ? ` (frames ${frames})` : ''}`);
-  execSync(cmd, {cwd: studio, stdio: 'inherit'});
+  execFileSync(process.execPath, [remotionCli, 'render', comp, outPath, `--props=${propsPath}`, `--public-dir=${publicDir}`, ...(frames ? [`--frames=${frames}`] : [])], {cwd: studio, stdio: 'inherit'});
   if (!existsSync(outPath)) {
     console.error(`FAILED: ${outPath} was not produced`);
     process.exit(1);
@@ -47,7 +50,7 @@ export function renderTake({comp, outPath, props, frames}) {
 // Returns the poster's absolute path (same dir, .jpg extension).
 export function posterFor(videoPath) {
   const posterPath = videoPath.replace(/\.[^.]+$/, '.jpg');
-  execSync(`npx remotion ffmpeg -y -i "${videoPath}" -frames:v 1 "${posterPath}"`, {
+  execFileSync(process.execPath, [remotionCli, 'ffmpeg', '-y', '-i', videoPath, '-frames:v', '1', posterPath], {
     cwd: studio,
     stdio: 'inherit',
   });
@@ -65,8 +68,9 @@ export function posterFor(videoPath) {
 // written, false when there is no run.json for this brand or no matching asset
 // entry — variants are additive metadata for Mission Control's picker, never
 // load-bearing for the render itself, so both cases are a silent no-op.
-export function registerVariants(brand, assetId, variants) {
-  const runPath = join(root, 'out', brand, 'marketing', 'run.json');
+export function registerVariants(workspace, assetId, variants) {
+  if (!workspace?.marketingDir) throw new Error('registerVariants requires a product workspace');
+  const runPath = join(workspace.marketingDir, 'run.json');
   if (!existsSync(runPath)) return false;
   let run;
   try {

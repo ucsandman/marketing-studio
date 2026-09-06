@@ -8,6 +8,7 @@ import {mkdirSync, writeFileSync} from 'node:fs';
 import {execSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {dirname, join} from 'node:path';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -15,7 +16,8 @@ process.on('unhandledRejection', (reason) => {
 });
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const outDir = join(root, 'out', 'tenwords', 'store');
+const workspace = resolveWorkspace(root, {brand: 'tenwords', project: projectArg(process.argv.slice(2))});
+const outDir = join(workspace.brandRoot, 'store');
 mkdirSync(outDir, {recursive: true});
 
 const studioDir = join(root, 'studio');
@@ -52,7 +54,7 @@ for (const tile of tiles) {
   );
   const outFile = join(outDir, `${tile.id}.png`);
   console.log(`still: ${tile.id}.png (${tile.formatWidth}x${tile.formatHeight})`);
-  execSync(`npx remotion still StoreTile "${outFile}" --props="${propsPath}"`, {
+  execSync(`npx remotion still StoreTile "${outFile}" --props="${propsPath}" --public-dir="${workspace.publicDir}"`, {
     cwd: studioDir,
     stdio: 'inherit',
   });

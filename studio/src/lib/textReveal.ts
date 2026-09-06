@@ -81,6 +81,22 @@ const presets: Record<TextReveal, (args: RevealArgs) => RevealFragment> = {
 export const revealFragment = (preset: TextReveal, args: RevealArgs): RevealFragment =>
   presets[preset](args);
 
+/** Editorial line reveal: the baseline rises through a clean clipping mask. */
+export const lineMaskFragment = (
+  args: Omit<RevealArgs, 'total'> & {total?: number},
+): RevealFragment => {
+  const s = clamp01(
+    brandSpring(args.frame, args.fps, args.motion, {
+      delayFrames: args.delayOverride ?? 6 + staggerDelay(args.index, 3, args.motion),
+    }),
+  );
+  return {
+    opacity: 1,
+    transform: `translateY(${(1 - s) * 34 * args.scale}px)`,
+    clipPath: `inset(${(1 - s) * 100}% 0 0 0)`,
+  };
+};
+
 /**
  * Whether Headline should split `text` into characters (charStagger under the cap)
  * or words (every other preset, or charStagger above the cap).

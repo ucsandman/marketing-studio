@@ -66,12 +66,13 @@ test('cardsFor emits nothing for an empty brief', () => {
 
 test('--dry-run writes one props JSON per card and prints the counts', () => {
   const dir = mkdtempSync(join(tmpdir(), 'cards-'));
+  mkdirSync(join(dir, '.git'));
   const briefPath = join(dir, 'brief.json');
   writeFileSync(briefPath, JSON.stringify(fixtureBrief));
   const outDir = join(dir, 'cards');
   const stdout = execFileSync(
     process.execPath,
-    [script, 'sidetap', '--brief', briefPath, '--out', outDir, '--dry-run'],
+    [script, 'sidetap', '--project', dir, '--brief', briefPath, '--out', outDir, '--dry-run'],
     {encoding: 'utf8'},
   );
   assert.deepEqual(readdirSync(outDir).sort(), [
@@ -85,10 +86,11 @@ test('--dry-run writes one props JSON per card and prints the counts', () => {
 
 test('a missing brief is a clean skip, not a crash', () => {
   const dir = mkdtempSync(join(tmpdir(), 'cards-'));
+  mkdirSync(join(dir, '.git'));
   mkdirSync(join(dir, 'empty'));
   const stdout = execFileSync(
     process.execPath,
-    [script, 'sidetap', '--brief', join(dir, 'nope.json'), '--out', join(dir, 'empty'), '--dry-run'],
+    [script, 'sidetap', '--project', dir, '--brief', join(dir, 'nope.json'), '--out', join(dir, 'empty'), '--dry-run'],
     {encoding: 'utf8'},
   );
   assert.match(stdout, /skipping \(0 cards from 0 proof points\)/);

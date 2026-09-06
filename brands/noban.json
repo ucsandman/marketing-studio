@@ -32,6 +32,7 @@
     "settle": 0.3,
     "textReveal": "maskWipe"
   },
+  "progressTreatment": "cs2-wear",
   "voice": "Instrument-grade trading terminal that speaks CS2. Terse, factual, no hype. Profit is gold, never green. Green means simulation/safe only. Red means loss/live/danger. Not esports-neon.",
   "grade": {
     "grain": 0.12,

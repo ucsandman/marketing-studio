@@ -15,6 +15,7 @@ import {existsSync, readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join, relative} from 'node:path';
 import {posterFor, registerVariants, renderTake} from './lib/takes.mjs';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -24,8 +25,9 @@ process.on('unhandledRejection', (reason) => {
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 const argv = process.argv.slice(2);
-const positional = argv.filter((a) => !a.startsWith('--'));
+const positional = argv.filter((a, i) => !a.startsWith('--') && !['--project', '--takes'].includes(argv[i - 1]));
 const [brand, asset] = positional;
+const workspace = brand ? resolveWorkspace(root, {brand, project: projectArg(argv)}) : null;
 const takesIdx = argv.indexOf('--takes');
 const takes = takesIdx >= 0 ? parseInt(argv[takesIdx + 1], 10) : 3;
 
@@ -42,7 +44,7 @@ if (!Number.isFinite(takes) || takes < 1 || takes > 3) {
   process.exit(1);
 }
 
-const launchPath = join(root, 'props', `${brand}-launch.json`);
+const launchPath = join(workspace.propsDir, `${brand}-launch.json`);
 if (!existsSync(launchPath)) {
   console.error(`render-variants: missing ${launchPath}`);
   process.exit(1);
@@ -106,22 +108,22 @@ async function main() {
     baseProps = {...launch, formatWidth: 1920, formatHeight: 1080};
   }
 
-  const outDir = join(root, 'out', brand, 'marketing', 'variants');
+  const outDir = join(workspace.marketingDir, 'variants');
   const variants = [];
   takeDefs.forEach((def, i) => {
     const n = i + 1;
     const motionOverride = def.override ? def.override(brandJson.motion) : null;
     const props = {...baseProps, motionOverride};
     const outPath = join(outDir, `${asset}-v${n}.mp4`);
-    const {path, bytes} = renderTake({comp, outPath, props, frames});
+    const {path, bytes} = renderTake({comp, outPath, props, frames, publicDir: workspace.publicDir});
     const posterPath = posterFor(outPath);
-    const relPath = relative(root, path).replace(/\\/g, '/');
-    const relPoster = relative(root, posterPath).replace(/\\/g, '/');
+    const relPath = relative(workspace.projectRoot, path).replace(/\\/g, '/');
+    const relPoster = relative(workspace.projectRoot, posterPath).replace(/\\/g, '/');
     variants.push({id: `${asset}-v${n}`, path: relPath, label: def.label});
     console.log(`render-variants: ${asset}-v${n} (${def.label}) -> ${relPath} (${bytes} bytes); poster ${relPoster}`);
   });
 
-  const registered = registerVariants(brand, asset, variants);
+  const registered = registerVariants(workspace, asset, variants);
   console.log(
     registered
       ? `render-variants: registered ${variants.length} variant(s) on asset "${asset}" in run.json`

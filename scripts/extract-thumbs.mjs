@@ -47,6 +47,7 @@ import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join, resolve} from 'node:path';
 import {makeBaseLoader, withFormat} from './lib/matrix-props.mjs';
+import {projectArg, resolveWorkspace} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -92,12 +93,12 @@ const stillFrame = (c) => (c === 'LaunchVideo' ? LOGO_LEN + 70 : 40);
 // then applies pickFeatureFrame. Never throws: any missing/unreadable input or
 // import failure resolves to {frame: null, source: <why>} so the caller falls
 // through to the constant tier instead of dying mid-run.
-export async function resolveTimingFrame(brand, rootDir = root) {
-  const launchPath = join(rootDir, 'props', `${brand}-launch.json`);
+export async function resolveTimingFrame(brand, workspace) {
+  const launchPath = join(workspace.propsDir, `${brand}-launch.json`);
   if (!existsSync(launchPath)) return {frame: null, source: `no props/${brand}-launch.json`};
   try {
     const launch = JSON.parse(readFileSync(launchPath, 'utf8'));
-    const audioPath = join(rootDir, 'props', `${brand}-audio.json`);
+    const audioPath = join(workspace.propsDir, `${brand}-audio.json`);
     const lines = existsSync(audioPath) ? JSON.parse(readFileSync(audioPath, 'utf8')).lines ?? [] : [];
     // The demo duration that actually renders is the one EMBEDDED in the launch
     // props (Root.tsx calculateMetadata and judge-av-sync both read only that).
@@ -141,7 +142,8 @@ function pickPosterFrame(aspect, comp, base, timingLookup) {
 }
 
 const args = process.argv.slice(2);
-const brand = args.find((a) => !a.startsWith('--'));
+const brand = args.find((a, i) => !a.startsWith('--') && args[i - 1] !== '--project');
+const project = projectArg(args);
 const compIdx = args.indexOf('--comp');
 const comp = compIdx >= 0 ? args[compIdx + 1] : 'LaunchVideo';
 
@@ -169,13 +171,14 @@ for (let i = 0; i < args.length; i++) {
   perAspectFrameArgs[m[1]] = n;
 }
 
-const usage = 'usage: node scripts/extract-thumbs.mjs <brand> [--comp LaunchVideo] [--frame <n>] [--frame-<aspect> <n>]';
+const usage = 'usage: node scripts/extract-thumbs.mjs <brand> --project <product-repo> [--comp LaunchVideo] [--frame <n>] [--frame-<aspect> <n>]';
 
 async function main() {
   if (!brand) {
     console.error(usage);
     process.exit(1);
   }
+  const workspace = resolveWorkspace(root, {brand, project});
 
   const platforms = JSON.parse(readFileSync(join(root, 'scripts', 'platforms.json'), 'utf8')).filter(
     (p) => p.comp === comp,
@@ -185,18 +188,18 @@ async function main() {
     process.exit(1);
   }
 
-  const outDir = join(root, 'out', brand, 'thumbs');
+  const outDir = workspace.thumbsDir;
   const propsDir = join(outDir, '.props');
   mkdirSync(propsDir, {recursive: true});
 
-  const loadBase = makeBaseLoader(root, brand);
+  const loadBase = makeBaseLoader(workspace, brand);
 
   // scripts/lib/matrix-props.mjs's resolveBaseProps() exits the process if the base
   // props file is missing, so touch it once up front via loadBase for a clean error.
   loadBase(comp);
 
   const timingLookup =
-    comp === 'LaunchVideo' ? await resolveTimingFrame(brand) : {frame: null, source: 'timing lookup skipped (not LaunchVideo)'};
+    comp === 'LaunchVideo' ? await resolveTimingFrame(brand, workspace) : {frame: null, source: 'timing lookup skipped (not LaunchVideo)'};
 
   const aspectOf = (id) => id.replace(/^(launch|social)-/, '');
 
@@ -209,7 +212,7 @@ async function main() {
     writeFileSync(propsPath, JSON.stringify(props));
     const {frame, source} = pickPosterFrame(aspect, p.comp, base, timingLookup);
     const outFile = join(outDir, `thumb-${aspect}.jpg`);
-    const cmd = `npx remotion still ${p.comp} "${outFile}" --props="${propsPath}" --frame=${frame} --image-format=jpeg`;
+    const cmd = `npx remotion still ${p.comp} "${outFile}" --props="${propsPath}" --public-dir="${workspace.publicDir}" --frame=${frame} --image-format=jpeg`;
     console.log(
       `thumbs: ${aspect} (${p.width}x${p.height}) frame ${frame} [${source}] -> out/${brand}/thumbs/thumb-${aspect}.jpg`,
     );
@@ -221,7 +224,7 @@ async function main() {
       console.log(`thumbs: --image-format=jpeg failed, falling back to png: ${err.message}`);
       const pngFile = join(outDir, `thumb-${aspect}.png`);
       execSync(
-        `npx remotion still ${p.comp} "${pngFile}" --props="${propsPath}" --frame=${frame}`,
+        `npx remotion still ${p.comp} "${pngFile}" --props="${propsPath}" --public-dir="${workspace.publicDir}" --frame=${frame}`,
         {cwd: studio, stdio: 'inherit'},
       );
       if (!existsSync(pngFile)) {

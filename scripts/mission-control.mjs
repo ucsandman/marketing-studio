@@ -2,7 +2,7 @@
 // Replaces the one-shot static contact sheet: the operator watches the run
 // manifest fill in live and approves / requests redos per asset from the browser.
 //
-//   node scripts/mission-control.mjs <brandId> [--port 4600]
+//   node scripts/mission-control.mjs <brandId> --project <product-repo> [--port 4600]
 //
 // Zero npm deps (node:http/fs/path only). The manifest is written concurrently
 // by the running /marketing skill process, so run.json is re-read on every
@@ -10,6 +10,7 @@
 // POST re-reads the manifest at write time — never a stale in-memory copy.
 import http from 'node:http';
 import {execFileSync} from 'node:child_process';
+import {randomBytes, timingSafeEqual} from 'node:crypto';
 import {
   existsSync,
   readFileSync,
@@ -22,6 +23,8 @@ import {
 } from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, join, resolve, relative, isAbsolute, basename, extname} from 'node:path';
+import {createProductionReview, readJson, sha256File, sha256Json} from './lib/production-quality.mjs';
+import {projectArg, resolveWorkspace, resolveWorkspacePath} from './lib/workspace.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
@@ -42,7 +45,9 @@ const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(imp
 let brand = null;
 let port = 4600;
 let snapshotOnly = false;
-let brandOut, marketingDir, runPath, reviewPath, postsPath; // bound below once brand is known
+let workspace, brandOut, marketingDir, runPath, reviewPath, postsPath; // bound below once brand is known
+const csrfToken = randomBytes(32).toString('base64url');
+const CSRF_HEADER = 'x-mission-control-token';
 
 if (isMain) {
   const argv = process.argv.slice(2);
@@ -54,7 +59,7 @@ if (isMain) {
     else if (!a.startsWith('-') && !brand) brand = a;
   }
   if (!brand) {
-    console.error('usage: node scripts/mission-control.mjs <brandId> [--port 4600] [--snapshot-approved]');
+    console.error('usage: node scripts/mission-control.mjs <brandId> --project <product-repo> [--port 4600] [--snapshot-approved]');
     process.exit(1);
   }
   if (!Number.isFinite(port)) {
@@ -62,8 +67,14 @@ if (isMain) {
     process.exit(1);
   }
 
-  brandOut = join(root, 'out', brand); // media root — nothing is served from outside this dir
-  marketingDir = join(brandOut, 'marketing');
+  try {
+    workspace = resolveWorkspace(root, {brand, project: projectArg(argv)});
+  } catch (err) {
+    console.error(`mission-control: ${err.message}`);
+    process.exit(1);
+  }
+  brandOut = workspace.brandOut; // media root — nothing is served from outside this product workspace
+  marketingDir = workspace.marketingDir;
   runPath = join(marketingDir, 'run.json');
   reviewPath = join(marketingDir, 'review.json');
   postsPath = join(marketingDir, 'posts.json');
@@ -87,6 +98,38 @@ function atomicWrite(target, data) {
   renameSync(tmp, target); // rename over target is atomic; a concurrent reader sees old-or-new, never partial
 }
 
+function rejectJson(res, status, error) {
+  res.writeHead(status, {'content-type': 'application/json', 'cache-control': 'no-store'});
+  res.end(JSON.stringify({error}));
+}
+
+function validToken(value) {
+  if (typeof value !== 'string' || value.length !== csrfToken.length) return false;
+  return timingSafeEqual(Buffer.from(value), Buffer.from(csrfToken));
+}
+
+// Loopback binding prevents remote connections, but browsers can still submit a
+// cross-site POST to loopback. Every mutation therefore requires the exact UI
+// origin plus an unguessable process-local header that only this page receives.
+function authorizePost(req, res, path) {
+  const expectedHost = `127.0.0.1:${port}`;
+  if (req.headers.host !== expectedHost || req.headers.origin !== `http://${expectedHost}`) {
+    rejectJson(res, 403, 'forbidden origin');
+    return false;
+  }
+  if (!validToken(req.headers[CSRF_HEADER])) {
+    rejectJson(res, 403, 'invalid mission control token');
+    return false;
+  }
+  const expectsJson = path.startsWith('/asset/') || path.startsWith('/stage-review/') || path === '/posted' || path === '/production-review';
+  const mediaType = String(req.headers['content-type'] ?? '').split(';', 1)[0].trim().toLowerCase();
+  if (expectsJson && mediaType !== 'application/json') {
+    rejectJson(res, 415, 'content-type must be application/json');
+    return false;
+  }
+  return true;
+}
+
 // ---- approved-set snapshot -------------------------------------------------
 // Approving an asset copies its artifact into out/<brand>/approved/<YYYY-MM-DD>/.
 // That directory is the calibration set judge-drift's --ref wants: pointed at it,
@@ -104,9 +147,14 @@ function atomicWrite(target, data) {
 // missing artifact must not fail an approval the operator already made.
 export function snapshotApproved(brandOutDir, rel, {now = new Date()} = {}) {
   if (!rel) return null;
-  const src = resolve(brandOutDir, rel);
+  let src;
+  try {
+    src = resolveWorkspacePath({projectRoot: brandOutDir}, rel);
+  } catch {
+    return null;
+  }
   const inside = relative(brandOutDir, src);
-  if (!inside || inside.startsWith('..') || isAbsolute(inside)) return null; // never copy in from outside the media root
+  if (!inside) return null;
   try {
     if (!statSync(src).isFile()) return null;
   } catch {
@@ -256,10 +304,12 @@ function safeMediaPath(relPath) {
     return null;
   }
   if (decoded.includes('\0')) return null;
-  const full = resolve(brandOut, decoded);
-  const rel = relative(brandOut, full);
-  if (rel === '' || rel.startsWith('..') || isAbsolute(rel)) return null;
-  return full;
+  try {
+    const full = resolveWorkspacePath({projectRoot: brandOut}, decoded);
+    return relative(brandOut, full) ? full : null;
+  } catch {
+    return null;
+  }
 }
 
 function serveMedia(req, res, relPath) {
@@ -407,6 +457,122 @@ async function handleAssetPost(req, res, id) {
   res.end(JSON.stringify({ok: true, id, status: entry.status}));
 }
 
+// ---- POST /production-review ---------------------------------------------
+// The browser submits judgments, never hashes. The server binds each review to
+// the current evidence manifest so a stale render or source plan cannot inherit
+// an earlier approval.
+export function applyProductionReview(path, payload, evidence, {now = new Date()} = {}) {
+  if (payload?.reviewerRole === 'author') {
+    return {status: 400, body: {error: 'author self-review is not allowed'}};
+  }
+  const result = createProductionReview(payload, evidence, {now});
+  if (!result.entry) return result;
+  let rows = [];
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf8'));
+    if (Array.isArray(parsed)) rows = parsed;
+  } catch {
+    rows = [];
+  }
+  rows.push(result.entry);
+  mkdirSync(dirname(path), {recursive: true});
+  atomicWrite(path, JSON.stringify(rows, null, 2) + '\n');
+  return {...result, body: {...result.body, reviews: rows.filter((row) => row?.type === 'production-visual-review').length}};
+}
+
+async function handleProductionReviewPost(req, res) {
+  let payload;
+  try {
+    payload = JSON.parse((await readBody(req)) || '{}');
+  } catch {
+    res.writeHead(400, {'content-type': 'application/json'});
+    res.end(JSON.stringify({error: 'invalid json body'}));
+    return;
+  }
+  let evidence = null;
+  try {
+    evidence = readJson(join(marketingDir, 'production-evidence.json'));
+  } catch {
+    evidence = null;
+  }
+  const {status, body} = applyProductionReview(reviewPath, payload, evidence);
+  res.writeHead(status, {'content-type': 'application/json'});
+  res.end(JSON.stringify(body));
+}
+
+const STAGE_NAMES = new Set(['styleFrame', 'animatic']);
+
+export function applyStageReview({projectRoot, directionPath, stageName, payload, now = new Date()}) {
+  if (!STAGE_NAMES.has(stageName)) return {status: 404, body: {error: 'unknown review stage'}};
+  const action = payload?.action;
+  const name = typeof payload?.reviewerName === 'string' ? payload.reviewerName.trim() : '';
+  const role = payload?.reviewerRole;
+  const observations = typeof payload?.observations === 'string' ? payload.observations.trim() : '';
+  if (!['approved', 'revise'].includes(action)) return {status: 400, body: {error: 'action must be approved or revise'}};
+  if (!name || !['director', 'operator', 'independent'].includes(role)) {
+    return {status: 400, body: {error: 'a named director, operator, or independent reviewer is required'}};
+  }
+  if (!observations) return {status: 400, body: {error: 'review observations are required'}};
+
+  let direction;
+  try {
+    direction = readJson(resolveWorkspacePath({projectRoot}, directionPath));
+  } catch {
+    return {status: 404, body: {error: 'direction record is missing or outside the product repository'}};
+  }
+  const stage = direction?.[stageName];
+  if (!stage?.artifact || !stage?.review) return {status: 409, body: {error: `${stageName} artifact and review paths are not declared`}};
+  let artifactPath;
+  let stageReviewPath;
+  try {
+    artifactPath = resolveWorkspacePath({projectRoot}, stage.artifact);
+    stageReviewPath = resolveWorkspacePath({projectRoot}, stage.review);
+  } catch {
+    return {status: 400, body: {error: `${stageName} path escapes the product repository`}};
+  }
+  if (!existsSync(artifactPath) || !statSync(artifactPath).isFile()) {
+    return {status: 409, body: {error: `${stageName} artifact is missing`}};
+  }
+  if (extname(stageReviewPath).toLowerCase() !== '.json' || stageReviewPath === artifactPath || stageReviewPath === directionPath) {
+    return {status: 400, body: {error: `${stageName} review path is not a safe JSON sidecar`}};
+  }
+  const artifactSha256 = sha256File(artifactPath);
+  if (stage.sha256 && stage.sha256 !== artifactSha256) {
+    return {status: 409, body: {error: `${stageName} artifact hash does not match the direction record`}};
+  }
+  const record = {
+    type: 'stage-review',
+    stage: stageName,
+    action,
+    approved: action === 'approved',
+    artifactSha256,
+    reviewer: {name, role},
+    observations,
+    at: now.toISOString(),
+  };
+  mkdirSync(dirname(stageReviewPath), {recursive: true});
+  atomicWrite(stageReviewPath, JSON.stringify(record, null, 2) + '\n');
+  return {status: 200, body: {ok: true, stage: stageName, action, artifactSha256}};
+}
+
+async function handleStageReviewPost(req, res, stageName) {
+  let payload;
+  try {
+    payload = JSON.parse((await readBody(req)) || '{}');
+  } catch {
+    rejectJson(res, 400, 'invalid json body');
+    return;
+  }
+  const result = applyStageReview({
+    projectRoot: workspace.projectRoot,
+    directionPath: join(marketingDir, 'direction.json'),
+    stageName,
+    payload,
+  });
+  res.writeHead(result.status, {'content-type': 'application/json', 'cache-control': 'no-store'});
+  res.end(JSON.stringify(result.body));
+}
+
 // ---- POST /posted ----------------------------------------------------------
 // Records where a variant actually went live. posts.json is not a new format —
 // it is the input scripts/fetch-results.mjs already reads (array of {platform,
@@ -523,14 +689,18 @@ export function runCliScript(scriptPath, args, {timeoutMs = 60_000} = {}) {
   }
 }
 
+export function workspaceCliArgs(brandId, projectRoot) {
+  return [brandId, '--project', projectRoot];
+}
+
 function handleReviewInMagnetic(res) {
-  const result = runCliScript(join(root, 'scripts', 'review-in-magnetic.mjs'), [brand]);
+  const result = runCliScript(join(root, 'scripts', 'review-in-magnetic.mjs'), workspaceCliArgs(brand, workspace.projectRoot));
   res.writeHead(result.ok ? 200 : 502, {'content-type': 'application/json'});
   res.end(JSON.stringify(result));
 }
 
 function handlePullVerdicts(res) {
-  const result = runCliScript(join(root, 'scripts', 'pull-magnetic-verdicts.mjs'), [brand]);
+  const result = runCliScript(join(root, 'scripts', 'pull-magnetic-verdicts.mjs'), workspaceCliArgs(brand, workspace.projectRoot));
   res.writeHead(result.ok ? 200 : 502, {'content-type': 'application/json'});
   res.end(JSON.stringify(result));
 }
@@ -542,7 +712,11 @@ function handlePullVerdicts(res) {
 // ponytail: blocks the event loop like the other two run-level actions; move to
 // execFile + a job id if a second long-running publisher lands.
 function handlePublishBluesky(res) {
-  const result = runCliScript(join(root, 'scripts', 'publish-bluesky.mjs'), [brand], {timeoutMs: 240_000});
+  const result = runCliScript(
+    join(root, 'scripts', 'publish-bluesky.mjs'),
+    workspaceCliArgs(brand, workspace.projectRoot),
+    {timeoutMs: 240_000},
+  );
   res.writeHead(result.ok ? 200 : 502, {'content-type': 'application/json'});
   res.end(JSON.stringify(result));
 }
@@ -709,6 +883,96 @@ function readReview() {
   }
 }
 
+export function readProductionState(dir = marketingDir, review = readReview(), paths = {}) {
+  const evidencePath = join(dir, 'production-evidence.json');
+  const reportPath = join(dir, 'judge-production.json');
+  let evidence = null;
+  let report = null;
+  try { evidence = readJson(evidencePath); } catch { evidence = null; }
+  try { report = readJson(reportPath); } catch { report = null; }
+  const latestReview = (Array.isArray(review) ? review : []).filter((row) => row?.type === 'production-visual-review').at(-1) ?? null;
+  const brandRoot = paths.brandOutDir ?? brandOut;
+  const project = paths.projectRoot ?? workspace?.projectRoot;
+  let renderUrl = null;
+  if (evidence?.renderPath && brandRoot && project) {
+    const full = resolve(project, evidence.renderPath);
+    const inside = relative(brandRoot, full);
+    if (inside && !inside.startsWith('..') && !isAbsolute(inside)) renderUrl = mediaUrl(inside.replaceAll('\\', '/'));
+  }
+  const sheetExists = existsSync(join(dir, 'stills', 'Production-sheet.html'));
+  return {
+    ready: Boolean(evidence),
+    planSha256: evidence?.planSha256 ?? null,
+    renderSha256: evidence?.renderSha256 ?? null,
+    sourceBundleSha256: evidence?.sourceBundleSha256 ?? null,
+    shots: evidence?.shots ?? 0,
+    samples: evidence?.sampleCount ?? evidence?.samples?.length ?? 0,
+    sheetUrl: sheetExists ? mediaUrl('marketing/stills/Production-sheet.html') : null,
+    renderUrl,
+    report: report ? {verdict: report.verdict ?? 'UNKNOWN', summary: report.summary ?? null, generatedAt: report.generatedAt ?? null} : null,
+    latestReview: latestReview ? {
+      action: latestReview.action,
+      at: latestReview.at,
+      reviewer: latestReview.reviewer,
+      wouldShare: latestReview.wouldShare,
+      scores: latestReview.scores,
+      defects: latestReview.defects?.length ?? 0,
+      current: Boolean(evidence) && latestReview.planSha256 === evidence.planSha256 && latestReview.renderSha256 === evidence.renderSha256 && latestReview.sourceBundleSha256 === evidence.sourceBundleSha256 && latestReview.evidenceSha256 === sha256Json(evidence),
+    } : null,
+  };
+}
+
+export function readStageStates(dir = marketingDir, paths = {}) {
+  const project = paths.projectRoot ?? workspace?.projectRoot;
+  const brandRoot = paths.brandOutDir ?? brandOut;
+  let direction = null;
+  try { direction = readJson(join(dir, 'direction.json')); } catch { direction = null; }
+  return ['styleFrame', 'animatic'].map((stageName) => {
+    const label = stageName === 'styleFrame' ? 'Style frame' : 'Audio-bearing animatic';
+    const stage = direction?.[stageName];
+    const blank = {stageName, label, declared: Boolean(stage), ready: false, artifactUrl: null, kind: null, review: null};
+    if (!project || !brandRoot || !stage?.artifact || !stage?.review) return {...blank, error: `${label} artifact and review paths are not declared.`};
+    let artifactPath;
+    let stageReviewPath;
+    try {
+      artifactPath = resolveWorkspacePath({projectRoot: project}, stage.artifact);
+      stageReviewPath = resolveWorkspacePath({projectRoot: project}, stage.review);
+    } catch {
+      return {...blank, error: `${label} path is outside the product repository.`};
+    }
+    if (!existsSync(artifactPath) || !statSync(artifactPath).isFile()) return {...blank, error: `${label} artifact is missing.`};
+    if (extname(stageReviewPath).toLowerCase() !== '.json' || stageReviewPath === artifactPath) {
+      return {...blank, error: `${label} review path is not a safe JSON sidecar.`};
+    }
+    const artifactSha256 = sha256File(artifactPath);
+    if (stage.sha256 && stage.sha256 !== artifactSha256) return {...blank, artifactSha256, error: `${label} artifact hash is stale.`};
+    let stageReview = null;
+    try { stageReview = readJson(stageReviewPath); } catch { stageReview = null; }
+    const inside = relative(brandRoot, artifactPath);
+    const artifactUrl = inside && !inside.startsWith('..') && !isAbsolute(inside)
+      ? mediaUrl(inside.replaceAll('\\', '/'))
+      : null;
+    const extension = extname(artifactPath).toLowerCase();
+    const kind = VIDEO_EXT.has(extension) ? 'video' : IMAGE_EXT.has(extension) ? 'image' : null;
+    const current = stageReview?.artifactSha256 === artifactSha256;
+    return {
+      ...blank,
+      ready: Boolean(artifactUrl && kind),
+      artifactUrl,
+      kind,
+      artifactSha256,
+      error: artifactUrl && kind ? null : `${label} artifact is not previewable inside this brand workspace.`,
+      review: stageReview ? {
+        action: stageReview.action,
+        at: stageReview.at,
+        reviewer: stageReview.reviewer,
+        observations: stageReview.observations,
+        current,
+      } : null,
+    };
+  });
+}
+
 // ---- state -----------------------------------------------------------------
 // Serves the run manifest, each asset enriched with a computed _artifact
 // (url/kind/sizeBytes) resolved against the disk at read time. The file is
@@ -720,7 +984,8 @@ function serveState(res) {
     res.end(JSON.stringify({error: 'no run found'}));
     return;
   }
-  const verdictsByAsset = latestVerdictsByAsset(readReview());
+  const review = readReview();
+  const verdictsByAsset = latestVerdictsByAsset(review);
   const enriched = {
     ...run,
     assets: Array.isArray(run.assets) ? run.assets.map((a) => enrichAsset(a, verdictsByAsset)) : [],
@@ -728,6 +993,8 @@ function serveState(res) {
     _results: readResults(),
     _posted: readPosts(postsPath),
     _staleness: readStaleness(),
+    _stages: readStageStates(marketingDir),
+    _production: readProductionState(marketingDir, review),
   };
   res.writeHead(200, {'content-type': 'application/json', 'cache-control': 'no-store'});
   res.end(JSON.stringify(enriched));
@@ -740,7 +1007,7 @@ function noRunPage() {
 <div class="empty">
   <h1>No run found</h1>
   <p>Expected a manifest at:</p>
-  <code>out/${escapeHtml(brand)}/marketing/run.json</code>
+  <code>${escapeHtml(runPath)}</code>
   <p class="dim">Start a <b>/marketing</b> run for <b>${escapeHtml(brand)}</b>, then reload. This page re-checks every 3s.</p>
 </div>
 <script>setInterval(function(){fetch('/state').then(function(r){if(r.ok)location.reload();}).catch(function(){});},3000);</script>`;
@@ -769,6 +1036,10 @@ header .started{color:#8a929b;font-size:13px;}
 .mcstatus{font-size:12px;color:#8ce6a5;}
 .mcerror{margin:0;padding:10px 22px;background:#2a1414;border-bottom:1px solid #5a2323;color:#ff8a8a;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;white-space:pre-wrap;word-break:break-word;}
 .mcerror[hidden]{display:none;}
+.production-review{margin:16px 22px;padding:16px;background:#14171b;border:1px solid #2b3138;border-radius:12px;}
+.stage-reviews{margin:16px 22px;display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px}.stage-card{padding:16px;background:#14171b;border:1px solid #2b3138;border-radius:12px}.stage-card h2{font-size:16px;margin:0 0 6px}.stage-media img,.stage-media video{display:block;width:100%;max-height:48vh;object-fit:contain;background:#060708;border-radius:8px;margin:10px 0}.stage-review-meta{font-size:12px;color:#8a929b;margin:7px 0}.stage-card input,.stage-card select,.stage-card textarea{width:100%;background:#0d0f12;color:#e6e8eb;border:1px solid #2b3138;border-radius:7px;padding:7px;margin-top:7px}.stage-actions{display:flex;gap:8px;margin-top:9px}.stage-missing{color:#e6b45a}.stage-approved{color:#8ce6a5}
+.production-review h2{margin:0 0 6px;font-size:16px}.production-meta{color:#8a929b;font-size:12px;margin-bottom:12px}.production-links{display:flex;gap:12px;margin:8px 0}.production-links a{color:#7fb2ff}.review-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}.review-grid label,.review-checks label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:#c9d1d9}.review-checks{display:flex;flex-wrap:wrap;gap:14px;margin:10px 0}.review-checks label{flex-direction:row;align-items:center}.production-review input,.production-review select{background:#0d0f12;color:#e6e8eb;border:1px solid #2b3138;border-radius:7px;padding:7px}.production-review textarea{margin-top:9px}.production-actions{display:flex;gap:9px;margin-top:10px}.production-status{font-size:12px;color:#8ce6a5;margin-left:8px}.production-missing{color:#e6b45a;}
+.production-player{display:block;width:100%;max-height:70vh;background:#060708;border:1px solid #2b3138;border-radius:9px;margin:12px 0}.production-gate{display:inline-block;border-radius:6px;padding:4px 9px;font-size:12px;font-weight:750;letter-spacing:.04em}.production-gate.incomplete{color:#ffb4a8;background:#351716;border:1px solid #71322d}.production-gate.complete{color:#8ce6a5;background:#123023;border:1px solid #256b45}.production-actions .approve{flex:none}.production-status[role=alert]{color:#ffb4a8;min-height:1.4em;display:inline-flex;align-items:center}
 .judge{position:relative;}
 .judge summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-variant-numeric:tabular-nums;padding:3px 10px;border-radius:999px;border:1px solid #2b3138;background:#181c21;}
 .judge summary::-webkit-details-marker{display:none;}
@@ -786,6 +1057,7 @@ header .started{color:#8a929b;font-size:13px;}
 .results-chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;border:1px solid #284876;background:#13233d;color:#7fb2ff;font-variant-numeric:tabular-nums;}
 .vstats{color:#8a929b;font-size:11px;font-variant-numeric:tabular-nums;margin-left:4px;}
 .wrap{padding:22px;display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:18px;max-width:1500px;margin:0 auto;}
+.legacy-assets{padding:4px 22px 0;max-width:1500px;margin:0 auto}.legacy-assets h2{font-size:15px;margin:12px 0 2px}.legacy-assets p{margin:0;color:#8a929b;font-size:12px}
 .card{background:#14171b;border:1px solid #262b31;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;}
 .card-head{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #21262c;}
 .card-head h2{margin:0;font-size:14px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -850,11 +1122,19 @@ function consolePage() {
   <span class="mcstatus" id="mcStatus"></span>
 </div>
 <pre class="mcerror" id="mcError" hidden></pre>
+<section class="stage-reviews" id="stageReviews"></section>
+<section class="production-review" id="productionReview"></section>
+<section class="legacy-assets"><h2>Legacy asset tracking</h2><p>Asset-level status and approvals below do not satisfy the hash-bound production gate above.</p></section>
 <main class="wrap" id="cards"></main>
 <script>
+const CSRF_TOKEN = ${JSON.stringify(csrfToken)};
+const MC_HEADERS = {'x-mission-control-token': CSRF_TOKEN};
 const STATUSES = ['planned','rendered','approved','delivered'];
 const cardsEl = document.getElementById('cards');
 const lastRender = {}; // assetId -> serialized entry, so we only rebuild changed cards
+const stageEl=document.getElementById('stageReviews');
+const productionEl=document.getElementById('productionReview');
+let lastProductionKey='';
 
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function fmtSize(b){if(b==null)return null;if(b<1024)return b+' B';if(b<1048576)return (b/1024).toFixed(0)+' KB';return (b/1048576).toFixed(1)+' MB';}
@@ -902,6 +1182,66 @@ function verdictHtml(e){
   return '<div class="verdict-badge '+cls+'">magnetic: '+esc(action)+(v.note?' — '+esc(v.note):'')+'</div>';
 }
 
+function scoreSelect(key,label){
+  return '<label>'+esc(label)+'<select name="'+esc(key)+'" required><option value="">Choose 1–5</option>'+[1,2,3,4,5].map(n=>'<option value="'+n+'">'+n+(n<4?' · revise':' · approval-eligible')+'</option>').join('')+'</select></label>';
+}
+function reviewerFields(){
+  return '<label>Reviewer name<input name="reviewerName" required></label><label>Reviewer role<select name="reviewerRole"><option value="director">Director</option><option value="operator">Operator</option><option value="independent">Independent reviewer</option></select></label>';
+}
+function renderStages(stages){
+  stageEl.innerHTML=(stages||[]).map(stage=>{
+    const review=stage.review;
+    const reviewText=review
+      ?'<div class="stage-review-meta '+(review.current&&review.action==='approved'?'stage-approved':'')+'">'+esc(review.action||'reviewed')+' by '+esc(review.reviewer?.name||'unknown')+(review.current?'':' · stale')+(review.observations?' · '+esc(review.observations):'')+'</div>'
+      :'<div class="stage-review-meta">No human review recorded.</div>';
+    if(!stage.ready)return '<article class="stage-card" data-stage="'+esc(stage.stageName)+'"><h2>'+esc(stage.label)+'</h2><p class="stage-missing">'+esc(stage.error||'Stage artifact is missing.')+'</p>'+reviewText+'</article>';
+    const media=stage.kind==='video'
+      ?'<video controls preload="metadata" src="'+esc(stage.artifactUrl)+'"></video>'
+      :'<img loading="lazy" src="'+esc(stage.artifactUrl)+'" alt="'+esc(stage.label)+'">';
+    return '<article class="stage-card" data-stage="'+esc(stage.stageName)+'"><h2>'+esc(stage.label)+'</h2><div class="stage-media">'+media+'</div>'+reviewText
+      +'<form data-stage-form="'+esc(stage.stageName)+'">'+reviewerFields()+'<textarea name="observations" required placeholder="What you saw and why this stage is ready or needs revision"></textarea><div class="stage-actions"><button class="btn approve" type="submit" value="approved">Approve stage</button><button class="btn redo" type="submit" value="revise">Revise stage</button><span class="production-status" role="alert"></span></div></form></article>';
+  }).join('');
+}
+
+stageEl.addEventListener('submit',async ev=>{
+  ev.preventDefault();const form=ev.target;const data=new FormData(form);const stageName=form.dataset.stageForm;const status=form.querySelector('[role=alert]');
+  const body={action:ev.submitter?.value||'revise',reviewerName:data.get('reviewerName'),reviewerRole:data.get('reviewerRole'),observations:data.get('observations')};
+  status.textContent='Saving…';
+  try{const r=await fetch('/stage-review/'+encodeURIComponent(stageName),{method:'POST',headers:{...MC_HEADERS,'content-type':'application/json'},body:JSON.stringify(body)});const result=await r.json().catch(()=>({}));if(!r.ok){status.textContent=result.error||('HTTP '+r.status);return;}status.textContent='Stage review recorded.';refresh();}catch(err){status.textContent=err.message;}
+});
+function renderProduction(p){
+  const key=JSON.stringify(p||null);
+  if(key===lastProductionKey)return;
+  lastProductionKey=key;
+  if(!p||!p.ready){productionEl.innerHTML='<h2>Production visual review</h2><p class="production-missing">No rendered production evidence yet. Generate the production contact sheet before review.</p>';return;}
+  const report=p.report?'<strong>'+esc(p.report.verdict)+'</strong>':'not run';
+  const latest=p.latestReview?esc(p.latestReview.action)+' by '+esc(p.latestReview.reviewer?.name||'unknown')+(p.latestReview.current?'':' (stale for current evidence)'):'none';
+  const links=(p.sheetUrl?'<a href="'+esc(p.sheetUrl)+'" target="_blank">Annotated shot sheet &#8599;</a>':'')+(p.renderUrl?'<a href="'+esc(p.renderUrl)+'" target="_blank">Final render &#8599;</a>':'');
+  const currentApproved=p.latestReview&&p.latestReview.current&&p.latestReview.action==='approved';
+  const gatePassed=currentApproved&&p.report&&p.report.verdict==='PASS';
+  const gateLabel=gatePassed?'PRODUCTION GATE PASS':currentApproved?'REVIEW CURRENT · GATE RERUN REQUIRED':'INCOMPLETE · REVIEW REQUIRED';
+  const gate='<span class="production-gate '+(gatePassed?'complete':'incomplete')+'">'+gateLabel+'</span>';
+  const player=p.renderUrl?'<video class="production-player" controls preload="metadata" src="'+esc(p.renderUrl)+'"></video>':'<p class="production-missing">The final render is unavailable. Approval is blocked.</p>';
+  productionEl.innerHTML='<h2>Production visual review</h2>'+gate+'<div class="production-meta">'+p.shots+' shots · '+p.samples+' rendered samples · gate '+report+' · latest review '+latest+'</div>'+player+'<div class="production-links">'+links+'</div>'
+    +'<form id="productionForm" novalidate><div class="review-grid">'+reviewerFields()
+    +scoreSelect('storyClarity','Story clarity')+scoreSelect('visualHierarchy','Visual hierarchy')+scoreSelect('motionIntent','Motion intent')+scoreSelect('productReadability','Product readability')+scoreSelect('endingConfidence','Ending confidence')+'</div>'
+    +'<textarea name="observations" required placeholder="What you actually saw: strongest moment, weakest moment, and why"></textarea>'
+    +'<textarea name="blockingDefects" placeholder="Blocking defects, one per line (optional)"></textarea><textarea name="otherDefects" placeholder="Major defects, one per line (optional; any one blocks PASS)"></textarea>'
+    +'<div class="review-checks"><label><input type="checkbox" name="watchedFullRender">I watched the full render</label><label><input type="checkbox" name="heardAudio">I heard the full soundtrack</label><label><input type="checkbox" name="wouldShare">I would share this</label></div>'
+    +'<div class="production-actions"><button class="btn approve" type="submit" value="approved">Approve production</button><button class="btn redo" type="submit" value="revise">Needs revision</button><span class="production-status" id="productionMessage" role="alert" aria-live="polite"></span></div></form>';
+}
+
+productionEl.addEventListener('submit',async ev=>{
+  ev.preventDefault();const form=ev.target;const data=new FormData(form);const action=ev.submitter?.value||'revise';
+  const defects=[];
+  String(data.get('blockingDefects')||'').split(/\\r?\\n/).filter(Boolean).forEach(description=>defects.push({severity:'blocking',category:'perceptual',description}));
+  String(data.get('otherDefects')||'').split(/\\r?\\n/).filter(Boolean).forEach(description=>defects.push({severity:'major',category:'perceptual',description}));
+  const scores={};['storyClarity','visualHierarchy','motionIntent','productReadability','endingConfidence'].forEach(k=>scores[k]=Number(data.get(k)));
+  const body={action,reviewerName:data.get('reviewerName'),reviewerRole:data.get('reviewerRole'),observations:data.get('observations'),watchedFullRender:data.get('watchedFullRender')==='on',heardAudio:data.get('heardAudio')==='on',wouldShare:data.get('wouldShare')==='on',scores,defects};
+  const status=form.querySelector('#productionMessage');status.textContent='Saving…';
+  try{const r=await fetch('/production-review',{method:'POST',headers:{...MC_HEADERS,'content-type':'application/json'},body:JSON.stringify(body)});const result=await r.json().catch(()=>({}));if(!r.ok){status.textContent=result.error||('HTTP '+r.status);return;}status.textContent='Review recorded.';lastProductionKey='';refresh();}catch(err){status.textContent=err.message;}
+});
+
 function cardHtml(e){
   const status=STATUSES.indexOf(e.status)>=0?e.status:'unknown';
   let media='<div class="placeholder">no artifact yet</div>';
@@ -936,7 +1276,7 @@ function cardHtml(e){
     +'<div class="media">'+media+'</div>'
     +meta+redo+verdictHtml(e)+stillsHtml(e)+variants
     +'<div class="controls">'
-      +'<div class="row"><button class="btn approve'+(approvedLike?' done':'')+'" data-act="approve"'+(approvedLike?' disabled':'')+'>'+(approvedLike?'Approved ✓':'Approve')+'</button>'
+      +'<div class="row"><button class="btn approve'+(approvedLike?' done':'')+'" data-act="approve"'+(approvedLike?' disabled':'')+'>'+(approvedLike?'Asset approved ✓':'Approve asset')+'</button>'
         +'<button class="btn posted" data-act="posted">Mark posted</button></div>'
       +'<textarea placeholder="Redo note: what should change"></textarea>'
       +'<div class="row"><button class="btn redo" data-act="redo">Request redo</button></div>'
@@ -958,7 +1298,7 @@ async function act(id,action,cardEl){
   const actBtn=cardEl.querySelector('button[data-act="'+action+'"]');const prevLabel=actBtn?actBtn.textContent:'';
   if(actBtn)actBtn.textContent=action==='approve'?'Approving…':'Requesting…';
   try{
-    const r=await fetch('/asset/'+encodeURIComponent(id),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+    const r=await fetch('/asset/'+encodeURIComponent(id),{method:'POST',headers:{...MC_HEADERS,'content-type':'application/json'},body:JSON.stringify(body)});
     if(!r.ok){const t=await r.text();alert('Action failed: '+t);}
   }catch(err){alert('Action failed: '+err.message);if(actBtn)actBtn.textContent=prevLabel;}
   finally{btns.forEach(b=>b.disabled=false);}
@@ -977,7 +1317,7 @@ async function markPosted(id,cardEl){
   if(variant!==undefined)body.variant=variant;
   const btns=cardEl.querySelectorAll('button');btns.forEach(b=>b.disabled=true);
   try{
-    const r=await fetch('/posted',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+    const r=await fetch('/posted',{method:'POST',headers:{...MC_HEADERS,'content-type':'application/json'},body:JSON.stringify(body)});
     const j=await r.json().catch(()=>({}));
     if(!r.ok)alert('Mark posted failed: '+(j.error||('HTTP '+r.status)));
   }catch(err){alert('Mark posted failed: '+err.message);}
@@ -1006,7 +1346,7 @@ async function runMcAction(path,btn,otherBtn,successText){
   mcStatusEl.textContent='';
   btn.disabled=true;otherBtn.disabled=true;
   try{
-    const r=await fetch(path,{method:'POST'});
+    const r=await fetch(path,{method:'POST',headers:MC_HEADERS});
     const body=await r.json().catch(()=>({}));
     if(!r.ok||body.ok===false){showMcError(body.error||('request failed: HTTP '+r.status));return;}
     mcStatusEl.textContent=successText;
@@ -1072,6 +1412,8 @@ function renderAdvisories(run){
 let lastResults=null;
 function render(run){
   renderHeader(run);
+  renderStages(run._stages);
+  renderProduction(run._production);
   // results feed variant stat lines inside cards: when they change, force
   // affected cards to re-render by clearing their lastRender entries.
   const resKey=JSON.stringify(run._results||null);
@@ -1126,7 +1468,7 @@ if (isMain) {
     }
     const day = new Date().toISOString().slice(0, 10);
     console.log(
-      `mission-control: snapshotted ${copied} of ${approved.length} approved asset(s) -> out/${brand}/approved/${day}/`,
+      `mission-control: snapshotted ${copied} of ${approved.length} approved asset(s) -> ${join(brandOut, 'approved', day)}`,
     );
     process.exit(0);
   }
@@ -1134,6 +1476,8 @@ if (isMain) {
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://localhost');
     const path = url.pathname;
+
+    if (req.method === 'POST' && !authorizePost(req, res, path)) return;
 
     if (req.method === 'POST' && path.startsWith('/asset/')) {
       const id = decodeURIComponent(path.slice('/asset/'.length));
@@ -1154,6 +1498,26 @@ if (isMain) {
           res.writeHead(500, {'content-type': 'application/json'});
           res.end(JSON.stringify({error: 'internal error'}));
         }
+      });
+      return;
+    }
+
+    if (req.method === 'POST' && path === '/production-review') {
+      handleProductionReviewPost(req, res).catch((err) => {
+        console.error('mission-control: POST /production-review error', err);
+        if (!res.headersSent) {
+          res.writeHead(500, {'content-type': 'application/json'});
+          res.end(JSON.stringify({error: 'internal error'}));
+        }
+      });
+      return;
+    }
+
+    if (req.method === 'POST' && path.startsWith('/stage-review/')) {
+      const stageName = decodeURIComponent(path.slice('/stage-review/'.length));
+      handleStageReviewPost(req, res, stageName).catch((err) => {
+        console.error('mission-control: POST stage review error', err);
+        if (!res.headersSent) rejectJson(res, 500, 'internal error');
       });
       return;
     }
@@ -1193,12 +1557,32 @@ if (isMain) {
       const run = readRun();
       if (!run) {
         console.error(`mission-control: no run manifest at ${runPath}`);
-        res.writeHead(200, {'content-type': 'text/html; charset=utf-8'});
+        res.writeHead(200, {
+          'content-type': 'text/html; charset=utf-8',
+          'content-security-policy': "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' data:; media-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+          'x-frame-options': 'DENY',
+          'x-content-type-options': 'nosniff',
+          'referrer-policy': 'no-referrer',
+          'cache-control': 'no-store',
+        });
         res.end(noRunPage());
         return;
       }
-      res.writeHead(200, {'content-type': 'text/html; charset=utf-8'});
+      res.writeHead(200, {
+        'content-type': 'text/html; charset=utf-8',
+        'content-security-policy': "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' data:; media-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+        'x-frame-options': 'DENY',
+        'x-content-type-options': 'nosniff',
+        'referrer-policy': 'no-referrer',
+        'cache-control': 'no-store',
+      });
       res.end(consolePage());
+      return;
+    }
+
+    if (path === '/favicon.ico') {
+      res.writeHead(204, {'cache-control': 'no-store'});
+      res.end();
       return;
     }
 
@@ -1211,11 +1595,11 @@ if (isMain) {
     process.exit(1);
   });
 
-  server.listen(port, () => {
-    const url = `http://localhost:${port}/`;
+  server.listen(port, '127.0.0.1', () => {
+    const url = `http://127.0.0.1:${port}/`;
     if (!existsSync(runPath)) {
       console.error(`mission-control: WARNING no manifest at ${runPath} yet — serving a "no run found" page until it appears.`);
     }
-    console.log(`mission-control: ${brand} console at ${url}  (manifest: out/${brand}/marketing/run.json)`);
+    console.log(`mission-control: ${brand} console at ${url}  (manifest: ${runPath})`);
   });
 }
