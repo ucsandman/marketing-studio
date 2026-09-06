@@ -188,7 +188,9 @@ scripts/           props builders, staging, statics, smoke, copy linter, brief
                    gatherer, storyboard board, export matrix, captions, thumbs,
                    post kit, contact sheets, footage cache, SFX library,
                    Mission Control review server
-docs/PLAYBOOK.md   the operational reference: engine map, onboarding, gotchas
+docs/PLAYBOOK.md   the operational reference: engine map, onboarding, process, delivery contract
+docs/playbook/     the verified gotchas by topic (remotion, capture, blender, unreal, audio, ...);
+                   read only the topic you are working in
 docs/DECISIONS.md  durable architecture decisions, newest first
 reference/         read-only reference material carried in from retired repos
 launch.py          single-command health check + Remotion Studio
@@ -212,8 +214,8 @@ node scripts/build-captions.mjs <brand> --project <product> --check
 node scripts/mission-control.mjs <brand> --project <product>
 node scripts/master-audio.mjs <product>/marketing/assets/<brand>/launch.mp4 --project <product>
 node scripts/verify-cue.mjs <product>/marketing/assets/<brand>/launch.mp4 2 1.5
-node scripts/judge-motion.mjs <brand> --project <product> # motion-craft + motion/grade token bands
-node scripts/judge-drift.mjs <brand> --project <product>
+node scripts/gates.mjs <brand> --project <product> [--strict]   # all seven gates, one row each, drift last; logs in <workspace>/marketing/reports/gates/
+node scripts/judge-motion.mjs <brand> --project <product> # one gate on its own, full report
 node scripts/build-postkit.mjs <brand> --project <product> --production
 node launch/dist/index.js post <product-dir> --all      # preview every platform post with the kit attached (dry-run is the default)
 node launch/dist/index.js post <product-dir> --all --live   # publish for real, through the ledger and media pre-flight
@@ -249,15 +251,41 @@ The `/marketing` skill does all of this for you from your product repo's design 
 ## Verification
 
 ```bash
+node scripts/verify.mjs    # root tests, studio tests, studio lint, smoke: one row each, logs in out/verify/
 python launch.py --check   # toolchain health
-node scripts/smoke.mjs     # renders frame 0 of every composition; must stay green
-cd studio && npm test      # brand schema, motion standards, timing libs
-cd studio && npm run lint  # eslint + tsc
-node --test scripts/*.test.mjs scripts/lib/*.test.mjs feeders/capture/*.test.mjs feeders/audio/*.test.mjs feeders/comfy/*.test.mjs
 python -m unittest discover -s feeders -p 'test_workspace.py' -v
 ```
 
+The four suites can also run on their own (`node scripts/smoke.mjs`, `cd studio && npm test`,
+`cd studio && npm run lint`, and the `node --test` line in `.github/workflows/verify.yml`).
+`verify.mjs` exists so an agent reads four lines instead of 700.
+
 Every asset prop is nullable with a placeholder, so the smoke test passes on a clean clone with no captures, no Blender, and no API keys.
+
+## Speed and token budget
+
+Measured 2026-09-06 on a 24-core RTX 3070 Ti workstation (Remotion 4.0.486), the render
+harness is not where time goes: `remotion bundle` is 1.5 s warm and Chrome renders a
+1080p frame in about 0.4 s. What moved the numbers:
+
+- **GPU rendering is the default.** `studio/remotion.config.ts` sets
+  `chrome-for-testing` + `angle`: LaunchVideo and LogoReveal render 4 to 5x faster
+  (60 frames: 28 to 33 s down to 6 to 8 s), stills unchanged, output visually identical.
+  `REMOTION_GPU=0` restores the headless shell; CI never downloads Chrome for Testing.
+- **Renders are quiet.** Every script shells to Remotion through
+  `scripts/lib/remotion.mjs`: the checked-in CLI via Node (the `npx` shim fails with
+  `EINVAL` on Windows), `--log=error`, one summary line per render instead of one
+  progress line per frame, the last 40 log lines when a render dies.
+  `REMOTION_VERBOSE=1` shows everything.
+- **Gates and suites print rows, not reports.** `scripts/gates.mjs` and
+  `scripts/verify.mjs` write the full output to disk and print one line per gate or
+  suite with the counts they processed.
+- **Agents read the topic, not the book.** `docs/PLAYBOOK.md` is the short reference;
+  the gotchas live in `docs/playbook/<topic>.md` and each skill names only the files
+  its recipe needs.
+
+The design and the measurements are in
+[`docs/superpowers/specs/2026-09-06-speed-and-token-budget-design.md`](docs/superpowers/specs/2026-09-06-speed-and-token-budget-design.md).
 
 ## launch/ (distribution layer)
 

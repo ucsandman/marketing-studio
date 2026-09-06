@@ -430,3 +430,30 @@ with 348 packages.
 **Prevention.** Call JavaScript CLIs through Node on Windows, retain child-process
 identity for probes, and stop only the verified orphan rather than killing by process
 name.
+
+## 2026-09-06 — "Slow and token-hungry": the first hypothesis was wrong, measurement found the levers
+
+**Symptom.** Wes: the studio works but a run is slow and burns tokens. The obvious fix
+(cache the Remotion bundle so 22 scripts stop re-bundling) was designed before anything
+was timed.
+
+**What measurement said.** `remotion bundle` is 1.5s warm; a prebuilt bundle saves 0.7s
+per call. Rendering is Chrome-bound at about 0.4s per 1080p frame. The token cost was
+elsewhere: one progress line per frame reaching the agent through `stdio: 'inherit'`
+(64 sites; a 2700-frame render is about 25k tokens), a 60 KB PLAYBOOK read by every
+executor (six per `/marketing` run), 51 KB of test output per verify, and seven
+separate gate commands. The speed lever was `--chrome-mode=chrome-for-testing
+--gl=angle`: LaunchVideo 60 frames 28s to 7s, two rounds, visually identical output.
+
+**Fix.** GPU rendering on by default in `studio/remotion.config.ts` (`REMOTION_GPU=0`
+and CI opt out); `scripts/lib/remotion.mjs` runs every Remotion call quiet with one
+summary line; `scripts/gates.mjs` and `scripts/verify.mjs` print one row per gate or
+suite with logs on disk; the PLAYBOOK gotchas moved verbatim to `docs/playbook/<topic>.md`
+and the skills name only the files their recipe needs.
+
+**Trap on the way.** `remotion render --help` hangs on this box (two probes sat for ten
+minutes and blocked the benchmark until they were stopped by PID). Read flags from
+`node_modules/@remotion/cli/dist/config/index.d.ts` instead of probing.
+
+**Prevention.** Time the thing before designing the fix; a speed spec starts with a
+table of measurements and names the hypothesis it killed.

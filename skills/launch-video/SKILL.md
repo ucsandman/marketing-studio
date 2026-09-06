@@ -5,7 +5,10 @@ description: Use when the user wants a full launch video, hero video, or 20–60
 
 # Launch Video
 
-**REQUIRED BACKGROUND:** marketing-studio skill. Work in `${CLAUDE_SKILL_DIR}/../..`.
+**REQUIRED BACKGROUND:** marketing-studio skill; also read
+`${CLAUDE_SKILL_DIR}/../../docs/playbook/remotion.md`,
+`${CLAUDE_SKILL_DIR}/../../docs/playbook/audio.md`, and
+`${CLAUDE_SKILL_DIR}/../../docs/playbook/capture.md`. Work in `${CLAUDE_SKILL_DIR}/../..`.
 
 Produces a scored film and its direction, shot plan, stage approvals, render evidence,
 and review record inside `<product>/marketing/assets/<brand>/`. Read

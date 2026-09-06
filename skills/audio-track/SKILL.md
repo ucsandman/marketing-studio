@@ -6,7 +6,7 @@ description: Use when the user wants music, voiceover, narration, or a soundtrac
 # Audio Track
 
 **REQUIRED BACKGROUND:** marketing-studio skill. Work in `${CLAUDE_SKILL_DIR}/../..`.
-Read the PLAYBOOK's Audio section first (endpoints, ducking, manifest contract).
+Read `${CLAUDE_SKILL_DIR}/../../docs/playbook/audio.md` first (endpoints, ducking, manifest contract).
 
 Every film gets this pass; it is not opt-in (CLAUDE.md: a film is not done without
 audio, and audio means narration). `node scripts/check-audio.mjs <brand> --project <product>` is the exit

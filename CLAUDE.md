@@ -18,9 +18,10 @@ its own package (Node 24, vitest, tsc, vite dashboard), its own conventions in
 launch/CLAUDE.md. Posting is dry-run unless --live; never make a test hit a live
 provider. Social keys live in launch/.env; infra credentials are MCP-only.
 
-**Read docs/PLAYBOOK.md before any asset or feeder work** — engine map, brand
-onboarding, and verified gotchas (Blender 5.1.2 API traps, camera math, seamless-loop
-rules, capture lessons). Do not re-derive them. User-level skills (/logo-reveal,
+**Read docs/PLAYBOOK.md before any asset or feeder work** (short: engine map, onboarding,
+process, delivery contract) plus the docs/playbook/<topic>.md for the feeder or stage
+you touch — the topic index is in PLAYBOOK.md. Do not read topic files for feeders you
+are not using. User-level skills (/logo-reveal,
 /social-clip, /product-demo, /launch-video, /og-assets, /audio-track, /marketing)
 drive this repo from any repo.
 
@@ -56,7 +57,7 @@ Rules:
 - Engine-local out/, assets/, props/, examples/, and studio/public/*/ are gitignored
   build products, never production workspaces.
 - Blender via BLENDER_PATH in .env; ComfyUI on :8000/:8188 with documented fallback.
-- Unreal via UNREAL_PATH in .env (feeders/unreal, PLAYBOOK "Unreal Engine 5.8"); plates
+- Unreal via UNREAL_PATH in .env (feeders/unreal, docs/playbook/unreal.md); plates
   are PNG sequences staged like Blender output.
 - **A storyboard or any approval artifact is handed over annotated, never as bare
   frames:** shot number, timing, ground, the camera move drawn on the frame, the

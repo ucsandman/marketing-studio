@@ -7,6 +7,20 @@ GitHub release.
 
 ### Changed
 
+- Renders run on the GPU by default (`chrome-for-testing` + `angle` in
+  `studio/remotion.config.ts`): 4 to 5x faster on LaunchVideo and LogoReveal, measured
+  2026-09-06. Off with `REMOTION_GPU=0`; CI keeps the headless shell.
+- Every script that shells to Remotion or its ffmpeg goes through
+  `scripts/lib/remotion.mjs`: the checked-in CLI via Node (no `npx` shim), `--log=error`,
+  one summary line per render instead of one progress line per frame, the last 40 log
+  lines on failure. `REMOTION_VERBOSE=1` restores the full output.
+- `scripts/gates.mjs <brand> --project <product>` runs the seven mechanical gates in
+  order (drift last) and prints one row per gate; full reports land in
+  `<workspace>/marketing/reports/gates/`. `scripts/verify.mjs` does the same for the
+  four test suites with logs in `out/verify/`.
+- `docs/PLAYBOOK.md` keeps the engine map, onboarding, process, and delivery contract;
+  the feeder gotchas moved verbatim to `docs/playbook/<topic>.md`, and each asset skill
+  names only the topic files its recipe needs.
 - Production runs now keep generated inputs, evidence, renders, and delivery assets in
   the owning product repository under `marketing/assets/<brand>/`. Production commands
   require `--project <product-repo>` when they are run outside that product worktree.

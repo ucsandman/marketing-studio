@@ -38,4 +38,4 @@ The project at `project/` is a bare `.uproject` with the Python and MRQ plugins 
 `Content/`, `Saved/`, `Intermediate/` and `DerivedDataCache/` are build products
 (gitignored) that the scenes recreate.
 
-Gotchas are in docs/PLAYBOOK.md, "Unreal Engine 5.8". Read them before editing a scene.
+Gotchas are in docs/playbook/unreal.md. Read them before editing a scene.

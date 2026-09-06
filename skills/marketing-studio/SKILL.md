@@ -17,9 +17,10 @@ record, render, and delivery file belongs in
 renderers. Do not render into ENGINE and copy out later.
 
 **REQUIRED READING before any asset work:** `${CLAUDE_SKILL_DIR}/../../docs/PLAYBOOK.md`
-— engine map, brand onboarding steps, and the verified gotchas (Blender 5.1.2 API
-traps, camera math, seamless-loop rules, capture-feeder lessons). Those were
-expensive to discover; do not re-derive or second-guess them.
+(engine map, onboarding, process, delivery contract) plus ONLY the
+`${CLAUDE_SKILL_DIR}/../../docs/playbook/<topic>.md` files the recipe names; do not
+read the other topic files. Those were expensive to discover; do not re-derive or
+second-guess them.
 
 ## Workflow shape (every asset skill follows this)
 

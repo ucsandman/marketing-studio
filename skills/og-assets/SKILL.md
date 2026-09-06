@@ -5,7 +5,8 @@ description: Use when the user wants OG images, link-preview assets, animated OG
 
 # OG Assets
 
-**REQUIRED BACKGROUND:** marketing-studio skill. Work in `${CLAUDE_SKILL_DIR}/../..`.
+**REQUIRED BACKGROUND:** marketing-studio skill; also read
+`${CLAUDE_SKILL_DIR}/../../docs/playbook/remotion.md`. Work in `${CLAUDE_SKILL_DIR}/../..`.
 
 Produces product-owned `og.mp4`, `og.gif`, `readme.gif`, and social-card exports under
 `<product>/marketing/assets/<brand>/`, optionally backed by an approved ComfyUI texture.
@@ -13,7 +14,8 @@ Produces product-owned `og.mp4`, `og.gif`, `readme.gif`, and social-card exports
 ## Recipe
 
 1. Toolchain + brand check per marketing-studio. Background loop staged for the brand
-   (Blender `background_loop` scene; PLAYBOOK seam rules) — or run with it null.
+   (Blender `background_loop` scene; seam rules in
+   `${CLAUDE_SKILL_DIR}/../../docs/playbook/remotion.md`) — or run with it null.
 2. Optional AI hero: `node feeders/comfy/client.mjs hero --project <product> --brand <brand> [--seed N]` (needs ComfyUI
    Desktop up + a checkpoint; exit 2 = fine, procedural fallback is spec-compliant).
    Read the hero PNG: dark, on-brand hue, no text/people/off-brand colors; re-roll
@@ -21,7 +23,8 @@ Produces product-owned `og.mp4`, `og.gif`, `readme.gif`, and social-card exports
 3. Run the brand's statics renderer with `--project <product>`; it writes product-owned
    props/output and passes the workspace public directory to Remotion.
    The AnimatedOG loop is SEAMLESS by construction — if you touch the template, every
-   animated value must stay periodic over the full duration (PLAYBOOK loop rules).
+   animated value must stay periodic over the full duration (loop rules in
+   `${CLAUDE_SKILL_DIR}/../../docs/playbook/remotion.md`).
 4. Verify one still (lockup sharp, CTA in the brand's positive color) + readme.gif
    legibility (extract frame 0 via ffmpeg if the gif exceeds Read limits).
 5. Size check: GIFs are heavy; prefer og.mp4 for social embeds. For READMEs going to

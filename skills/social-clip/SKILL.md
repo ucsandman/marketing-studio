@@ -5,7 +5,8 @@ description: Use when the user wants a short social media video / feature announ
 
 # Social Clip
 
-**REQUIRED BACKGROUND:** marketing-studio skill. Work in `${CLAUDE_SKILL_DIR}/../..`.
+**REQUIRED BACKGROUND:** marketing-studio skill; also read
+`${CLAUDE_SKILL_DIR}/../../docs/playbook/remotion.md`. Work in `${CLAUDE_SKILL_DIR}/../..`.
 
 Produces a scored short-form asset in `<product>/marketing/assets/<brand>/`. Its opening,
 aspect-specific composition, and CTA must serve the platform rather than repeat the

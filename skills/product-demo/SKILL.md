@@ -5,7 +5,9 @@ description: Use when the user wants a product demo video / screen recording wit
 
 # Product Demo
 
-**REQUIRED BACKGROUND:** marketing-studio skill. Work in `${CLAUDE_SKILL_DIR}/../..`.
+**REQUIRED BACKGROUND:** marketing-studio skill; also read
+`${CLAUDE_SKILL_DIR}/../../docs/playbook/capture.md` and
+`${CLAUDE_SKILL_DIR}/../../docs/playbook/remotion.md`. Work in `${CLAUDE_SKILL_DIR}/../..`.
 
 Produces `<product>/marketing/assets/<brand>/demo.mp4`: real app footage with a
 timestamp-driven cursor, subject-safe camera framing, and concise captions.
@@ -16,8 +18,8 @@ timestamp-driven cursor, subject-safe camera framing, and concise captions.
    (ask the user to start it; never start their stack yourself).
 2. Capture script: `feeders/capture/record-<brand>-demo.mjs`. For a new product copy
    `record-noban-demo.mjs`: viewport wide enough for the app, `deviceScaleFactor: 2`,
-   proven ready-locators per view, a step caption per view. Read the PLAYBOOK's
-   capture gotchas FIRST — especially: camera focus rects are MEASURED from raw
+   proven ready-locators per view, a step caption per view. Read
+   `${CLAUDE_SKILL_DIR}/../../docs/playbook/capture.md` FIRST — especially: camera focus rects are MEASURED from raw
    footage frames, never derived from click points, and must end before any app-side
    clipped edge.
 3. Run the capture with `--project <product>`; verify `capture OK` and the product-owned
